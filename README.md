@@ -30,3 +30,17 @@ Built with:
 ## Status
 
 🚧 Android foundation
+
+## Google Satellite Field Map
+
+The dashboard uses Google Maps Compose in satellite mode. To enable map tiles on your device:
+
+1. Enable **Maps SDK for Android** in your Google Maps Platform project.
+2. Create an API key and restrict it to this Android app (package name + SHA-1).
+3. In the local project root, add this to `local.properties`:
+
+```properties
+MAPS_API_KEY=YOUR_API_KEY
+```
+
+The key is read locally and is not stored in the repository. Long-press the actual field on the satellite map to pin its location; the selected coordinates are saved locally on the phone.
