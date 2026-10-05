@@ -1,5 +1,6 @@
 package com.tubalrr.agrivision
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -60,7 +62,23 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AgriVisionApp() {
     var selected by remember { mutableStateOf(0) }
-    val fields = remember { mutableStateListOf(FarmField("North Field", "Rice", "1.0 ha")) }
+    val context = LocalContext.current
+    val fieldPrefs = remember {
+        context.getSharedPreferences("agrivision_field", Context.MODE_PRIVATE)
+    }
+    val savedLatitude = fieldPrefs.getString("latitude", null)?.toDoubleOrNull()
+    val savedLongitude = fieldPrefs.getString("longitude", null)?.toDoubleOrNull()
+    val fields = remember {
+        mutableStateListOf(
+            FarmField(
+                "North Field",
+                "Rice",
+                "1.0 ha",
+                latitude = savedLatitude,
+                longitude = savedLongitude
+            )
+        )
+    }
     val inputs = remember {
         mutableStateListOf(
             FarmInput("Rice Seeds", "25", "kg"),
@@ -223,6 +241,10 @@ private fun DashboardScreen(
                             latitude = point.latitude,
                             longitude = point.longitude
                         )
+                        fieldPrefs.edit()
+                            .putString("latitude", point.latitude.toString())
+                            .putString("longitude", point.longitude.toString())
+                            .apply()
                     }
                 }
             )
