@@ -1,10 +1,3 @@
-val localProperties = Properties().apply {
-    val localFile = rootProject.file("local.properties")
-    if (localFile.exists()) {
-        FileInputStream(localFile).use { load(it) }
-    }
-}
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
