@@ -56,6 +56,7 @@ data class ExpenseRecord(val category: String, val amount: Double, val note: Str
 data class InventoryItem(val name: String, val quantity: String, val status: String)
 data class EquipmentRecord(val name: String, val status: String, val note: String)
 data class FarmTask(val title: String, val category: String, val date: String, val done: Boolean)
+data class SaleRecord(val product: String, val amount: Double, val date: String)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,19 +84,9 @@ private fun AgriVisionApp() {
             addAll(loadCrops(farmPrefs))
         }
     }
-    val production = remember {
-        mutableStateListOf(
-            ProductionRecord("Eggs", "186 pcs", "Today"),
-            ProductionRecord("Vegetables", "12 kg", "This week")
-        )
-    }
-    val expenses = remember {
-        mutableStateListOf(
-            ExpenseRecord("Feeds", 1730.0, "Layer feed"),
-            ExpenseRecord("Farm supplies", 620.0, "General supplies"),
-            ExpenseRecord("Medicine", 350.0, "Animal care")
-        )
-    }
+    val production = remember { mutableStateListOf<ProductionRecord>().apply { addAll(loadProduction(farmPrefs)) } }
+    val expenses = remember { mutableStateListOf<ExpenseRecord>().apply { addAll(loadExpenses(farmPrefs)) } }
+    val sales = remember { mutableStateListOf<SaleRecord>().apply { addAll(loadSales(farmPrefs)) } }
     val inventory = remember {
         mutableStateListOf<InventoryItem>().apply {
             addAll(loadInventory(farmPrefs))
@@ -116,6 +107,8 @@ private fun AgriVisionApp() {
     }
 
     val totalExpenses = expenses.sumOf { it.amount }
+    val totalSales = sales.sumOf { it.amount }
+    val netIncome = totalSales - totalExpenses
     val openTasks = tasks.count { !it.done }
     val totalAnimals = livestock.sumOf { it.count }
 
@@ -144,7 +137,7 @@ private fun AgriVisionApp() {
                     padding, livestock, crops, inventory, equipment, farmPrefs
                 )
                 2 -> ProductionFinanceScreen(
-                    padding, production, expenses, totalExpenses
+                    padding, production, expenses, sales, totalExpenses, totalSales, netIncome, farmPrefs
                 )
                 3 -> TasksScreen(padding, tasks)
                 else -> ProfileScreen(padding, context)
@@ -543,49 +536,115 @@ private fun ProductionFinanceScreen(
     padding: PaddingValues,
     production: MutableList<ProductionRecord>,
     expenses: MutableList<ExpenseRecord>,
-    totalExpenses: Double
+    sales: MutableList<SaleRecord>,
+    totalExpenses: Double,
+    totalSales: Double,
+    netIncome: Double,
+    farmPrefs: android.content.SharedPreferences
 ) {
     var tab by remember { mutableStateOf("Production") }
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        AddProductionFinanceDialog(
+            tab = tab,
+            onDismiss = { showDialog = false },
+            onProduction = { record -> production.add(record); saveProduction(farmPrefs, production); showDialog = false },
+            onExpense = { record -> expenses.add(record); saveExpenses(farmPrefs, expenses); showDialog = false },
+            onSale = { record -> sales.add(record); saveSales(farmPrefs, sales); showDialog = false }
+        )
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { ScreenHeader("Production & Finance", "Track what the farm produces and what it costs.") }
+        item { ScreenHeader("Production & Finance", "Track production, sales, expenses and farm income.") }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilterChip(
-                    selected = tab == "Production",
-                    onClick = { tab = "Production" },
-                    label = { Text("Production") },
-                    leadingIcon = { Icon(Icons.Outlined.Assessment, null) }
-                )
-                FilterChip(
-                    selected = tab == "Finance",
-                    onClick = { tab = "Finance" },
-                    label = { Text("Finance") },
-                    leadingIcon = { Icon(Icons.Outlined.MonetizationOn, null) }
-                )
+                FilterChip(selected = tab == "Production", onClick = { tab = "Production" }, label = { Text("Production") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) })
+                FilterChip(selected = tab == "Finance", onClick = { tab = "Finance" }, label = { Text("Finance") }, leadingIcon = { Icon(Icons.Outlined.MonetizationOn, null) })
             }
         }
 
         if (tab == "Production") {
-            item { SummaryCard("Recorded production", production.size.toString() + " records", "Eggs, meat, milk, harvests and other farm products.") }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    SummaryCard("Recorded production", production.size.toString() + " records", "Eggs, meat, milk, harvests and other farm products.")
+                    TextButton(onClick = { showDialog = true }) { Text("+ Add") }
+                }
+            }
             item { SectionTitle("Production Records") }
-            items(production) { record ->
-                FarmRecordCard(record.product, record.quantity, record.period, Icons.Outlined.Assessment)
-            }
-            item { AddHint("Next upgrade: daily production entry and monthly production charts.") }
+            items(production) { record -> FarmRecordCard(record.product, record.quantity, record.period, Icons.Outlined.Assessment) }
         } else {
-            item { SummaryCard("Total expenses", "₱" + money(totalExpenses), "Track feeds, supplies, medicine, labor and other costs.") }
-            item { SectionTitle("Expense Records") }
-            items(expenses) { expense ->
-                FarmRecordCard(expense.category, "₱" + money(expense.amount), expense.note, Icons.Outlined.ReceiptLong)
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SummaryCard("Sales", "₱" + money(totalSales), "Farm product sales.")
+                    SummaryCard("Net", "₱" + money(netIncome), "Sales minus expenses.")
+                }
             }
-            item { AddHint("Next upgrade: sales, profit, budget and expense categories.") }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    SectionTitle("Finance Records")
+                    TextButton(onClick = { showDialog = true }) { Text("+ Add") }
+                }
+            }
+            item { Text("Expenses", fontWeight = FontWeight.SemiBold) }
+            items(expenses) { expense -> FarmRecordCard(expense.category, "₱" + money(expense.amount), expense.note, Icons.Outlined.ReceiptLong) }
+            item { Text("Sales", fontWeight = FontWeight.SemiBold) }
+            items(sales) { sale -> FarmRecordCard(sale.product, "₱" + money(sale.amount), sale.date, Icons.Outlined.MonetizationOn) }
         }
     }
+}
+
+@Composable
+private fun AddProductionFinanceDialog(
+    tab: String,
+    onDismiss: () -> Unit,
+    onProduction: (ProductionRecord) -> Unit,
+    onExpense: (ExpenseRecord) -> Unit,
+    onSale: (SaleRecord) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var quantity by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var period by remember { mutableStateOf("Today") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (tab == "Production") "Add Production" else "Add Finance Record", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(if (tab == "Production") "Product" else "Type / category") }, singleLine = true)
+                if (tab == "Production") {
+                    OutlinedTextField(quantity, { quantity = it }, Modifier.fillMaxWidth(), label = { Text("Quantity") }, singleLine = true)
+                } else {
+                    OutlinedTextField(amount, { amount = it }, Modifier.fillMaxWidth(), label = { Text("Amount (₱)") }, singleLine = true)
+                }
+                OutlinedTextField(period, { period = it }, Modifier.fillMaxWidth(), label = { Text("Date / period") }, singleLine = true)
+                if (tab == "Finance") Text("For a sale, prefix the product with SALE:", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank() && (tab == "Production" && quantity.isNotBlank() || tab == "Finance" && amount.toDoubleOrNull() != null),
+                onClick = {
+                    if (tab == "Production") {
+                        onProduction(ProductionRecord(name.trim(), quantity.trim(), period.trim()))
+                    } else {
+                        val value = amount.toDouble()
+                        if (name.trim().startsWith("SALE:", ignoreCase = true)) {
+                            onSale(SaleRecord(name.trim().substringAfter(":").trim(), value, period.trim()))
+                        } else {
+                            onExpense(ExpenseRecord(name.trim(), value, period.trim()))
+                        }
+                    }
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -871,6 +930,27 @@ private fun saveEquipment(prefs: android.content.SharedPreferences, list: List<E
         put("name", it.name); put("status", it.status); put("note", it.note)
     }) }
     prefs.edit().putString("equipment", a.toString()).apply()
+}
+
+private fun loadProduction(prefs: android.content.SharedPreferences): List<ProductionRecord> {
+    val raw = prefs.getString("production", null) ?: return listOf(ProductionRecord("Eggs", "186 pcs", "Today"), ProductionRecord("Vegetables", "12 kg", "This week"))
+    val a = JSONArray(raw); return List(a.length()) { i -> val o = a.getJSONObject(i); ProductionRecord(o.getString("product"), o.getString("quantity"), o.getString("period")) }
+}
+private fun loadExpenses(prefs: android.content.SharedPreferences): List<ExpenseRecord> {
+    val raw = prefs.getString("expenses", null) ?: return listOf(ExpenseRecord("Feeds", 1730.0, "Layer feed"), ExpenseRecord("Farm supplies", 620.0, "General supplies"), ExpenseRecord("Medicine", 350.0, "Animal care"))
+    val a = JSONArray(raw); return List(a.length()) { i -> val o = a.getJSONObject(i); ExpenseRecord(o.getString("category"), o.getDouble("amount"), o.getString("note")) }
+}
+private fun loadSales(prefs: android.content.SharedPreferences): List<SaleRecord> {
+    val a = JSONArray(prefs.getString("sales", "[]")); return List(a.length()) { i -> val o = a.getJSONObject(i); SaleRecord(o.getString("product"), o.getDouble("amount"), o.getString("date")) }
+}
+private fun saveProduction(prefs: android.content.SharedPreferences, list: List<ProductionRecord>) {
+    val a=JSONArray(); list.forEach { a.put(JSONObject().apply { put("product",it.product); put("quantity",it.quantity); put("period",it.period) }) }; prefs.edit().putString("production",a.toString()).apply()
+}
+private fun saveExpenses(prefs: android.content.SharedPreferences, list: List<ExpenseRecord>) {
+    val a=JSONArray(); list.forEach { a.put(JSONObject().apply { put("category",it.category); put("amount",it.amount); put("note",it.note) }) }; prefs.edit().putString("expenses",a.toString()).apply()
+}
+private fun saveSales(prefs: android.content.SharedPreferences, list: List<SaleRecord>) {
+    val a=JSONArray(); list.forEach { a.put(JSONObject().apply { put("product",it.product); put("amount",it.amount); put("date",it.date) }) }; prefs.edit().putString("sales",a.toString()).apply()
 }
 
 private fun money(value: Double): String {
