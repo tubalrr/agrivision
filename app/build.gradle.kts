@@ -43,5 +43,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("io.github.sceneview:sceneview:4.52.0")
+    implementation("com.google.maps.android:maps-compose:9.0.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
