@@ -505,7 +505,7 @@ private fun LiveFieldMap(
         object {
             @JavascriptInterface
             fun selectLocation(latitude: Double, longitude: Double) {
-                context.mainExecutor.execute {
+                ContextCompat.getMainExecutor(context).execute {
                     selectLocation(latitude, longitude)
                 }
             }
