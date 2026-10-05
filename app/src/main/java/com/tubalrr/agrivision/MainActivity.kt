@@ -109,7 +109,18 @@ private fun AgriVisionApp() {
             bottomBar = { AgriBottomBar(selected) { selected = it } }
         ) { padding ->
             when (selected) {
-                0 -> DashboardScreen(padding, fields, inputs, tasks)
+                0 -> DashboardScreen(padding, fields, inputs, tasks) { point ->
+                    if (fields.isNotEmpty()) {
+                        fields[0] = fields[0].copy(
+                            latitude = point.latitude,
+                            longitude = point.longitude
+                        )
+                        fieldPrefs.edit()
+                            .putString("latitude", point.latitude.toString())
+                            .putString("longitude", point.longitude.toString())
+                            .apply()
+                    }
+                }
                 1 -> FieldsScreen(padding, fields)
                 2 -> InsightsScreen(padding, fields)
                 3 -> TasksScreen(padding, tasks)
@@ -158,7 +169,8 @@ private fun DashboardScreen(
     padding: PaddingValues,
     fields: List<FarmField>,
     inputs: List<FarmInput>,
-    tasks: List<FarmTask>
+    tasks: List<FarmTask>,
+    onFieldLocationSelected: (LatLng) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -235,18 +247,7 @@ private fun DashboardScreen(
             Spacer(Modifier.height(10.dp))
             LiveFieldMap(
                 field = fields.firstOrNull(),
-                onFieldLocationSelected = { point ->
-                    if (fields.isNotEmpty()) {
-                        fields[0] = fields[0].copy(
-                            latitude = point.latitude,
-                            longitude = point.longitude
-                        )
-                        fieldPrefs.edit()
-                            .putString("latitude", point.latitude.toString())
-                            .putString("longitude", point.longitude.toString())
-                            .apply()
-                    }
-                }
+                onFieldLocationSelected = onFieldLocationSelected
             )
         }
 
