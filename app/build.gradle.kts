@@ -9,7 +9,7 @@ kotlin {
 
 android {
     namespace = "com.tubalrr.agrivision"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.tubalrr.agrivision"
