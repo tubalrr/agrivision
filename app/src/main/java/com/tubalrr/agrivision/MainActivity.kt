@@ -71,6 +71,11 @@ data class AssistanceRecord(
     val status: String,
     val source: String
 )
+data class ReportSubmission(
+    val status: String,
+    val submittedDate: String,
+    val referenceNo: String
+)
 data class FarmerProfile(
     val farmerName: String,
     val farmerId: String,
@@ -156,6 +161,7 @@ private fun AgriVisionApp(
     val openTasks = tasks.count { !it.done }
     val totalAnimals = livestock.sumOf { it.count }
     var farmerProfile by remember { mutableStateOf(loadFarmerProfile(farmPrefs)) }
+    var reportSubmission by remember { mutableStateOf(loadReportSubmission(farmPrefs)) }
     val assistance = remember {
         mutableStateListOf<AssistanceRecord>().apply { addAll(loadAssistance(farmPrefs)) }
     }
@@ -196,7 +202,12 @@ private fun AgriVisionApp(
                     openTasks = openTasks,
                     farmPrefs = farmPrefs,
                     farmerProfile = farmerProfile,
-                    assistance = assistance
+                    assistance = assistance,
+                    reportSubmission = reportSubmission,
+                    onSubmissionSaved = {
+                        reportSubmission = it
+                        saveReportSubmission(farmPrefs, it)
+                    }
                 )
                 3 -> TasksScreen(padding, tasks, inventory, farmPrefs)
                 else -> ProfileScreen(
@@ -682,7 +693,9 @@ private fun ProductionFinanceScreen(
     openTasks: Int,
     farmPrefs: android.content.SharedPreferences,
     farmerProfile: FarmerProfile,
-    assistance: List<AssistanceRecord>
+    assistance: List<AssistanceRecord>,
+    reportSubmission: ReportSubmission,
+    onSubmissionSaved: (ReportSubmission) -> Unit
 ) {
     var tab by remember { mutableStateOf("Production") }
     var showDialog by remember { mutableStateOf(false) }
@@ -763,6 +776,17 @@ private fun ProductionFinanceScreen(
             }
             item { SummaryCard("Assistance Received", assistance.size.toString() + " records", "Seeds, fertilizer, livestock, equipment and other agricultural support.") }
             item { SectionTitle("Assistance Records") }
+
+            item { SectionTitle("DA Report Submission") }
+
+            item {
+                ReportSubmissionCard(
+                    submission = reportSubmission,
+                    onSave = onSubmissionSaved
+                )
+            }
+
+
             if (assistance.isEmpty()) {
                 item { InfoCard("No assistance recorded", "Add agricultural assistance from the Farmer & Farm Registry section.") }
             } else {
@@ -798,6 +822,115 @@ private fun ProductionFinanceScreen(
             items(sales) { sale -> FarmRecordCard(sale.product, "₱" + money(sale.amount), sale.date, Icons.Outlined.MonetizationOn) }
         }
     }
+}
+
+@Composable
+private fun ReportSubmissionCard(
+    submission: ReportSubmission,
+    onSave: (ReportSubmission) -> Unit
+) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        ReportSubmissionDialog(
+            submission = submission,
+            onDismiss = { showDialog = false },
+            onSave = {
+                onSave(it)
+                showDialog = false
+            }
+        )
+    }
+
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard)
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Submission Status", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        submission.status,
+                        color = AgriGreen,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                StatusBadge(submission.status)
+            }
+
+            if (submission.submittedDate.isNotBlank()) {
+                Text("Date: " + submission.submittedDate, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            }
+            if (submission.referenceNo.isNotBlank()) {
+                Text("Reference: " + submission.referenceNo, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            }
+
+            OutlinedButton(onClick = { showDialog = true }, shape = RoundedCornerShape(14.dp)) {
+                Text("Update Submission")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReportSubmissionDialog(
+    submission: ReportSubmission,
+    onDismiss: () -> Unit,
+    onSave: (ReportSubmission) -> Unit
+) {
+    var status by remember { mutableStateOf(submission.status) }
+    var date by remember { mutableStateOf(submission.submittedDate) }
+    var reference by remember { mutableStateOf(submission.referenceNo) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("DA Report Submission", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    Text("Status", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf("Draft", "Ready for Submission", "Submitted").forEach { option ->
+                            FilterChip(
+                                selected = status == option,
+                                onClick = { status = option },
+                                label = { Text(option, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
+                item {
+                    OutlinedTextField(
+                        date,
+                        { date = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Submission date") },
+                        singleLine = true
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        reference,
+                        { reference = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Reference / tracking number") },
+                        singleLine = true
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(ReportSubmission(status, date.trim(), reference.trim()))
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -1639,6 +1772,11 @@ private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.
         put("sales", JSONArray(prefs.getString("sales", "[]")))
         put("tasks", JSONArray(prefs.getString("tasks", "[]")))
         put("assistance", JSONArray(prefs.getString("assistance", "[]")))
+        put("reportSubmission", JSONObject().apply {
+            put("status", prefs.getString("reportStatus", "Draft"))
+            put("submittedDate", prefs.getString("reportSubmittedDate", ""))
+            put("referenceNo", prefs.getString("reportReferenceNo", ""))
+        })
         put("farmerProfile", JSONObject().apply {
             put("farmerName", prefs.getString("farmerName", ""))
             put("farmerId", prefs.getString("farmerId", ""))
@@ -1665,6 +1803,12 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
     val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks", "assistance")
     keys.forEach { key ->
         if (backup.has(key)) edit.putString(key, backup.getJSONArray(key).toString())
+    }
+    if (backup.has("reportSubmission")) {
+        val r = backup.getJSONObject("reportSubmission")
+        edit.putString("reportStatus", r.optString("status", "Draft"))
+        edit.putString("reportSubmittedDate", r.optString("submittedDate"))
+        edit.putString("reportReferenceNo", r.optString("referenceNo"))
     }
     if (backup.has("farmerProfile")) {
         val p = backup.getJSONObject("farmerProfile")
@@ -1711,6 +1855,22 @@ private fun saveAssistance(prefs: android.content.SharedPreferences, list: List<
         })
     }
     prefs.edit().putString("assistance", a.toString()).apply()
+}
+
+private fun loadReportSubmission(prefs: android.content.SharedPreferences): ReportSubmission {
+    return ReportSubmission(
+        prefs.getString("reportStatus", "Draft") ?: "Draft",
+        prefs.getString("reportSubmittedDate", "") ?: "",
+        prefs.getString("reportReferenceNo", "") ?: ""
+    )
+}
+
+private fun saveReportSubmission(prefs: android.content.SharedPreferences, submission: ReportSubmission) {
+    prefs.edit()
+        .putString("reportStatus", submission.status)
+        .putString("reportSubmittedDate", submission.submittedDate)
+        .putString("reportReferenceNo", submission.referenceNo)
+        .apply()
 }
 
 private fun loadFarmerProfile(prefs: android.content.SharedPreferences): FarmerProfile {
