@@ -185,7 +185,18 @@ private fun AgriVisionApp(
                     padding, livestock, crops, inventory, equipment, farmPrefs
                 )
                 2 -> ProductionFinanceScreen(
-                    padding, production, expenses, sales, totalExpenses, totalSales, netIncome, totalAnimals, openTasks, farmPrefs
+                    padding = padding,
+                    production = production,
+                    expenses = expenses,
+                    sales = sales,
+                    totalExpenses = totalExpenses,
+                    totalSales = totalSales,
+                    netIncome = netIncome,
+                    totalAnimals = totalAnimals,
+                    openTasks = openTasks,
+                    farmPrefs = farmPrefs,
+                    farmerProfile = farmerProfile,
+                    assistance = assistance
                 )
                 3 -> TasksScreen(padding, tasks, inventory, farmPrefs)
                 else -> ProfileScreen(
@@ -669,7 +680,9 @@ private fun ProductionFinanceScreen(
     netIncome: Double,
     totalAnimals: Int,
     openTasks: Int,
-    farmPrefs: android.content.SharedPreferences
+    farmPrefs: android.content.SharedPreferences,
+    farmerProfile: FarmerProfile,
+    assistance: List<AssistanceRecord>
 ) {
     var tab by remember { mutableStateOf("Production") }
     var showDialog by remember { mutableStateOf(false) }
@@ -716,10 +729,48 @@ private fun ProductionFinanceScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilterChip(selected = tab == "Production", onClick = { tab = "Production" }, label = { Text("Production") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) })
                 FilterChip(selected = tab == "Finance", onClick = { tab = "Finance" }, label = { Text("Finance") }, leadingIcon = { Icon(Icons.Outlined.MonetizationOn, null) })
+                FilterChip(selected = tab == "DA Report", onClick = { tab = "DA Report" }, label = { Text("DA Report") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) })
             }
         }
 
-        if (tab == "Production") {
+        if (tab == "DA Report") {
+            item {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriGreen)) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Agricultural Report", color = Color.White.copy(alpha = .75f), style = MaterialTheme.typography.labelLarge)
+                        Text(farmerProfile.farmerName.ifBlank { "Farmer not registered" }, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(farmerProfile.farmName.ifBlank { "Farm not registered" }, color = Color.White.copy(alpha = .85f))
+                    }
+                }
+            }
+            item { SectionTitle("Farmer & Farm Summary") }
+            item {
+                ReportSummaryGrid(listOf(
+                    "Farmer ID" to farmerProfile.farmerId.ifBlank { "—" },
+                    "Farm Area" to farmerProfile.farmSize.ifBlank { "—" },
+                    "Location" to listOf(farmerProfile.barangay, farmerProfile.municipality, farmerProfile.province).filter { it.isNotBlank() }.joinToString(", ").ifBlank { "—" },
+                    "Commodities" to farmerProfile.commodities.ifBlank { "—" }
+                ))
+            }
+            item { SectionTitle("Agricultural Records") }
+            item {
+                ReportSummaryGrid(listOf(
+                    "Livestock" to (totalAnimals.toString() + " heads"),
+                    "Production" to (production.size.toString() + " records"),
+                    "Assistance" to (assistance.size.toString() + " records"),
+                    "Open Tasks" to openTasks.toString()
+                ))
+            }
+            item { SummaryCard("Assistance Received", assistance.size.toString() + " records", "Seeds, fertilizer, livestock, equipment and other agricultural support.") }
+            item { SectionTitle("Assistance Records") }
+            if (assistance.isEmpty()) {
+                item { InfoCard("No assistance recorded", "Add agricultural assistance from the Farmer & Farm Registry section.") }
+            } else {
+                items(assistance.takeLast(10).asReversed()) { record ->
+                    FarmRecordCard(record.program, record.assistanceType, listOf(record.dateReceived, record.quantity, record.status).filter { it.isNotBlank() }.joinToString(" · "), Icons.Outlined.Inventory2)
+                }
+            }
+        } else if (tab == "Production") {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     SummaryCard("Recorded production", production.size.toString() + " records", "Eggs, meat, milk, harvests and other farm products.")
@@ -745,6 +796,20 @@ private fun ProductionFinanceScreen(
             items(expenses) { expense -> FarmRecordCard(expense.category, "₱" + money(expense.amount), expense.note, Icons.Outlined.ReceiptLong) }
             item { Text("Sales", fontWeight = FontWeight.SemiBold) }
             items(sales) { sale -> FarmRecordCard(sale.product, "₱" + money(sale.amount), sale.date, Icons.Outlined.MonetizationOn) }
+        }
+    }
+}
+
+@Composable
+private fun ReportSummaryGrid(items: List<Pair<String, String>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { (title, value) ->
+                    ReportStatCard(title, value, "", Modifier.weight(1f))
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
