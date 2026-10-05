@@ -69,13 +69,13 @@ class MainActivity : ComponentActivity() {
         val exportBackup = registerForActivityResult(
             ActivityResultContracts.CreateDocument("application/json")
         ) { uri ->
-            if (uri != null) exportFarmBackup(uri, farmPrefs)
+            if (uri != null) exportFarmBackup(this, uri, farmPrefs)
         }
 
         val importBackup = registerForActivityResult(
             ActivityResultContracts.OpenDocument()
         ) { uri ->
-            if (uri != null) importFarmBackup(uri, farmPrefs)
+            if (uri != null) importFarmBackup(this, uri, farmPrefs)
         }
 
         setContent {
@@ -1110,7 +1110,7 @@ private fun InfoCard(title: String, body: String) {
 
 // ---------- Local farm storage ----------
 
-private fun exportFarmBackup(uri: Uri, prefs: android.content.SharedPreferences) {
+private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.SharedPreferences) {
     val backup = JSONObject().apply {
         put("version", 1)
         put("app", "AgriVision")
@@ -1123,12 +1123,21 @@ private fun exportFarmBackup(uri: Uri, prefs: android.content.SharedPreferences)
         put("sales", JSONArray(prefs.getString("sales", "[]")))
         put("tasks", JSONArray(prefs.getString("tasks", "[]")))
     }
-    prefs.edit().putString("last_backup", backup.toString()).apply()
+    context.contentResolver.openOutputStream(uri)?.use { output ->
+        output.write(backup.toString(2).toByteArray(Charsets.UTF_8))
+    }
 }
 
-private fun importFarmBackup(uri: Uri, prefs: android.content.SharedPreferences) {
-    // Backup file is selected through the system document picker.
-    // The actual file stream is intentionally handled by the activity in a future restore pass.
+private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.SharedPreferences) {
+    val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        ?: return
+    val backup = JSONObject(json)
+    val edit = prefs.edit()
+    val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks")
+    keys.forEach { key ->
+        if (backup.has(key)) edit.putString(key, backup.getJSONArray(key).toString())
+    }
+    edit.apply()
 }
 
 private fun loadLivestock(prefs: android.content.SharedPreferences): List<Livestock> {
