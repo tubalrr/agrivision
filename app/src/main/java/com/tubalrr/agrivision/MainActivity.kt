@@ -31,7 +31,6 @@ import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
-import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -587,8 +586,6 @@ private fun LiveFieldMap(
 
 @Composable
 private fun StatCard(title: String, value: String, change: String, icon: String, background: Color) {
-    Card(
-(title: String, value: String, change: String, icon: String, background: Color) {
     Card(
         Modifier.width(150.dp),
         shape = RoundedCornerShape(22.dp),
