@@ -1309,6 +1309,15 @@ private fun ProfileScreen(
         }
 
         item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("DA Farmer Registry", color = AgriGreen, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Registry status: " + if (profile.farmerName.isNotBlank() && profile.farmerId.isNotBlank()) "Registered" else "Incomplete", color = AgriText, fontWeight = FontWeight.SemiBold)
+                    Text("Use this record as the farmer identity reference for future DA workflows.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        item {
             Card(
                 Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(26.dp),
