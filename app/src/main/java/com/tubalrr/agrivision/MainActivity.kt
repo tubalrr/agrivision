@@ -72,7 +72,8 @@ data class AssistanceRecord(
     val dateReceived: String,
     val quantity: String,
     val status: String,
-    val source: String
+    val source: String,
+    val incidentId: String = ""
 )
 data class ReportSubmission(
     val status: String,
@@ -212,6 +213,7 @@ private fun AgriVisionApp(
                     inventory = inventory,
                     tasks = tasks,
                     fieldIncidents = fieldIncidents,
+                    assistance = assistance,
                     farmPrefs = farmPrefs,
                     totalAnimals = totalAnimals,
                     totalExpenses = totalExpenses,
@@ -311,6 +313,7 @@ private fun DashboardScreen(
     inventory: List<InventoryItem>,
     tasks: List<FarmTask>,
     fieldIncidents: MutableList<FieldIncident>,
+    assistance: MutableList<AssistanceRecord>,
     farmPrefs: android.content.SharedPreferences,
     totalAnimals: Int,
     totalExpenses: Double,
@@ -323,7 +326,9 @@ private fun DashboardScreen(
     val totalTasks = tasks.size
     val submittedIncidents = fieldIncidents.count { it.status == "Submitted" }
     val reviewIncidents = fieldIncidents.count { it.status == "Under Review" }
+    val verifiedIncidents = fieldIncidents.count { it.status == "Verified" }
     var showIncidentDialog by remember { mutableStateOf(false) }
+    var reviewIncident by remember { mutableStateOf<FieldIncident?>(null) }
 
     if (showIncidentDialog) {
         AddFieldIncidentDialog(
@@ -332,6 +337,21 @@ private fun DashboardScreen(
                 fieldIncidents.add(incident)
                 saveFieldIncidents(farmPrefs, fieldIncidents)
                 showIncidentDialog = false
+            }
+        )
+    }
+
+    reviewIncident?.let { incident ->
+        IncidentReviewDialog(
+            incident = incident,
+            onDismiss = { reviewIncident = null },
+            onSave = { updated ->
+                val index = fieldIncidents.indexOfFirst { it.id == updated.id }
+                if (index >= 0) {
+                    fieldIncidents[index] = updated
+                    saveFieldIncidents(farmPrefs, fieldIncidents)
+                }
+                reviewIncident = null
             }
         )
     }
@@ -510,11 +530,29 @@ private fun DashboardScreen(
             items(fieldIncidents.takeLast(5).asReversed()) { incident ->
                 FieldIncidentCard(
                     incident = incident,
+                    hasAssistanceRequest = assistance.any { it.incidentId == incident.id },
                     onStatusChange = { next ->
                         val index = fieldIncidents.indexOfFirst { it.id == incident.id }
                         if (index >= 0) {
                             fieldIncidents[index] = incident.copy(status = next)
                             saveFieldIncidents(farmPrefs, fieldIncidents)
+                        }
+                    },
+                    onReview = { reviewIncident = incident },
+                    onCreateAssistance = {
+                        if (!assistance.any { it.incidentId == incident.id }) {
+                            assistance.add(
+                                AssistanceRecord(
+                                    program = "Field Incident Assistance",
+                                    assistanceType = incident.type,
+                                    dateReceived = "",
+                                    quantity = incident.affectedArea,
+                                    status = "Applied",
+                                    source = "Linked to " + incident.id,
+                                    incidentId = incident.id
+                                )
+                            )
+                            saveAssistance(farmPrefs, assistance)
                         }
                     }
                 )
@@ -640,7 +678,10 @@ private fun ActionQueueRow(
 @Composable
 private fun FieldIncidentCard(
     incident: FieldIncident,
-    onStatusChange: (String) -> Unit
+    hasAssistanceRequest: Boolean,
+    onStatusChange: (String) -> Unit,
+    onReview: () -> Unit,
+    onCreateAssistance: () -> Unit
 ) {
     Card(
         Modifier.fillMaxWidth(),
@@ -652,6 +693,12 @@ private fun FieldIncidentCard(
                 Column(Modifier.weight(1f)) {
                     Text(incident.type, fontWeight = FontWeight.Bold)
                     Text(
+                        incident.id,
+                        color = AgriGreen,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
                         listOf(incident.commodity, incident.affectedArea, incident.date)
                             .filter { it.isNotBlank() }
                             .joinToString(" · "),
@@ -661,11 +708,13 @@ private fun FieldIncidentCard(
                 }
                 StatusBadge(incident.status)
             }
+
             Text(
                 incident.description.ifBlank { "No description provided." },
                 color = AgriText,
                 style = MaterialTheme.typography.bodySmall
             )
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "Severity: " + incident.severity,
@@ -675,18 +724,139 @@ private fun FieldIncidentCard(
                     modifier = Modifier.weight(1f)
                 )
                 if (incident.evidenceUri.isNotBlank()) {
-                    Text("Photo evidence attached", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+                    Text("Photo evidence", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                if (incident.status == "Draft" || incident.status == "Returned") {
-                    TextButton(onClick = { onStatusChange("Submitted") }) { Text("Submit Report") }
-                } else if (incident.status == "Submitted") {
-                    TextButton(onClick = { onStatusChange("Draft") }) { Text("Edit / Reopen") }
+
+            if (incident.reviewNotes.isNotBlank()) {
+                Text(
+                    "Review note: " + incident.reviewNotes,
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                when (incident.status) {
+                    "Draft", "Returned" -> {
+                        TextButton(onClick = { onStatusChange("Submitted") }) {
+                            Text("Submit Report")
+                        }
+                    }
+                    "Submitted" -> {
+                        TextButton(onClick = onReview) {
+                            Text("Start Review")
+                        }
+                    }
+                    "Under Review" -> {
+                        TextButton(onClick = onReview) {
+                            Text("Review")
+                        }
+                    }
+                    "Verified" -> {
+                        if (!hasAssistanceRequest) {
+                            TextButton(onClick = onCreateAssistance) {
+                                Text("Request Assistance")
+                            }
+                        } else {
+                            Text("Assistance linked", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = { onStatusChange("Resolved") }) {
+                            Text("Mark Resolved")
+                        }
+                    }
+                    "Resolved" -> {
+                        Text("Case closed", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun IncidentReviewDialog(
+    incident: FieldIncident,
+    onDismiss: () -> Unit,
+    onSave: (FieldIncident) -> Unit
+) {
+    var status by remember(incident.id) {
+        mutableStateOf(
+            when (incident.status) {
+                "Submitted" -> "Under Review"
+                else -> incident.status
+            }
+        )
+    }
+    var notes by remember(incident.id) { mutableStateOf(incident.reviewNotes) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Incident Review", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 390.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    Text(incident.id, color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        incident.type + " · " + incident.commodity,
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                item {
+                    Text("Validation status", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Under Review", "Verified", "Returned").forEach { option ->
+                            FilterChip(
+                                selected = status == option,
+                                onClick = { status = option },
+                                label = { Text(option, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
+                item {
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Reviewer notes") },
+                        minLines = 3
+                    )
+                }
+                item {
+                    Text(
+                        "Verified reports can be converted into a linked assistance request.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        incident.copy(
+                            status = status,
+                            reviewNotes = notes.trim()
+                        )
+                    )
+                }
+            ) { Text("Save Review") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -2412,7 +2582,8 @@ private fun loadAssistance(prefs: android.content.SharedPreferences): List<Assis
             o.optString("dateReceived"),
             o.optString("quantity"),
             o.optString("status"),
-            o.optString("source")
+            o.optString("source"),
+            o.optString("incidentId")
         )
     }
 }
@@ -2427,6 +2598,7 @@ private fun saveAssistance(prefs: android.content.SharedPreferences, list: List<
             put("quantity", it.quantity)
             put("status", it.status)
             put("source", it.source)
+            put("incidentId", it.incidentId)
         })
     }
     prefs.edit().putString("assistance", a.toString()).apply()
