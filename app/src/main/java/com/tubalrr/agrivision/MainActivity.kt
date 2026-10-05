@@ -23,17 +23,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapType
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.Polygon
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberUpdatedMarkerState
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
+import android.net.Uri
+import android.os.Build
+import android.os.CancellationSignal
+import android.os.Looper
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Checklist
@@ -79,18 +80,6 @@ private fun AgriVisionApp() {
     }
     val savedLatitude = fieldPrefs.getString("latitude", null)?.toDoubleOrNull()
     val savedLongitude = fieldPrefs.getString("longitude", null)?.toDoubleOrNull()
-    val savedBoundary = fieldPrefs.getString("boundary", null)
-        ?.split(";")
-        ?.mapNotNull { pair ->
-            val parts = pair.split(",")
-            if (parts.size == 2) {
-                val lat = parts[0].toDoubleOrNull()
-                val lng = parts[1].toDoubleOrNull()
-                if (lat != null && lng != null) LatLng(lat, lng) else null
-            } else null
-        }
-        ?: emptyList()
-    val fieldBoundary = remember { mutableStateListOf<LatLng>().apply { addAll(savedBoundary) } }
     val fields = remember {
         mutableStateListOf(
             FarmField(
@@ -133,28 +122,21 @@ private fun AgriVisionApp() {
         ) { padding ->
             when (selected) {
                 0 -> DashboardScreen(
-                    padding,
-                    fields,
-                    inputs,
-                    tasks,
-                    fieldBoundary,
-                    onFieldLocationSelected = { point ->
+                    padding = padding,
+                    fields = fields,
+                    inputs = inputs,
+                    tasks = tasks,
+                    onFieldLocationSelected = { location ->
                         if (fields.isNotEmpty()) {
                             fields[0] = fields[0].copy(
-                                latitude = point.latitude,
-                                longitude = point.longitude
+                                latitude = location.latitude,
+                                longitude = location.longitude
                             )
                             fieldPrefs.edit()
-                                .putString("latitude", point.latitude.toString())
-                                .putString("longitude", point.longitude.toString())
+                                .putString("latitude", location.latitude.toString())
+                                .putString("longitude", location.longitude.toString())
                                 .apply()
                         }
-                    },
-                    onFieldBoundaryChanged = { points ->
-                        fieldBoundary.clear()
-                        fieldBoundary.addAll(points)
-                        val encoded = points.joinToString(";") { it.latitude.toString() + "," + it.longitude.toString() }
-                        fieldPrefs.edit().putString("boundary", encoded).apply()
                     }
                 )
                 1 -> FieldsScreen(
@@ -233,9 +215,7 @@ private fun DashboardScreen(
     fields: List<FarmField>,
     inputs: List<FarmInput>,
     tasks: List<FarmTask>,
-    fieldBoundary: List<LatLng>,
-    onFieldLocationSelected: (LatLng) -> Unit,
-    onFieldBoundaryChanged: (List<LatLng>) -> Unit
+    onFieldLocationSelected: (Location) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -347,9 +327,7 @@ private fun DashboardScreen(
             Spacer(Modifier.height(10.dp))
             LiveFieldMap(
                 field = fields.firstOrNull(),
-                boundary = fieldBoundary,
-                onFieldLocationSelected = onFieldLocationSelected,
-                onFieldBoundaryChanged = onFieldBoundaryChanged
+                onFieldLocationSelected = onFieldLocationSelected
             )
         }
 
@@ -404,253 +382,213 @@ private fun DashboardScreen(
 @Composable
 private fun LiveFieldMap(
     field: FarmField?,
-    boundary: List<LatLng>,
-    onFieldLocationSelected: (LatLng) -> Unit,
-    onFieldBoundaryChanged: (List<LatLng>) -> Unit
+    onFieldLocationSelected: (Location) -> Unit
 ) {
-    val defaultCenter = LatLng(12.8797, 121.7740)
-    val fieldLocation = remember(field?.latitude, field?.longitude) {
-        if (field?.latitude != null && field.longitude != null) {
-            LatLng(field.latitude, field.longitude)
-        } else {
-            null
-        }
-    }
-    var drawingBoundary by remember { mutableStateOf(false) }
-    var showFieldDetails by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var currentLocation by remember { mutableStateOf<Location?>(null) }
+    var locationMessage by remember { mutableStateOf("Phone GPS not connected yet") }
+    var loading by remember { mutableStateOf(false) }
 
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(
-            fieldLocation ?: defaultCenter,
-            if (fieldLocation != null) 19f else 5.5f
+    fun openGoogleMaps(latitude: Double, longitude: Double) {
+        val uri = Uri.parse(
+            "https://www.google.com/maps/@?api=1&map_action=map" +
+                "&center=" + latitude + "%2C" + longitude +
+                "&zoom=19&basemap=satellite"
         )
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
     }
 
-    LaunchedEffect(fieldLocation) {
-        if (fieldLocation != null) {
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(fieldLocation, 19f),
-                700
-            )
+    fun getPhoneLocation() {
+        val fine = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!fine && !coarse) {
+            locationMessage = "Allow location permission to use phone GPS"
+            loading = false
+            return
         }
+
+        val locationManager = context.getSystemService(LocationManager::class.java)
+        if (!locationManager.isLocationEnabled) {
+            locationMessage = "Turn on Location/GPS in phone settings"
+            loading = false
+            return
+        }
+
+        loading = true
+        locationMessage = "Getting current phone location…"
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                locationManager.getCurrentLocation(
+                    LocationManager.GPS_PROVIDER,
+                    CancellationSignal(),
+                    context.mainExecutor
+                ) { location ->
+                    loading = false
+                    if (location != null) {
+                        currentLocation = location
+                        locationMessage = "GPS locked · %.6f, %.6f".format(
+                            location.latitude,
+                            location.longitude
+                        )
+                        onFieldLocationSelected(location)
+                    } else {
+                        locationMessage = "GPS could not get a fix. Move outdoors and try again."
+                    }
+                }
+            } else {
+                val providers = locationManager.getProviders(true)
+                val last = providers
+                    .mapNotNull { provider ->
+                        locationManager.getLastKnownLocation(provider)
+                    }
+                    .minByOrNull { location -> location.accuracy.toDouble() }
+
+                loading = false
+                if (last != null) {
+                    currentLocation = last
+                    locationMessage = "GPS location · %.6f, %.6f".format(
+                        last.latitude,
+                        last.longitude
+                    )
+                    onFieldLocationSelected(last)
+                } else {
+                    locationMessage = "No recent GPS location available"
+                }
+            }
+        } catch (_: SecurityException) {
+            loading = false
+            locationMessage = "Location permission is required"
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val granted =
+            result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) getPhoneLocation()
+        else locationMessage = "Location permission was denied"
+    }
+
+    val savedLocation = remember(field?.latitude, field?.longitude) {
+        if (field?.latitude != null && field.longitude != null) {
+            Pair(field.latitude, field.longitude)
+        } else null
     }
 
     Card(
-        Modifier.fillMaxWidth().height(340.dp),
+        Modifier.fillMaxWidth().height(220.dp),
         shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE5E8D8))
+        colors = CardDefaults.cardColors(containerColor = AgriCard)
     ) {
-        Box(Modifier.fillMaxSize()) {
-            GoogleMap(
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp)),
-                cameraPositionState = cameraPositionState,
-                properties = MapProperties(mapType = MapType.SATELLITE),
-                uiSettings = MapUiSettings(
-                    zoomControlsEnabled = false,
-                    mapToolbarEnabled = false,
-                    compassEnabled = true,
-                    rotationGesturesEnabled = true,
-                    tiltGesturesEnabled = true
-                ),
-                onMapClick = { point ->
-                    if (drawingBoundary) {
-                        onFieldBoundaryChanged(boundary + point)
-                        if (fieldLocation == null) {
-                            onFieldLocationSelected(point)
-                        }
-                    }
-                },
-                onMapLongClick = { point ->
-                    if (!drawingBoundary) {
-                        onFieldLocationSelected(point)
-                    }
-                }
-            ) {
-                if (boundary.size >= 3) {
-                    Polygon(
-                        points = boundary,
-                        clickable = true,
-                        fillColor = Color(0x664F7D45),
-                        strokeColor = AgriGreen,
-                        strokeWidth = 4f,
-                        onClick = { showFieldDetails = true }
-                    )
-                }
-
-                if (drawingBoundary) {
-                    boundary.forEachIndexed { index, point ->
-                        Marker(
-                            state = rememberUpdatedMarkerState(position = point),
-                            title = "Boundary point " + (index + 1)
-                        )
-                    }
-                } else if (fieldLocation != null && boundary.size < 3) {
-                    Marker(
-                        state = rememberUpdatedMarkerState(position = fieldLocation),
-                        title = field?.name ?: "Farm Field",
-                        snippet = (field?.crop ?: "Crop") + " · " + (field?.area ?: "")
-                    )
-                }
-            }
-
+        Column(
+            Modifier.fillMaxSize().padding(18.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
             Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xEFFFFFFF))
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    Modifier.size(9.dp).clip(CircleShape).background(AgriGreen)
-                )
-                Spacer(Modifier.width(8.dp))
-                Column {
+                    Modifier
+                        .size(50.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AgriGreenSoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("📍", style = MaterialTheme.typography.titleLarge)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        "SATELLITE FIELD",
+                        "PHONE GPS FIELD LOCATION",
+                        color = AgriGreen,
                         fontWeight = FontWeight.Bold,
-                        color = AgriText,
                         style = MaterialTheme.typography.labelMedium
                     )
                     Text(
-                        when {
-                            boundary.size >= 3 -> "Field boundary saved · " + boundary.size + " points"
-                            drawingBoundary -> "Tap each corner of the real field"
-                            fieldLocation != null -> "Field pinned · ready to trace boundary"
-                            else -> "Long-press the field to set its location"
-                        },
+                        locationMessage,
                         color = AgriMuted,
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (drawingBoundary) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
-                            drawingBoundary = false
+                            val fine = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            val coarse = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                            if (fine || coarse) getPhoneLocation()
+                            else permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+                        enabled = !loading,
+                        shape = RoundedCornerShape(13.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("Finish")
+                        Text(if (loading) "Locating…" else "Use My Location")
                     }
-                } else {
-                    Button(
+
+                    OutlinedButton(
                         onClick = {
-                            drawingBoundary = true
-                            onFieldBoundaryChanged(emptyList())
+                            val location = currentLocation
+                            val lat = location?.latitude ?: savedLocation?.first
+                            val lng = location?.longitude ?: savedLocation?.second
+                            if (lat != null && lng != null) {
+                                openGoogleMaps(lat, lng)
+                            } else {
+                                locationMessage = "Get your phone location first"
+                            }
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+                        shape = RoundedCornerShape(13.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("Trace Field")
+                        Icon(
+                            imageVector = Icons.Outlined.Map,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Open Satellite")
                     }
                 }
-            }
 
-            if (boundary.size >= 3 && !drawingBoundary) {
                 Text(
-                    "Real field boundary · " + "%.2f".format(calculateApproxAreaHa(boundary)) + " ha",
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(12.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xEFFFFFFF))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    color = AgriText,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
+                    "Google Maps opens on the phone in satellite mode. No embedded Maps API key.",
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.labelSmall
                 )
             }
-
-            if (showFieldDetails && field != null && boundary.size >= 3) {
-                AlertDialog(
-                    onDismissRequest = { showFieldDetails = false },
-                    confirmButton = {
-                        TextButton(onClick = { showFieldDetails = false }) {
-                            Text("Close")
-                        }
-                    },
-                    title = {
-                        Text(field.name, fontWeight = FontWeight.Bold)
-                    },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            FieldDetailRow("Crop", field.crop)
-                            FieldDetailRow("Mapped Area", "%.2f ha".format(calculateApproxAreaHa(boundary)))
-                            FieldDetailRow("Recorded Area", field.area)
-                            FieldDetailRow(
-                                "Center",
-                                if (fieldLocation != null)
-                                    "%.6f, %.6f".format(fieldLocation.latitude, fieldLocation.longitude)
-                                else "Not set"
-                            )
-                            FieldDetailRow("Health", "92% Healthy")
-                            FieldDetailRow("Map", "Google Satellite")
-                        }
-                    },
-                    shape = RoundedCornerShape(26.dp),
-                    containerColor = AgriCard
-                )
-            }
-
-            Text(
-                if (drawingBoundary) "Tap corners → Finish"
-                else "Google Satellite · Drag · Pinch · Rotate",
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xD9FFFDF4))
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                color = AgriText,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold
-            )
         }
     }
-}
-
-@Composable
-private fun FieldDetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, color = AgriMuted)
-        Spacer(Modifier.width(16.dp))
-        Text(value, color = AgriText, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-private fun calculateApproxAreaHa(points: List<LatLng>): Double {
-    if (points.size < 3) return 0.0
-    val avgLat = points.map { it.latitude }.average()
-    val latMeters = 111_320.0
-    val lonMeters = 111_320.0 * kotlin.math.cos(Math.toRadians(avgLat))
-    var areaM2 = 0.0
-    for (i in points.indices) {
-        val a = points[i]
-        val b = points[(i + 1) % points.size]
-        val ax = a.longitude * lonMeters
-        val ay = a.latitude * latMeters
-        val bx = b.longitude * lonMeters
-        val by = b.latitude * latMeters
-        areaM2 += ax * by - bx * ay
-    }
-    return kotlin.math.abs(areaM2) / 2.0 / 10_000.0
 }
 
 @Composable
 private fun StatCard(title: String, value: String, change: String, icon: String, background: Color) {
+    Card(
+(title: String, value: String, change: String, icon: String, background: Color) {
     Card(
         Modifier.width(150.dp),
         shape = RoundedCornerShape(22.dp),
