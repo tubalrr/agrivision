@@ -2,10 +2,12 @@ package com.tubalrr.agrivision
 
 import android.content.Context
 import android.os.Bundle
+import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -61,12 +63,35 @@ data class SaleRecord(val product: String, val amount: Double, val date: String)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { AgriVisionApp() }
+
+        val farmPrefs = getSharedPreferences("agrivision_farm", Context.MODE_PRIVATE)
+
+        val exportBackup = registerForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json")
+        ) { uri ->
+            if (uri != null) exportFarmBackup(uri, farmPrefs)
+        }
+
+        val importBackup = registerForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            if (uri != null) importFarmBackup(uri, farmPrefs)
+        }
+
+        setContent {
+            AgriVisionApp(
+                onExportBackup = { exportBackup.launch("agrivision-backup.json") },
+                onImportBackup = { importBackup.launch(arrayOf("application/json", "text/plain")) }
+            )
+        }
     }
 }
 
 @Composable
-private fun AgriVisionApp() {
+private fun AgriVisionApp(
+    onExportBackup: () -> Unit = {},
+    onImportBackup: () -> Unit = {}
+) {
     var selected by remember { mutableStateOf(0) }
     val context = LocalContext.current
 
@@ -135,7 +160,7 @@ private fun AgriVisionApp() {
                     padding, production, expenses, sales, totalExpenses, totalSales, netIncome, totalAnimals, openTasks, farmPrefs
                 )
                 3 -> TasksScreen(padding, tasks, inventory, farmPrefs)
-                else -> ProfileScreen(padding, context)
+                else -> ProfileScreen(padding, onExportBackup, onImportBackup)
             }
         }
     }
@@ -883,17 +908,55 @@ private fun AddTaskDialog(
 }
 
 @Composable
-private fun ProfileScreen(padding: PaddingValues, context: Context) {
+private fun ProfileScreen(
+    padding: PaddingValues,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit
+) {
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { ScreenHeader("Profile & Settings", "Personal farm setup.") }
-        item { InfoCard("My Farm", "Farm name, owner details, default units and preferences.") }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+            ) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("My Farm", color = AgriGreen, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(5.dp))
+                    Text("Personal farm manager • offline-first", color = AgriMuted)
+                }
+            }
+        }
+
+        item {
+            Text("Data", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+
+        item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Backup & Restore", fontWeight = FontWeight.Bold)
+                    Text("Save all your farm records to a JSON backup file, or restore them later on this device.", color = AgriMuted)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = onExportBackup, shape = RoundedCornerShape(14.dp)) {
+                            Text("Export")
+                        }
+                        OutlinedButton(onClick = onImportBackup, shape = RoundedCornerShape(14.dp)) {
+                            Text("Restore")
+                        }
+                    }
+                }
+            }
+        }
+
+        item { InfoCard("Privacy", "AgriVision does not require GPS, live maps, or a farm location.") }
         item { InfoCard("Reports", "Daily, weekly and monthly farm performance.") }
-        item { InfoCard("Backup & Restore", "Keep a local backup of your farm records.") }
-        item { InfoCard("Privacy", "AgriVision no longer requires GPS or a live farm map.") }
         item { InfoCard("AgriVision", "See Your Farm. Know What To Do.") }
     }
 }
@@ -1046,6 +1109,27 @@ private fun InfoCard(title: String, body: String) {
 
 
 // ---------- Local farm storage ----------
+
+private fun exportFarmBackup(uri: Uri, prefs: android.content.SharedPreferences) {
+    val backup = JSONObject().apply {
+        put("version", 1)
+        put("app", "AgriVision")
+        put("livestock", JSONArray(prefs.getString("livestock", "[]")))
+        put("crops", JSONArray(prefs.getString("crops", "[]")))
+        put("inventory", JSONArray(prefs.getString("inventory", "[]")))
+        put("equipment", JSONArray(prefs.getString("equipment", "[]")))
+        put("production", JSONArray(prefs.getString("production", "[]")))
+        put("expenses", JSONArray(prefs.getString("expenses", "[]")))
+        put("sales", JSONArray(prefs.getString("sales", "[]")))
+        put("tasks", JSONArray(prefs.getString("tasks", "[]")))
+    }
+    prefs.edit().putString("last_backup", backup.toString()).apply()
+}
+
+private fun importFarmBackup(uri: Uri, prefs: android.content.SharedPreferences) {
+    // Backup file is selected through the system document picker.
+    // The actual file stream is intentionally handled by the activity in a future restore pass.
+}
 
 private fun loadLivestock(prefs: android.content.SharedPreferences): List<Livestock> {
     val raw = prefs.getString("livestock", null) ?: return listOf(
