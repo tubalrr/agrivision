@@ -98,12 +98,7 @@ private fun AgriVisionApp() {
         }
     }
     val tasks = remember {
-        mutableStateListOf(
-            FarmTask("Feed layer chickens", "Livestock", "Today", false),
-            FarmTask("Check water supply", "Farm", "Today", false),
-            FarmTask("Inspect growing rice", "Crops", "Tomorrow", false),
-            FarmTask("Record farm expenses", "Finance", "Today", false)
-        )
+        mutableStateListOf<FarmTask>().apply { addAll(loadTasks(farmPrefs)) }
     }
 
     val totalExpenses = expenses.sumOf { it.amount }
@@ -139,7 +134,7 @@ private fun AgriVisionApp() {
                 2 -> ProductionFinanceScreen(
                     padding, production, expenses, sales, totalExpenses, totalSales, netIncome, farmPrefs
                 )
-                3 -> TasksScreen(padding, tasks)
+                3 -> TasksScreen(padding, tasks, inventory, farmPrefs)
                 else -> ProfileScreen(padding, context)
             }
         }
@@ -648,41 +643,200 @@ private fun AddProductionFinanceDialog(
 }
 
 @Composable
-private fun TasksScreen(padding: PaddingValues, tasks: MutableList<FarmTask>) {
+private fun TasksScreen(
+    padding: PaddingValues,
+    tasks: MutableList<FarmTask>,
+    inventory: List<InventoryItem>,
+    farmPrefs: android.content.SharedPreferences
+) {
     val open = tasks.count { !it.done }
+    val lowStock = inventory.filter { it.status.equals("Low", ignoreCase = true) }
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        AddTaskDialog(
+            onDismiss = { showDialog = false },
+            onAdd = {
+                tasks.add(it)
+                saveTasks(farmPrefs, tasks)
+                showDialog = false
+            }
+        )
+    }
+
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(18.dp, 18.dp, 18.dp, 28.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { ScreenHeader("Farm Tasks", open.toString() + " task(s) still open.") }
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Tasks & Alerts", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text("Today · " + open + " open task(s)", color = AgriMuted)
+                }
+                Button(
+                    onClick = { showDialog = true },
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+                ) { Text("+ Add") }
+            }
+        }
+
+        item {
+            SectionTitle("Active Alerts")
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE2DA))
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AlertRow(
+                        title = if (open > 0) "Farm work needs attention" else "All farm tasks are clear",
+                        detail = if (open > 0) open.toString() + " task(s) still open today." else "No unfinished tasks.",
+                        warning = open > 0
+                    )
+                    if (lowStock.isNotEmpty()) {
+                        AlertRow(
+                            title = "Low inventory — " + lowStock.first().name,
+                            detail = "Restock before the next farm activity.",
+                            warning = true
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SectionTitle("Today's Farm Tasks")
+                Text(open.toString() + " open", color = AgriGreen, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
         items(tasks.indices.toList()) { index ->
             val task = tasks[index]
             Card(
                 Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = AgriCard)
             ) {
-                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(44.dp).clip(CircleShape).background(if (task.done) AgriGreen else AgriSage),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(if (task.done) "✓" else "!", color = if (task.done) Color.White else AgriGreen, fontWeight = FontWeight.Bold)
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(58.dp)) {
+                        Text(task.date, color = AgriGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                        Box(
+                            Modifier.padding(top = 7.dp).size(12.dp).clip(CircleShape)
+                                .background(if (task.done) AgriGreen else AgriSage)
+                        )
                     }
-                    Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
                         Text(task.title, fontWeight = FontWeight.Bold)
-                        Text(task.category + " · " + task.date, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                        Text(task.category + " · " + if (task.done) "Completed" else "Upcoming", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                     }
-                    TextButton(onClick = { tasks[index] = task.copy(done = !task.done) }) {
+                    TextButton(onClick = {
+                        tasks[index] = task.copy(done = !task.done)
+                        saveTasks(farmPrefs, tasks)
+                    }) {
                         Text(if (task.done) "Undo" else "Done")
                     }
                 }
             }
         }
-        item { AddHint("Tasks cover livestock, crops, equipment, inventory, finance and general farm work.") }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+            ) {
+                Column(Modifier.padding(18.dp)) {
+                    Text("Farm Reminders", fontWeight = FontWeight.Bold, color = AgriGreen)
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        "Use tasks for feeding, watering, cleaning, vaccination, planting, harvesting, repairs and general farm work.",
+                        color = AgriText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun AlertRow(title: String, detail: String, warning: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(42.dp).clip(RoundedCornerShape(13.dp))
+                .background(if (warning) Color(0xFFFFA98F) else AgriGreenSoft),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(if (warning) "!" else "✓", fontWeight = FontWeight.Bold, color = AgriGreen)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Bold)
+            Text(detail, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun AddTaskDialog(
+    onDismiss: () -> Unit,
+    onAdd: (FarmTask) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("General") }
+    var date by remember { mutableStateOf("Today") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Farm Task", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Task") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = { category = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Category") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = date,
+                    onValueChange = { date = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Date / time") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = title.isNotBlank(),
+                onClick = { onAdd(FarmTask(title.trim(), category.trim(), date.trim(), false)) }
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -951,6 +1105,33 @@ private fun saveExpenses(prefs: android.content.SharedPreferences, list: List<Ex
 }
 private fun saveSales(prefs: android.content.SharedPreferences, list: List<SaleRecord>) {
     val a=JSONArray(); list.forEach { a.put(JSONObject().apply { put("product",it.product); put("amount",it.amount); put("date",it.date) }) }; prefs.edit().putString("sales",a.toString()).apply()
+}
+
+private fun loadTasks(prefs: android.content.SharedPreferences): List<FarmTask> {
+    val raw = prefs.getString("tasks", null) ?: return listOf(
+        FarmTask("Feed layer chickens", "Livestock", "Today", false),
+        FarmTask("Check water supply", "Farm", "Today", false),
+        FarmTask("Inspect growing rice", "Crops", "Tomorrow", false),
+        FarmTask("Record farm expenses", "Finance", "Today", false)
+    )
+    val a = JSONArray(raw)
+    return List(a.length()) { i ->
+        val o = a.getJSONObject(i)
+        FarmTask(o.getString("title"), o.getString("category"), o.getString("date"), o.getBoolean("done"))
+    }
+}
+
+private fun saveTasks(prefs: android.content.SharedPreferences, list: List<FarmTask>) {
+    val a = JSONArray()
+    list.forEach { task ->
+        a.put(JSONObject().apply {
+            put("title", task.title)
+            put("category", task.category)
+            put("date", task.date)
+            put("done", task.done)
+        })
+    }
+    prefs.edit().putString("tasks", a.toString()).apply()
 }
 
 private fun money(value: Double): String {
