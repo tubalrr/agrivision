@@ -23,13 +23,13 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
-import io.github.sceneview.CubeNode
-import io.github.sceneview.CylinderNode
-import io.github.sceneview.ConeNode
-import io.github.sceneview.PlaneNode
+import io.github.sceneview.node.CubeNode
+import io.github.sceneview.node.CylinderNode
+import io.github.sceneview.node.ConeNode
+import io.github.sceneview.node.PlaneNode
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
-import io.github.sceneview.colorOf
+import io.github.sceneview.math.colorOf
 
 private val AgriCream = Color(0xFFF7F4E9)
 private val AgriCard = Color(0xFFFFFCF5)
