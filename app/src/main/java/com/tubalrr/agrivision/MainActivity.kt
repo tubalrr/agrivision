@@ -178,11 +178,11 @@ private fun AgriVisionApp(
                 )
                 3 -> TasksScreen(padding, tasks, inventory, farmPrefs)
                 else -> ProfileScreen(
-                    padding,
-                    farmerProfile,
+                    padding = padding,
+                    profile = farmerProfile,
                     onProfileSaved = { farmerProfile = it; saveFarmerProfile(farmPrefs, it) },
-                    onExportBackup,
-                    onImportBackup
+                    onExportBackup = onExportBackup,
+                    onImportBackup = onImportBackup
                 )
             }
         }
@@ -1384,6 +1384,19 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
     val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks")
     keys.forEach { key ->
         if (backup.has(key)) edit.putString(key, backup.getJSONArray(key).toString())
+    }
+    if (backup.has("farmerProfile")) {
+        val p = backup.getJSONObject("farmerProfile")
+        edit.putString("farmerName", p.optString("farmerName"))
+        edit.putString("farmerId", p.optString("farmerId"))
+        edit.putString("contact", p.optString("contact"))
+        edit.putString("province", p.optString("province"))
+        edit.putString("municipality", p.optString("municipality"))
+        edit.putString("barangay", p.optString("barangay"))
+        edit.putString("farmName", p.optString("farmName"))
+        edit.putString("farmSize", p.optString("farmSize"))
+        edit.putString("landTenure", p.optString("landTenure"))
+        edit.putString("commodities", p.optString("commodities"))
     }
     edit.apply()
 }
