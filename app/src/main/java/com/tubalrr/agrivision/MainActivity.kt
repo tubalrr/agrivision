@@ -157,7 +157,11 @@ private fun AgriVisionApp() {
                         fieldPrefs.edit().putString("boundary", encoded).apply()
                     }
                 )
-                1 -> FieldsScreen(padding, fields)
+                1 -> FieldsScreen(
+                    padding = padding,
+                    fields = fields,
+                    onOpenMap = { selected = 0 }
+                )
                 2 -> InsightsScreen(padding, fields)
                 3 -> TasksScreen(padding, tasks)
                 else -> MoreScreen(padding)
@@ -709,7 +713,11 @@ private fun AttentionCard(openTasks: Int, inventory: Int) {
 }
 
 @Composable
-private fun FieldsScreen(padding: PaddingValues, fields: MutableList<FarmField>) {
+private fun FieldsScreen(
+    padding: PaddingValues,
+    fields: MutableList<FarmField>,
+    onOpenMap: () -> Unit
+) {
     var showForm by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var crop by remember { mutableStateOf("") }
@@ -719,7 +727,13 @@ private fun FieldsScreen(padding: PaddingValues, fields: MutableList<FarmField>)
         modifier = Modifier.padding(padding),
         containerColor = AgriCream,
         floatingActionButton = {
-            FloatingActionButton(onClick = { showForm = true }, containerColor = AgriGreen, contentColor = Color.White) { Text("+") }
+            FloatingActionButton(
+                onClick = { showForm = true },
+                containerColor = AgriGreen,
+                contentColor = Color.White
+            ) {
+                Text("+", style = MaterialTheme.typography.headlineSmall)
+            }
         }
     ) { inner ->
         LazyColumn(
@@ -729,14 +743,88 @@ private fun FieldsScreen(padding: PaddingValues, fields: MutableList<FarmField>)
         ) {
             item { ScreenHeader("Your Fields", "Manage crops, areas and field records.") }
             items(fields) { field ->
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
-                    Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(AgriGreenSoft), contentAlignment = Alignment.Center) { Text("🌾") }
-                        Spacer(Modifier.width(14.dp))
-                        Column {
-                            Text(field.name, fontWeight = FontWeight.Bold)
-                            Text(field.crop)
-                            Text(field.area, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = AgriCard)
+                ) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(AgriGreenSoft),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    if (field.latitude != null && field.longitude != null) "📍" else "🌾",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(field.name, fontWeight = FontWeight.Bold)
+                                Text(field.crop)
+                                Text(
+                                    field.area,
+                                    color = AgriMuted,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Box(
+                                Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        if (field.latitude != null && field.longitude != null)
+                                            AgriGreenSoft
+                                        else
+                                            AgriSage
+                                    )
+                                    .padding(horizontal = 9.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    if (field.latitude != null && field.longitude != null) "Mapped" else "Not mapped",
+                                    color = AgriGreen,
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(color = AgriLine)
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Satellite location", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                                Text(
+                                    if (field.latitude != null && field.longitude != null)
+                                        "%.5f, %.5f".format(field.latitude, field.longitude)
+                                    else
+                                        "Add the real field location",
+                                    color = AgriText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = onOpenMap,
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Map,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Open Map")
+                            }
                         }
                     }
                 }
