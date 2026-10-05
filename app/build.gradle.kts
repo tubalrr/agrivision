@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+kotlin {
+    jvmToolchain(17)
+}
+
 android {
     namespace = "com.tubalrr.agrivision"
     compileSdk = 36
@@ -28,10 +32,6 @@ android {
 
     buildFeatures {
         compose = true
-    }
-
-    kotlin {
-        jvmToolchain(17)
     }
 }
 
