@@ -32,6 +32,14 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polygon
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Person
 
 private val AgriCream = Color(0xFFF7F4E9)
 private val AgriCard = Color(0xFFFFFCF5)
@@ -158,26 +166,49 @@ private fun AgriVisionApp() {
 
 @Composable
 private fun AgriBottomBar(selected: Int, onSelected: (Int) -> Unit) {
-    val labels = listOf("Dashboard", "Fields", "Insights", "Tasks", "Profile")
-    NavigationBar(containerColor = AgriCard, tonalElevation = 0.dp) {
-        labels.forEachIndexed { index, label ->
+    val items = listOf(
+        "Dashboard" to Icons.Outlined.Dashboard,
+        "Fields" to Icons.Outlined.Map,
+        "Insights" to Icons.Outlined.Assessment,
+        "Tasks" to Icons.Outlined.Checklist,
+        "Profile" to Icons.Outlined.Person
+    )
+
+    NavigationBar(
+        containerColor = AgriCard,
+        tonalElevation = 0.dp,
+        modifier = Modifier.height(78.dp)
+    ) {
+        items.forEachIndexed { index, item ->
             NavigationBarItem(
                 selected = selected == index,
                 onClick = { onSelected(index) },
                 icon = {
                     Box(
-                        Modifier.size(30.dp).clip(RoundedCornerShape(9.dp))
-                            .background(if (selected == index) AgriGreen else AgriGreenSoft),
+                        Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (selected == index) AgriGreen
+                                else AgriGreenSoft.copy(alpha = 0.55f)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            when (index) { 0 -> "≡"; 1 -> "▣"; 2 -> "↗"; 3 -> "⌂"; else -> "○" },
-                            color = if (selected == index) Color.White else AgriGreen,
-                            fontWeight = FontWeight.Bold
+                        Icon(
+                            imageVector = item.second,
+                            contentDescription = item.first,
+                            tint = if (selected == index) Color.White else AgriGreen,
+                            modifier = Modifier.size(21.dp)
                         )
                     }
                 },
-                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                label = {
+                    Text(
+                        item.first,
+                        fontWeight = if (selected == index) FontWeight.SemiBold else FontWeight.Normal,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.White,
                     selectedTextColor = AgriGreen,
@@ -213,22 +244,64 @@ private fun DashboardScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(AgriSage),
+                        Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(AgriGreen),
                         contentAlignment = Alignment.Center
-                    ) { Text("🌱", style = MaterialTheme.typography.headlineSmall) }
+                    ) {
+                        Text(
+                            "AV",
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("AgriVision", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("Farm Management", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "AgriVision",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Farm Management",
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("♧", style = MaterialTheme.typography.headlineSmall, color = AgriGreen)
-                    Spacer(Modifier.width(10.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(
+                        onClick = { },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(AgriCard)
+                            .border(1.dp, AgriLine, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.NotificationsNone,
+                            contentDescription = "Notifications",
+                            tint = AgriGreen
+                        )
+                    }
                     Box(
-                        Modifier.size(42.dp).clip(CircleShape).background(AgriGreenSoft),
+                        Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(AgriGreenSoft),
                         contentAlignment = Alignment.Center
-                    ) { Text("F", fontWeight = FontWeight.Bold, color = AgriGreen) }
+                    ) {
+                        Text(
+                            "F",
+                            fontWeight = FontWeight.Bold,
+                            color = AgriGreen
+                        )
+                    }
                 }
             }
         }
@@ -242,7 +315,7 @@ private fun DashboardScreen(
         }
 
         item {
-            SectionTitle("Farm Analytics", "i")
+            SectionTitle("Farm Analytics", "Info")
             Spacer(Modifier.height(10.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 item { StatCard("Total Area", "1.0 ha", "+0.0 ha", "🌿", AgriGreenSoft) }
@@ -732,9 +805,35 @@ private fun ScreenHeader(title: String, subtitle: String) {
 
 @Composable
 private fun SectionTitle(title: String, action: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        if (action.isNotBlank()) Text(action, color = AgriGreen, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+
+        when {
+            action == "Info" -> {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "Information",
+                    tint = AgriGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            action.isNotBlank() -> {
+                Text(
+                    action,
+                    color = AgriGreen,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
     }
 }
 
