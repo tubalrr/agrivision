@@ -21,15 +21,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.rememberCameraManipulator
+import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberMainLightNode
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.node.CubeNode
 import io.github.sceneview.node.CylinderNode
 import io.github.sceneview.node.ConeNode
 import io.github.sceneview.node.PlaneNode
+import io.github.sceneview.node.SphereNode
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Size
-import io.github.sceneview.math.colorOf
 
 private val AgriCream = Color(0xFFF7F4E9)
 private val AgriCard = Color(0xFFFFFCF5)
@@ -271,79 +273,305 @@ private fun DashboardScreen(
 private fun Farm3DScene(modifier: Modifier = Modifier) {
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
-    val green = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF4F7D45))) }
-    val darkGreen = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF285C3B))) }
-    val soil = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF8A7658))) }
-    val fieldGreen = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF789B58))) }
-    val water = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF7AAFC0))) }
-    val house = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFFE6D2A5))) }
-    val roof = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF8B5E3C))) }
 
-    SceneView(
-        modifier = modifier,
-        engine = engine,
-        materialLoader = materialLoader,
-        cameraManipulator = rememberCameraManipulator()
-    ) {
-        PlaneNode(
-            size = Size(8f, 8f),
-            materialInstance = green,
-            position = Position(y = -0.15f)
-        )
+    val grass = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF5E7F49))
+    }
+    val grassLight = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF87A965))
+    }
+    val paddy = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF79A75C))
+    }
+    val rice = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFFB6C878))
+    }
+    val soil = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF8A6C4C))
+    }
+    val path = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFFC3A57B))
+    }
+    val water = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF6AA9BB))
+    }
+    val house = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFFE6D09F))
+    }
+    val roof = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF7D4F35))
+    }
+    val trunk = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF76553A))
+    }
+    val treeTop = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF2F6B3F))
+    }
+    val mountain = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF758B78))
+    }
+    val mountainFar = remember(materialLoader) {
+        materialLoader.createColorInstance(Color(0xFF91A39A))
+    }
 
-        CubeNode(
-            size = Size(3.2f, 0.12f, 2.2f),
-            materialInstance = fieldGreen,
-            position = Position(x = -1.6f, y = -0.02f, z = -0.4f)
-        )
-        CubeNode(
-            size = Size(2.6f, 0.12f, 2.0f),
-            materialInstance = soil,
-            position = Position(x = 1.45f, y = -0.02f, z = -0.35f)
-        )
-        CubeNode(
-            size = Size(0.35f, 0.05f, 7f),
-            materialInstance = water,
-            position = Position(x = 0f, y = 0f, z = 1.9f)
-        )
+    val cameraNode = rememberCameraNode(engine) {
+        position = Position(x = 6.6f, y = 5.8f, z = 8.2f)
+    }
+    val mainLight = rememberMainLightNode(engine) {
+        intensity = 100_000f
+        direction(0f, -1f, -0.6f)
+        color(1f, 0.96f, 0.86f)
+        castShadows(true)
+    }
 
-        CubeNode(
-            size = Size(0.9f, 0.8f, 0.8f),
-            materialInstance = house,
-            position = Position(x = -0.15f, y = 0.4f, z = -2.0f)
-        )
-        ConeNode(
-            radius = 0.72f,
-            height = 0.55f,
-            materialInstance = roof,
-            position = Position(x = -0.15f, y = 1.05f, z = -2.0f)
-        )
+    Box(modifier.background(Color(0xFFD9DEC9))) {
+        SceneView(
+            modifier = Modifier.fillMaxSize(),
+            engine = engine,
+            materialLoader = materialLoader,
+            cameraNode = cameraNode,
+            mainLightNode = mainLight,
+            cameraManipulator = rememberCameraManipulator()
+        ) {
+            // Base terrain
+            PlaneNode(
+                size = Size(x = 14f, y = 12f),
+                materialInstance = grass,
+                position = Position(y = -0.15f)
+            )
 
-        listOf(
-            Position(x = -2.8f, y = 0.35f, z = -2.0f),
-            Position(x = 2.8f, y = 0.35f, z = -2.0f),
-            Position(x = -3.0f, y = 0.35f, z = 1.0f),
-            Position(x = 3.0f, y = 0.35f, z = 1.0f)
-        ).forEach { p ->
-            CylinderNode(radius = 0.22f, height = 0.7f, materialInstance = darkGreen, position = p)
-            ConeNode(radius = 0.5f, height = 0.75f, materialInstance = green, position = Position(p.x, 0.95f, p.z))
-        }
-
-        repeat(7) { index ->
-            val x = -2.6f + index * 0.8f
-            CylinderNode(
-                radius = 0.045f,
-                height = 0.35f,
-                materialInstance = darkGreen,
-                position = Position(x = x, y = 0.22f, z = -0.45f)
+            // Distant hills to make the farm feel like a real landscape
+            ConeNode(
+                radius = 4.8f,
+                height = 3.6f,
+                sideCount = 6,
+                materialInstance = mountainFar,
+                position = Position(x = -5.0f, y = 1.6f, z = -4.8f)
             )
             ConeNode(
-                radius = 0.18f,
+                radius = 4.3f,
+                height = 3.2f,
+                sideCount = 6,
+                materialInstance = mountain,
+                position = Position(x = 1.6f, y = 1.35f, z = -5.2f)
+            )
+            ConeNode(
+                radius = 3.8f,
+                height = 2.8f,
+                sideCount = 6,
+                materialInstance = mountainFar,
+                position = Position(x = 6.0f, y = 1.2f, z = -4.8f)
+            )
+
+            // Main access road and irrigation canal
+            CubeNode(
+                size = Size(x = 12f, y = 0.08f, z = 0.72f),
+                materialInstance = path,
+                position = Position(x = 0f, y = 0.02f, z = 2.8f)
+            )
+            CubeNode(
+                size = Size(x = 0.48f, y = 0.05f, z = 10f),
+                materialInstance = water,
+                position = Position(x = 4.6f, y = 0.04f, z = -0.3f)
+            )
+
+            // North rice paddy
+            CubeNode(
+                size = Size(x = 4.2f, y = 0.16f, z = 2.3f),
+                materialInstance = paddy,
+                position = Position(x = -2.4f, y = 0.02f, z = -0.2f)
+            )
+            CubeNode(
+                size = Size(x = 3.6f, y = 0.16f, z = 2.2f),
+                materialInstance = rice,
+                position = Position(x = -2.7f, y = 0.12f, z = -0.12f)
+            )
+
+            // South crop block
+            CubeNode(
+                size = Size(x = 4.0f, y = 0.16f, z = 2.4f),
+                materialInstance = soil,
+                position = Position(x = 1.1f, y = 0.02f, z = 0.0f)
+            )
+            repeat(5) { row ->
+                val z = -0.92f + row * 0.46f
+                CubeNode(
+                    size = Size(x = 3.2f, y = 0.05f, z = 0.09f),
+                    materialInstance = paddy,
+                    position = Position(x = 1.1f, y = 0.15f, z = z)
+                )
+                repeat(6) { col ->
+                    val x = -0.25f + col * 0.54f
+                    CylinderNode(
+                        radius = 0.035f,
+                        height = 0.26f,
+                        sideCount = 10,
+                        materialInstance = grass,
+                        position = Position(x = x, y = 0.30f, z = z)
+                    )
+                    SphereNode(
+                        radius = 0.09f,
+                        stacks = 8,
+                        slices = 8,
+                        materialInstance = treeTop,
+                        position = Position(x = x + 0.02f, y = 0.44f, z = z)
+                    )
+                }
+            }
+
+            // Farm house
+            CubeNode(
+                size = Size(x = 1.25f, y = 0.95f, z = 1.05f),
+                materialInstance = house,
+                position = Position(x = -0.9f, y = 0.48f, z = -2.15f)
+            )
+            ConeNode(
+                radius = 1.0f,
+                height = 0.72f,
+                sideCount = 4,
+                materialInstance = roof,
+                position = Position(x = -0.9f, y = 1.28f, z = -2.15f)
+            )
+            CubeNode(
+                size = Size(x = 0.24f, y = 0.42f, z = 0.08f),
+                materialInstance = roof,
+                position = Position(x = -0.9f, y = 0.36f, z = -1.62f)
+            )
+
+            // Small storage shed + silo
+            CubeNode(
+                size = Size(x = 0.85f, y = 0.68f, z = 0.72f),
+                materialInstance = path,
+                position = Position(x = 2.65f, y = 0.35f, z = -1.95f)
+            )
+            ConeNode(
+                radius = 0.63f,
+                height = 0.45f,
+                sideCount = 4,
+                materialInstance = roof,
+                position = Position(x = 2.65f, y = 0.92f, z = -1.95f)
+            )
+            CylinderNode(
+                radius = 0.28f,
+                height = 0.85f,
+                sideCount = 24,
+                materialInstance = house,
+                position = Position(x = 3.48f, y = 0.43f, z = -1.9f)
+            )
+            ConeNode(
+                radius = 0.31f,
                 height = 0.28f,
-                materialInstance = green,
-                position = Position(x = x, y = 0.5f, z = -0.45f)
+                sideCount = 24,
+                materialInstance = roof,
+                position = Position(x = 3.48f, y = 0.98f, z = -1.9f)
+            )
+
+            // Tree row
+            listOf(
+                Position(x = -5.1f, y = 0.42f, z = 1.5f),
+                Position(x = -4.1f, y = 0.42f, z = 1.65f),
+                Position(x = 5.25f, y = 0.42f, z = 1.2f),
+                Position(x = 5.25f, y = 0.42f, z = 0.0f)
+            ).forEach { p ->
+                CylinderNode(
+                    radius = 0.18f,
+                    height = 0.84f,
+                    sideCount = 18,
+                    materialInstance = trunk,
+                    position = p
+                )
+                SphereNode(
+                    radius = 0.53f,
+                    stacks = 12,
+                    slices = 12,
+                    materialInstance = treeTop,
+                    position = Position(x = p.x, y = 1.08f, z = p.z)
+                )
+            }
+
+            // Footpaths between farm sections
+            CubeNode(
+                size = Size(x = 0.22f, y = 0.06f, z = 4.8f),
+                materialInstance = path,
+                position = Position(x = -0.15f, y = 0.12f, z = 0.15f)
+            )
+            CubeNode(
+                size = Size(x = 5.4f, y = 0.06f, z = 0.22f),
+                materialInstance = path,
+                position = Position(x = 0.35f, y = 0.12f, z = -1.2f)
             )
         }
+
+        // Lightweight map HUD for context and polish.
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xF0FFFDF4))
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier
+                    .size(9.dp)
+                    .clip(CircleShape)
+                    .background(AgriGreen)
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    "NORTH FIELD",
+                    fontWeight = FontWeight.Bold,
+                    color = AgriText,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Text(
+                    "Rice · 1.0 ha · Healthy 92%",
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "3D",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AgriGreen)
+                    .padding(horizontal = 11.dp, vertical = 8.dp)
+            )
+            Text(
+                "LIVE MAP",
+                color = AgriGreen,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xF0FFFDF4))
+                    .padding(horizontal = 11.dp, vertical = 8.dp)
+            )
+        }
+
+        Text(
+            "Drag to orbit · Pinch to zoom",
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 12.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xD9FFFDF4))
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            color = AgriText,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
