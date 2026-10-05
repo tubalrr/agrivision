@@ -1,6 +1,3 @@
-import java.util.Properties
-import java.io.FileInputStream
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -8,13 +5,6 @@ plugins {
 
 kotlin {
     jvmToolchain(17)
-}
-
-val localProperties = Properties().apply {
-    val localFile = rootProject.file("local.properties")
-    if (localFile.exists()) {
-        FileInputStream(localFile).use { load(it) }
-    }
 }
 
 android {
@@ -27,8 +17,6 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        manifestPlaceholders["MAPS_API_KEY"] =
-            localProperties.getProperty("MAPS_API_KEY", "")
     }
 
     buildTypes {
@@ -56,6 +44,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.github.sceneview:sceneview:4.52.0")
-    implementation("com.google.maps.android:maps-compose:9.0.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
