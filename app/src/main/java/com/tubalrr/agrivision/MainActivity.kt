@@ -452,8 +452,8 @@ private fun ProfileScreen(padding: PaddingValues, context: Context) {
 @Composable
 private fun FarmCategory(name: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
     Card(
-        Modifier.width(90.dp).height(86.dp),
         onClick = onClick,
+        modifier = Modifier.width(90.dp).height(86.dp),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = if (selected) AgriGreenSoft else AgriCard)
     ) {
