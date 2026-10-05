@@ -1,5 +1,6 @@
 package com.tubalrr.agrivision
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -57,7 +58,7 @@ private val AgriText = Color(0xFF183526)
 private val AgriMuted = Color(0xFF7A806F)
 private val AgriLine = Color(0xFFE5E2D6)
 
-private class MapBridge(
+class MapBridge(
     private val onSelect: (Double, Double) -> Unit
 ) {
     @JavascriptInterface
@@ -470,6 +471,7 @@ private fun FieldOverviewCard(field: FarmField?) {
     }
 }
 
+@SuppressLint("JavascriptInterface")
 @Composable
 private fun LiveFieldMap(
     field: FarmField?,
