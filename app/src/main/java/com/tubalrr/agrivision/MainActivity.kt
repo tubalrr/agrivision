@@ -73,7 +73,14 @@ data class AssistanceRecord(
     val quantity: String,
     val status: String,
     val source: String,
-    val incidentId: String = ""
+    val incidentId: String = "",
+    val requestId: String = "",
+    val approvedDate: String = "",
+    val distributedDate: String = "",
+    val completedDate: String = "",
+    val distributionDetails: String = "",
+    val outcome: String = "",
+    val reviewNotes: String = ""
 )
 data class ReportSubmission(
     val status: String,
@@ -594,7 +601,8 @@ private fun DashboardScreen(
                                     quantity = incident.affectedArea,
                                     status = "Applied",
                                     source = "Linked to " + incident.id,
-                                    incidentId = incident.id
+                                    incidentId = incident.id,
+                                    requestId = "DAR-" + System.currentTimeMillis()
                                 )
                             )
                             saveAssistance(farmPrefs, assistance)
@@ -2174,10 +2182,11 @@ private fun ProfileScreen(
 
 @Composable
 private fun AssistanceSection(
-    assistance: List<AssistanceRecord>,
+    assistance: MutableList<AssistanceRecord>,
     onAdd: (AssistanceRecord) -> Unit
 ) {
     var showAdd by remember { mutableStateOf(false) }
+    var manageRecord by remember { mutableStateOf<AssistanceRecord?>(null) }
     var filter by remember { mutableStateOf("All") }
 
     if (showAdd) {
@@ -2190,9 +2199,29 @@ private fun AssistanceSection(
         )
     }
 
-    val statuses = listOf("All", "Applied", "Approved", "Received", "Completed")
+    manageRecord?.let { record ->
+        AssistanceWorkflowDialog(
+            record = record,
+            onDismiss = { manageRecord = null },
+            onSave = { updated ->
+                val index = assistance.indexOfFirst {
+                    it.requestId == record.requestId && record.requestId.isNotBlank()
+                            || it == record
+                }
+                if (index >= 0) {
+                    assistance[index] = updated
+                }
+                manageRecord = null
+            }
+        )
+    }
+
+    val statuses = listOf("All", "Applied", "Approved", "Distributed", "Completed")
     val filtered = if (filter == "All") assistance
-    else assistance.filter { it.status.equals(filter, ignoreCase = true) }
+    else assistance.filter {
+        val normalized = if (it.status == "Received") "Distributed" else it.status
+        normalized.equals(filter, ignoreCase = true)
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Card(
@@ -2203,9 +2232,9 @@ private fun AssistanceSection(
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("DA / Agriculture Programs", fontWeight = FontWeight.Bold, color = AgriGreen)
+                        Text("DA Assistance Management", fontWeight = FontWeight.Bold, color = AgriGreen)
                         Text(
-                            "Track applications and assistance from application to completion.",
+                            "Track an intervention from application through distribution and outcome.",
                             color = AgriMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -2215,7 +2244,7 @@ private fun AssistanceSection(
                     }
                 }
                 Row(
-                    Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     statuses.forEach { status ->
@@ -2231,11 +2260,11 @@ private fun AssistanceSection(
 
         if (filtered.isEmpty()) {
             InfoCard(
-                if (assistance.isEmpty()) "No assistance records" else "No records in $filter",
+                if (assistance.isEmpty()) "No assistance requests" else "No records in $filter",
                 if (assistance.isEmpty())
-                    "Add an agricultural program or assistance record."
+                    "Create an intervention record or link one from a verified field incident."
                 else
-                    "There are no assistance records with this status."
+                    "There are no assistance records with this workflow status."
             )
         } else {
             filtered.asReversed().forEach { record ->
@@ -2249,9 +2278,17 @@ private fun AssistanceSection(
                             Column(Modifier.weight(1f)) {
                                 Text(record.program, fontWeight = FontWeight.Bold)
                                 Text(record.assistanceType, color = AgriGreen, fontWeight = FontWeight.SemiBold)
+                                if (record.requestId.isNotBlank()) {
+                                    Text(
+                                        record.requestId,
+                                        color = AgriMuted,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                             }
-                            StatusBadge(record.status)
+                            StatusBadge(if (record.status == "Received") "Distributed" else record.status)
                         }
+
                         Text(
                             listOf(record.dateReceived, record.quantity)
                                 .filter { it.isNotBlank() }
@@ -2259,14 +2296,176 @@ private fun AssistanceSection(
                             color = AgriMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
+
+                        if (record.incidentId.isNotBlank()) {
+                            Text("Linked incident: " + record.incidentId, color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (record.distributionDetails.isNotBlank()) {
+                            Text("Distribution: " + record.distributionDetails, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (record.outcome.isNotBlank()) {
+                            Text("Outcome: " + record.outcome, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                        }
                         if (record.source.isNotBlank()) {
-                            Text("Source: " + record.source, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                            Text("Source / office: " + record.source, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                        }
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = { manageRecord = record }) {
+                                Text("Manage Workflow")
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun AssistanceWorkflowDialog(
+    record: AssistanceRecord,
+    onDismiss: () -> Unit,
+    onSave: (AssistanceRecord) -> Unit
+) {
+    val context = LocalContext.current
+    var status by remember(record.requestId) {
+        mutableStateOf(if (record.status == "Received") "Distributed" else record.status.ifBlank { "Applied" })
+    }
+    var requestedDate by remember(record.requestId) { mutableStateOf(record.dateReceived) }
+    var approvedDate by remember(record.requestId) { mutableStateOf(record.approvedDate) }
+    var distributedDate by remember(record.requestId) { mutableStateOf(record.distributedDate) }
+    var completedDate by remember(record.requestId) { mutableStateOf(record.completedDate) }
+    var details by remember(record.requestId) { mutableStateOf(record.distributionDetails) }
+    var outcome by remember(record.requestId) { mutableStateOf(record.outcome) }
+    var notes by remember(record.requestId) { mutableStateOf(record.reviewNotes) }
+    var pickerTarget by remember { mutableStateOf("") }
+
+    if (pickerTarget.isNotBlank()) {
+        val calendar = Calendar.getInstance()
+        val current = when (pickerTarget) {
+            "requested" -> requestedDate
+            "approved" -> approvedDate
+            "distributed" -> distributedDate
+            else -> completedDate
+        }
+        try {
+            calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(current) ?: calendar.time
+        } catch (_: Exception) { }
+
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                val picked = Calendar.getInstance().apply { set(year, month, day) }
+                val value = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
+                when (pickerTarget) {
+                    "requested" -> requestedDate = value
+                    "approved" -> approvedDate = value
+                    "distributed" -> distributedDate = value
+                    "completed" -> completedDate = value
+                }
+                pickerTarget = ""
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            setOnDismissListener { pickerTarget = "" }
+            show()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Assistance Workflow", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 520.dp),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                item {
+                    Text(
+                        record.requestId.ifBlank { "Assistance record" },
+                        color = AgriGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        record.program + " · " + record.assistanceType,
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                item {
+                    Text("Workflow status", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Applied", "Approved", "Distributed", "Completed").forEach { option ->
+                            FilterChip(
+                                selected = status == option,
+                                onClick = { status = option },
+                                label = { Text(option, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
+                item { OutlinedButton(onClick = { pickerTarget = "requested" }, Modifier.fillMaxWidth()) { Text("Applied date: " + requestedDate.ifBlank { "Set date" }) } }
+                item { OutlinedButton(onClick = { pickerTarget = "approved" }, Modifier.fillMaxWidth()) { Text("Approved date: " + approvedDate.ifBlank { "Set date" }) } }
+                item { OutlinedButton(onClick = { pickerTarget = "distributed" }, Modifier.fillMaxWidth()) { Text("Distributed date: " + distributedDate.ifBlank { "Set date" }) } }
+                item { OutlinedButton(onClick = { pickerTarget = "completed" }, Modifier.fillMaxWidth()) { Text("Completed date: " + completedDate.ifBlank { "Set date" }) } }
+                item {
+                    OutlinedTextField(
+                        details,
+                        { details = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Distribution details") },
+                        minLines = 2
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        outcome,
+                        { outcome = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Intervention outcome") },
+                        minLines = 2
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        notes,
+                        { notes = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Management notes") },
+                        minLines = 2
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        record.copy(
+                            status = status,
+                            dateReceived = requestedDate.trim(),
+                            approvedDate = approvedDate.trim(),
+                            distributedDate = distributedDate.trim(),
+                            completedDate = completedDate.trim(),
+                            distributionDetails = details.trim(),
+                            outcome = outcome.trim(),
+                            reviewNotes = notes.trim()
+                        )
+                    )
+                }
+            ) { Text("Save Workflow") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -2350,7 +2549,17 @@ private fun AddAssistanceDialog(
             TextButton(
                 enabled = program.isNotBlank(),
                 onClick = {
-                    onSave(AssistanceRecord(program.trim(), type.trim(), date, quantity.trim(), status.trim(), source.trim()))
+                    onSave(
+                        AssistanceRecord(
+                            program = program.trim(),
+                            assistanceType = type.trim(),
+                            dateReceived = date,
+                            quantity = quantity.trim(),
+                            status = status.trim(),
+                            source = source.trim(),
+                            requestId = "DAR-" + System.currentTimeMillis()
+                        )
+                    )
                 }
             ) { Text("Save") }
         },
@@ -2731,7 +2940,14 @@ private fun loadAssistance(prefs: android.content.SharedPreferences): List<Assis
             o.optString("quantity"),
             o.optString("status"),
             o.optString("source"),
-            o.optString("incidentId")
+            o.optString("incidentId"),
+            o.optString("requestId"),
+            o.optString("approvedDate"),
+            o.optString("distributedDate"),
+            o.optString("completedDate"),
+            o.optString("distributionDetails"),
+            o.optString("outcome"),
+            o.optString("reviewNotes")
         )
     }
 }
@@ -2747,6 +2963,13 @@ private fun saveAssistance(prefs: android.content.SharedPreferences, list: List<
             put("status", it.status)
             put("source", it.source)
             put("incidentId", it.incidentId)
+            put("requestId", it.requestId)
+            put("approvedDate", it.approvedDate)
+            put("distributedDate", it.distributedDate)
+            put("completedDate", it.completedDate)
+            put("distributionDetails", it.distributionDetails)
+            put("outcome", it.outcome)
+            put("reviewNotes", it.reviewNotes)
         })
     }
     prefs.edit().putString("assistance", a.toString()).apply()
