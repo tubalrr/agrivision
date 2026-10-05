@@ -357,6 +357,25 @@ private fun DashboardScreen(
     val submittedIncidents = fieldIncidents.count { it.status == "Submitted" }
     val reviewIncidents = fieldIncidents.count { it.status == "Under Review" }
     val verifiedIncidents = fieldIncidents.count { it.status == "Verified" }
+    val activeIncidents = fieldIncidents.filter { it.status != "Resolved" }
+    val urgentCases = activeIncidents.count {
+        it.severity == "Critical" || it.severity == "High"
+    }
+    val missingEvidence = activeIncidents.count {
+        it.evidenceUri.isBlank() && it.status != "Draft"
+    }
+    val assistancePending = activeIncidents.count { incident ->
+        incident.status == "Verified" &&
+                assistance.none {
+                    it.incidentId == incident.id && it.status == "Completed"
+                }
+    }
+    val closureReady = fieldIncidents.count { incident ->
+        incident.status == "Verified" &&
+                assistance.any {
+                    it.incidentId == incident.id && it.status == "Completed"
+                }
+    }
     var showIncidentDialog by remember { mutableStateOf(false) }
     var reviewIncident by remember { mutableStateOf<FieldIncident?>(null) }
     var timelineIncident by remember { mutableStateOf<FieldIncident?>(null) }
@@ -516,6 +535,19 @@ private fun DashboardScreen(
                     )
                 }
             }
+        }
+
+        item {
+            CaseTriageCard(
+                urgentCases = urgentCases,
+                missingEvidence = missingEvidence,
+                assistancePending = assistancePending,
+                closureReady = closureReady,
+                cases = fieldIncidents,
+                onReviewCase = { incident ->
+                    reviewIncident = incident
+                }
+            )
         }
 
         item {
@@ -732,6 +764,115 @@ private fun DashboardScreen(
             }
         }
     }
+}
+
+@Composable
+private fun CaseTriageCard(
+    urgentCases: Int,
+    missingEvidence: Int,
+    assistancePending: Int,
+    closureReady: Int,
+    cases: List<FieldIncident>,
+    onReviewCase: (FieldIncident) -> Unit
+) {
+    val triageCases = cases
+        .filter { it.status != "Resolved" && (it.severity == "Critical" || it.severity == "High" || it.status == "Submitted" || it.status == "Under Review") }
+        .take(3)
+
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard)
+    ) {
+        Column(
+            Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Case Triage", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Surface cases that need the next operational action.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Text(
+                    activeTriageLabel(urgentCases, assistancePending),
+                    color = if (urgentCases > 0 || assistancePending > 0) AgriWarning else AgriGreen,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TriageMetric("Urgent", urgentCases, Modifier.weight(1f))
+                TriageMetric("Evidence gaps", missingEvidence, Modifier.weight(1f))
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TriageMetric("Assistance pending", assistancePending, Modifier.weight(1f))
+                TriageMetric("Ready to close", closureReady, Modifier.weight(1f))
+            }
+
+            if (triageCases.isEmpty()) {
+                Text(
+                    "No active cases require triage right now.",
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                triageCases.forEach { incident ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(incident.id, fontWeight = FontWeight.Bold)
+                            Text(
+                                incident.type + " · " + incident.severity + " · " + incident.status,
+                                color = AgriMuted,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        TextButton(onClick = { onReviewCase(incident) }) {
+                            Text(if (incident.status == "Submitted") "Review" else "Open")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TriageMetric(
+    label: String,
+    value: Int,
+    modifier: Modifier
+) {
+    Card(
+        modifier,
+        shape = RoundedCornerShape(17.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(value.toString(), color = AgriGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Text(label, color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+private fun activeTriageLabel(
+    urgentCases: Int,
+    assistancePending: Int
+): String {
+    val total = urgentCases + assistancePending
+    return if (total == 0) "Clear" else total.toString() + " attention"
 }
 
 @Composable
