@@ -790,6 +790,25 @@ private fun ProductionFinanceScreen(
                 )
                 DataQualityCard(checks)
             }
+            item { SectionTitle("DA Submission Gate") }
+            item {
+                val checks = listOf(
+                    farmerProfile.farmerName.isNotBlank(),
+                    farmerProfile.farmerId.isNotBlank(),
+                    farmerProfile.farmName.isNotBlank(),
+                    listOf(farmerProfile.barangay, farmerProfile.municipality, farmerProfile.province).all { it.isNotBlank() },
+                    farmerProfile.farmSize.isNotBlank(),
+                    farmerProfile.commodities.isNotBlank(),
+                    totalAnimals > 0 || production.isNotEmpty() || assistance.isNotEmpty()
+                )
+                val ready = checks.all { it }
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = if (ready) AgriGreenSoft else Color(0xFFFFF1D6))) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(if (ready) "Report can be marked Ready for Submission" else "Complete the missing registry data first", fontWeight = FontWeight.Bold)
+                        Text(if (ready) "All required data checks passed." else "Open Farmer & Farm Registry and complete the fields marked as missing.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             item { SectionTitle("DA Report Submission") }
 
             item {
@@ -854,6 +873,7 @@ private fun DataQualityCard(checks: List<Pair<String, Boolean>>) {
                     Text(complete.toString() + "/" + checks.size + " required areas complete", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                 }
                 Text(if (ready) "READY" else "NEEDS INFO", color = if (ready) AgriGreen else AgriWarning, fontWeight = FontWeight.Bold)
+                
             }
             checks.forEach { (label, ok) ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
