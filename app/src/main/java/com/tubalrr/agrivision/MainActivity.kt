@@ -86,7 +86,9 @@ data class FarmerProfile(
     val farmName: String,
     val farmSize: String,
     val landTenure: String,
-    val commodities: String
+    val commodities: String,
+    val registryStatus: String = "For Review",
+    val reviewNotes: String = ""
 )
 
 class MainActivity : ComponentActivity() {
@@ -757,6 +759,7 @@ private fun ProductionFinanceScreen(
                 }
             }
             item { SectionTitle("Farmer & Farm Summary") }
+            item { RegistryReviewCard(farmerProfile.registryStatus, farmerProfile.reviewNotes) }
             item {
                 ReportSummaryGrid(listOf(
                     "Farmer ID" to farmerProfile.farmerId.ifBlank { "—" },
@@ -998,6 +1001,24 @@ private fun ReportSubmissionDialog(
     )
 }
 
+@Composable
+private fun RegistryReviewCard(status: String, notes: String) {
+    val color = when (status) {
+        "Verified" -> AgriGreen
+        "Returned" -> AgriWarning
+        else -> AgriMuted
+    }
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text("DA Registry Review", fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Status", color = AgriMuted, modifier = Modifier.weight(1f))
+                Text(status, color = color, fontWeight = FontWeight.Bold)
+            }
+            Text(if (notes.isBlank()) "No review notes recorded." else "Review notes: " + notes, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
 @Composable
 private fun ReportSummaryGrid(items: List<Pair<String, String>>) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1862,6 +1883,8 @@ private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.
             put("farmSize", prefs.getString("farmSize", ""))
             put("landTenure", prefs.getString("landTenure", ""))
             put("commodities", prefs.getString("commodities", ""))
+            put("registryStatus", prefs.getString("registryStatus", "For Review"))
+            put("reviewNotes", prefs.getString("reviewNotes", ""))
         })
     }
     context.contentResolver.openOutputStream(uri)?.use { output ->
@@ -1896,6 +1919,8 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
         edit.putString("farmSize", p.optString("farmSize"))
         edit.putString("landTenure", p.optString("landTenure"))
         edit.putString("commodities", p.optString("commodities"))
+        edit.putString("registryStatus", p.optString("registryStatus", "For Review"))
+        edit.putString("reviewNotes", p.optString("reviewNotes"))
     }
     edit.apply()
 }
@@ -1958,7 +1983,9 @@ private fun loadFarmerProfile(prefs: android.content.SharedPreferences): FarmerP
         prefs.getString("farmName", "") ?: "",
         prefs.getString("farmSize", "") ?: "",
         prefs.getString("landTenure", "") ?: "",
-        prefs.getString("commodities", "") ?: ""
+        prefs.getString("commodities", "") ?: "",
+        prefs.getString("registryStatus", "For Review") ?: "For Review",
+        prefs.getString("reviewNotes", "") ?: ""
     )
 }
 
@@ -1974,6 +2001,8 @@ private fun saveFarmerProfile(prefs: android.content.SharedPreferences, profile:
         .putString("farmSize", profile.farmSize)
         .putString("landTenure", profile.landTenure)
         .putString("commodities", profile.commodities)
+        .putString("registryStatus", profile.registryStatus)
+        .putString("reviewNotes", profile.reviewNotes)
         .apply()
 }
 
