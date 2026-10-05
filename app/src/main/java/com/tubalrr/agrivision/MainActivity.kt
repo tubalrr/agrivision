@@ -474,7 +474,9 @@ private fun LiveFieldMap(
 ) {
     val context = LocalContext.current
     var currentLocation by remember { mutableStateOf<Location?>(null) }
-    var locationMessage by remember { mutableStateOf("Field location not set") }
+    var pendingLocation by remember { mutableStateOf<Location?>(null) }
+    var locationMessage by remember { mutableStateOf("Farm location not set") }
+    var settingLocation by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
 
     val savedLocation = remember(field?.latitude, field?.longitude) {
@@ -492,6 +494,7 @@ private fun LiveFieldMap(
 
     LaunchedEffect(savedLocation) {
         savedLocation?.let {
+            locationMessage = "Saved farm location"
             cameraPositionState.animate(
                 CameraUpdateFactory.newLatLngZoom(it, 18f),
                 600
@@ -501,22 +504,31 @@ private fun LiveFieldMap(
 
     fun saveLocation(location: Location) {
         currentLocation = location
-        locationMessage = "Field located · %.6f, %.6f".format(
+        pendingLocation = null
+        settingLocation = false
+        locationMessage = "Farm location saved · %.6f, %.6f".format(
             location.latitude,
             location.longitude
         )
         onFieldLocationSelected(location)
     }
 
+    fun chooseLocation(location: Location) {
+        pendingLocation = location
+        currentLocation = location
+        settingLocation = true
+        locationMessage = "Location selected · tap Save Farm Location"
+        cameraPositionState.move(
+            CameraUpdateFactory.newLatLngZoom(
+                LatLng(location.latitude, location.longitude),
+                19f
+            )
+        )
+    }
+
     fun getPhoneLocation() {
-        val fine = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarse = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
         if (!fine && !coarse) {
             locationMessage = "Allow phone location permission first"
@@ -539,7 +551,7 @@ private fun LiveFieldMap(
         }
 
         loading = true
-        locationMessage = "Finding your field location…"
+        locationMessage = "Finding your current location…"
 
         try {
             val providers = locationManager.getProviders(true)
@@ -547,16 +559,12 @@ private fun LiveFieldMap(
                 .mapNotNull { locationManager.getLastKnownLocation(it) }
                 .minByOrNull { it.accuracy.toDouble() }
 
-            if (lastKnown != null) {
-                saveLocation(lastKnown)
-            }
+            if (lastKnown != null) chooseLocation(lastKnown)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val provider = when {
-                    locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ->
-                        LocationManager.NETWORK_PROVIDER
-                    locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ->
-                        LocationManager.GPS_PROVIDER
+                    locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+                    locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
                     else -> null
                 }
 
@@ -568,16 +576,9 @@ private fun LiveFieldMap(
                     ) { location ->
                         loading = false
                         if (location != null) {
-                            saveLocation(location)
-                            cameraPositionState.move(
-                                CameraUpdateFactory.newLatLngZoom(
-                                    LatLng(location.latitude, location.longitude),
-                                    19f
-                                )
-                            )
+                            chooseLocation(location)
                         } else if (lastKnown == null) {
-                            locationMessage =
-                                "No GPS fix yet. Try outdoors or near a window."
+                            locationMessage = "No GPS fix yet. Try outdoors or near a window."
                         }
                     }
                 } else {
@@ -602,9 +603,9 @@ private fun LiveFieldMap(
         else locationMessage = "Location permission was denied"
     }
 
-    val markerLocation = currentLocation?.let {
-        LatLng(it.latitude, it.longitude)
-    } ?: savedLocation
+    val markerLocation = pendingLocation?.let { LatLng(it.latitude, it.longitude) }
+        ?: currentLocation?.let { LatLng(it.latitude, it.longitude) }
+        ?: savedLocation
 
     Card(
         Modifier.fillMaxWidth().height(350.dp),
@@ -615,9 +616,7 @@ private fun LiveFieldMap(
             GoogleMap(
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp)),
                 cameraPositionState = cameraPositionState,
-                properties = MapProperties(
-                    mapType = MapType.SATELLITE
-                ),
+                properties = MapProperties(mapType = MapType.SATELLITE),
                 uiSettings = MapUiSettings(
                     zoomControlsEnabled = true,
                     mapToolbarEnabled = false,
@@ -626,15 +625,14 @@ private fun LiveFieldMap(
                     tiltGesturesEnabled = true
                 ),
                 onMapLongClick = { point ->
-                    val location = Location("map").apply {
-                        latitude = point.latitude
-                        longitude = point.longitude
-                        accuracy = 1f
+                    if (settingLocation) {
+                        val location = Location("map").apply {
+                            latitude = point.latitude
+                            longitude = point.longitude
+                            accuracy = 1f
+                        }
+                        chooseLocation(location)
                     }
-                    saveLocation(location)
-                    cameraPositionState.move(
-                        CameraUpdateFactory.newLatLngZoom(point, 19f)
-                    )
                 }
             ) {
                 markerLocation?.let { point ->
@@ -647,95 +645,66 @@ private fun LiveFieldMap(
             }
 
             Row(
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
+                Modifier.align(Alignment.TopStart).padding(12.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color(0xEEFFFDF4))
                     .padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Outlined.Map,
-                    contentDescription = null,
-                    tint = AgriGreen,
-                    modifier = Modifier.size(19.dp)
-                )
+                Icon(Icons.Outlined.Map, contentDescription = null, tint = AgriGreen, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(7.dp))
                 Column {
-                    Text(
-                        field?.name ?: "Farm Field",
-                        fontWeight = FontWeight.Bold,
-                        color = AgriText,
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                    Text(
-                        locationMessage,
-                        color = AgriMuted,
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    Text(field?.name ?: "Farm Field", fontWeight = FontWeight.Bold, color = AgriText, style = MaterialTheme.typography.labelLarge)
+                    Text(locationMessage, color = AgriMuted, style = MaterialTheme.typography.labelSmall)
                 }
             }
 
             Row(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(12.dp),
+                Modifier.align(Alignment.BottomStart).padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
                     onClick = {
-                        val fine = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        val coarse = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        if (fine || coarse) {
-                            getPhoneLocation()
+                        if (settingLocation && pendingLocation != null) {
+                            saveLocation(pendingLocation!!)
                         } else {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
+                            settingLocation = true
+                            locationMessage = "Long-press the exact farm location"
                         }
                     },
                     enabled = !loading,
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 13.dp, vertical = 8.dp)
                 ) {
-                    Text(if (loading) "Locating…" else "Use My Location")
+                    Text(
+                        when {
+                            loading -> "Locating…"
+                            pendingLocation != null -> "Save Farm Location"
+                            settingLocation -> "Select on Map"
+                            else -> "Set Farm Location"
+                        }
+                    )
                 }
 
                 OutlinedButton(
                     onClick = {
                         markerLocation?.let {
-                            cameraPositionState.move(
-                                CameraUpdateFactory.newLatLngZoom(it, 19f)
-                            )
+                            cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(it, 19f))
                         }
                     },
                     enabled = markerLocation != null,
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 13.dp, vertical = 8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xEEFFFDF4)
-                    )
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xEEFFFDF4))
                 ) {
-                    Text("Field")
+                    Text("Farm")
                 }
             }
 
             Text(
-                "Google Satellite · Drag · Pinch · Rotate · Long-press to set field",
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp)
+                if (settingLocation) "SELECT MODE · Long-press the exact farm location"
+                else "Google Satellite · Drag · Pinch · Rotate",
+                Modifier.align(Alignment.BottomEnd).padding(12.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xEEFFFDF4))
                     .padding(horizontal = 10.dp, vertical = 7.dp),
