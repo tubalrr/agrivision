@@ -34,16 +34,13 @@ import android.os.CancellationSignal
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapType
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberUpdatedMarkerState
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Checklist
@@ -473,139 +470,135 @@ private fun LiveFieldMap(
     onFieldLocationSelected: (Location) -> Unit
 ) {
     val context = LocalContext.current
-    var currentLocation by remember { mutableStateOf<Location?>(null) }
     var pendingLocation by remember { mutableStateOf<Location?>(null) }
     var locationMessage by remember { mutableStateOf("Farm location not set") }
     var settingLocation by remember { mutableStateOf(false) }
-    var loading by remember { mutableStateOf(false) }
+    var mapReady by remember { mutableStateOf(false) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
-    val savedLocation = remember(field?.latitude, field?.longitude) {
-        if (field?.latitude != null && field.longitude != null) {
-            LatLng(field.latitude, field.longitude)
-        } else null
-    }
+    val savedLat = field?.latitude
+    val savedLng = field?.longitude
 
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(
-            savedLocation ?: LatLng(12.8797, 121.7740),
-            if (savedLocation != null) 18f else 6f
-        )
-    }
-
-    LaunchedEffect(savedLocation) {
-        savedLocation?.let {
-            locationMessage = "Saved farm location"
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(it, 18f),
-                600
-            )
+    fun selectLocation(latitude: Double, longitude: Double) {
+        val location = Location("map").apply {
+            this.latitude = latitude
+            this.longitude = longitude
+            accuracy = 1f
         }
-    }
-
-    fun saveLocation(location: Location) {
-        currentLocation = location
-        pendingLocation = null
-        settingLocation = false
-        locationMessage = "Farm location saved · %.6f, %.6f".format(
-            location.latitude,
-            location.longitude
-        )
-        onFieldLocationSelected(location)
-    }
-
-    fun chooseLocation(location: Location) {
         pendingLocation = location
-        currentLocation = location
         settingLocation = true
         locationMessage = "Location selected · tap Save Farm Location"
-        cameraPositionState.move(
-            CameraUpdateFactory.newLatLngZoom(
-                LatLng(location.latitude, location.longitude),
-                19f
-            )
+    }
+
+    fun saveLocation() {
+        val location = pendingLocation ?: return
+        settingLocation = false
+        pendingLocation = null
+        locationMessage = "Farm location saved · %.6f, %.6f".format(
+            location.latitude, location.longitude
+        )
+        onFieldLocationSelected(location)
+        webViewRef?.evaluateJavascript(
+            "setFarmLocation(" + location.latitude + ", " + location.longitude + ", true);",
+            null
         )
     }
 
-    fun getPhoneLocation() {
-        val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-        if (!fine && !coarse) {
-            locationMessage = "Allow phone location permission first"
-            loading = false
-            return
-        }
-
-        val locationManager = context.getSystemService(LocationManager::class.java)
-        val enabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            locationManager.isLocationEnabled
-        } else {
-            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-        }
-
-        if (!enabled) {
-            locationMessage = "Turn on Location/GPS"
-            loading = false
-            return
-        }
-
-        loading = true
-        locationMessage = "Finding your current location…"
-
-        try {
-            val providers = locationManager.getProviders(true)
-            val lastKnown = providers
-                .mapNotNull { locationManager.getLastKnownLocation(it) }
-                .minByOrNull { it.accuracy.toDouble() }
-
-            if (lastKnown != null) chooseLocation(lastKnown)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val provider = when {
-                    locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-                    locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-                    else -> null
+    val mapBridge = remember {
+        object {
+            @JavascriptInterface
+            fun selectLocation(latitude: Double, longitude: Double) {
+                context.mainExecutor.execute {
+                    selectLocation(latitude, longitude)
                 }
-
-                if (provider != null) {
-                    locationManager.getCurrentLocation(
-                        provider,
-                        CancellationSignal(),
-                        context.mainExecutor
-                    ) { location ->
-                        loading = false
-                        if (location != null) {
-                            chooseLocation(location)
-                        } else if (lastKnown == null) {
-                            locationMessage = "No GPS fix yet. Try outdoors or near a window."
-                        }
-                    }
-                } else {
-                    loading = false
-                }
-            } else {
-                loading = false
             }
-        } catch (_: SecurityException) {
-            loading = false
-            locationMessage = "Location permission is required"
         }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val granted =
-            result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) getPhoneLocation()
-        else locationMessage = "Location permission was denied"
+    LaunchedEffect(savedLat, savedLng, mapReady) {
+        if (mapReady && savedLat != null && savedLng != null) {
+            locationMessage = "Saved farm location"
+            webViewRef?.evaluateJavascript(
+                "setFarmLocation($savedLat, $savedLng, true);",
+                null
+            )
+        }
     }
 
-    val markerLocation = pendingLocation?.let { LatLng(it.latitude, it.longitude) }
-        ?: currentLocation?.let { LatLng(it.latitude, it.longitude) }
-        ?: savedLocation
+    val html = remember {
+        """
+        <!doctype html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+          <style>
+            html, body, #map { height:100%; width:100%; margin:0; padding:0; }
+            body { overflow:hidden; font-family:Arial,sans-serif; }
+            .leaflet-control-attribution { font-size:9px; }
+            .leaflet-control-layers { font-size:12px; }
+          </style>
+        </head>
+        <body>
+          <div id="map"></div>
+          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <script>
+            const map = L.map('map', {
+              center: [12.8797, 121.7740],
+              zoom: 6,
+              zoomControl: true,
+              attributionControl: true
+            });
+
+            const satellite = L.tileLayer(
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+              { maxZoom: 19, attribution: 'Tiles © Esri' }
+            ).addTo(map);
+
+            const streets = L.tileLayer(
+              'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              { maxZoom: 19, attribution: '© OpenStreetMap contributors' }
+            );
+
+            L.control.layers({
+              'Satellite': satellite,
+              'Map': streets
+            }, null, { position:'topright', collapsed:true }).addTo(map);
+
+            let marker = null;
+            let selectionEnabled = false;
+
+            function setSelectionMode(enabled) {
+              selectionEnabled = enabled;
+              document.body.style.cursor = enabled ? 'crosshair' : 'default';
+            }
+
+            function setFarmLocation(lat, lng, saved) {
+              const point = [lat, lng];
+              if (marker) marker.setLatLng(point);
+              else marker = L.marker(point).addTo(map);
+              marker.bindPopup(saved ? 'Saved Farm Location' : 'Selected Farm Location');
+              map.setView(point, 18, { animate:true });
+              marker.openPopup();
+            }
+
+            function choosePoint(e) {
+              if (selectionEnabled && window.AndroidMap) {
+                window.AndroidMap.selectLocation(e.latlng.lat, e.latlng.lng);
+                setFarmLocation(e.latlng.lat, e.latlng.lng, false);
+              }
+            }
+
+            map.on('click', choosePoint);
+            map.on('contextmenu', choosePoint);
+
+            window.setSelectionMode = setSelectionMode;
+            window.setFarmLocation = setFarmLocation;
+          </script>
+        </body>
+        </html>
+        """.trimIndent()
+    }
 
     Card(
         Modifier.fillMaxWidth().height(350.dp),
@@ -613,36 +606,41 @@ private fun LiveFieldMap(
         colors = CardDefaults.cardColors(containerColor = AgriCard)
     ) {
         Box(Modifier.fillMaxSize()) {
-            GoogleMap(
+            AndroidView(
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp)),
-                cameraPositionState = cameraPositionState,
-                properties = MapProperties(mapType = MapType.SATELLITE),
-                uiSettings = MapUiSettings(
-                    zoomControlsEnabled = true,
-                    mapToolbarEnabled = false,
-                    compassEnabled = true,
-                    rotationGesturesEnabled = true,
-                    tiltGesturesEnabled = true
-                ),
-                onMapLongClick = { point ->
-                    if (settingLocation) {
-                        val location = Location("map").apply {
-                            latitude = point.latitude
-                            longitude = point.longitude
-                            accuracy = 1f
+                factory = {
+                    WebView(context).apply {
+                        webViewRef = this
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.loadsImagesAutomatically = true
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                mapReady = true
+                                view?.evaluateJavascript("setSelectionMode($settingLocation);", null)
+                                if (savedLat != null && savedLng != null) {
+                                    view?.evaluateJavascript(
+                                        "setFarmLocation($savedLat, $savedLng, true);", null
+                                    )
+                                }
+                            }
                         }
-                        chooseLocation(location)
+                        addJavascriptInterface(mapBridge, "AndroidMap")
+                        loadDataWithBaseURL(
+                            "https://agrivision.local/",
+                            html, "text/html", "UTF-8", null
+                        )
+                    }
+                },
+                update = { webView ->
+                    webViewRef = webView
+                    if (mapReady) {
+                        webView.evaluateJavascript("setSelectionMode($settingLocation);", null)
                     }
                 }
-            ) {
-                markerLocation?.let { point ->
-                    Marker(
-                        state = rememberUpdatedMarkerState(position = point),
-                        title = field?.name ?: "Farm Field",
-                        snippet = (field?.crop ?: "Rice") + " · " + (field?.area ?: "1.0 ha")
-                    )
-                }
-            }
+            )
 
             Row(
                 Modifier.align(Alignment.TopStart).padding(12.dp)
@@ -665,34 +663,29 @@ private fun LiveFieldMap(
             ) {
                 Button(
                     onClick = {
-                        if (settingLocation && pendingLocation != null) {
-                            saveLocation(pendingLocation!!)
+                        if (pendingLocation != null) {
+                            saveLocation()
                         } else {
                             settingLocation = true
-                            locationMessage = "Long-press the exact farm location"
+                            locationMessage = "Tap or long-press the exact farm location"
+                            webViewRef?.evaluateJavascript("setSelectionMode(true);", null)
                         }
                     },
-                    enabled = !loading,
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 13.dp, vertical = 8.dp)
                 ) {
-                    Text(
-                        when {
-                            loading -> "Locating…"
-                            pendingLocation != null -> "Save Farm Location"
-                            settingLocation -> "Select on Map"
-                            else -> "Set Farm Location"
-                        }
-                    )
+                    Text(if (pendingLocation != null) "Save Farm Location" else "Set Farm Location")
                 }
 
                 OutlinedButton(
                     onClick = {
-                        markerLocation?.let {
-                            cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(it, 19f))
+                        if (savedLat != null && savedLng != null) {
+                            webViewRef?.evaluateJavascript(
+                                "setFarmLocation($savedLat, $savedLng, true);", null
+                            )
                         }
                     },
-                    enabled = markerLocation != null,
+                    enabled = savedLat != null && savedLng != null,
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 13.dp, vertical = 8.dp),
                     colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xEEFFFDF4))
@@ -702,8 +695,10 @@ private fun LiveFieldMap(
             }
 
             Text(
-                if (settingLocation) "SELECT MODE · Long-press the exact farm location"
-                else "Google Satellite · Drag · Pinch · Rotate",
+                if (settingLocation)
+                    "SELECT MODE · Tap or long-press the exact farm location"
+                else
+                    "Satellite · Drag · Pinch · Zoom",
                 Modifier.align(Alignment.BottomEnd).padding(12.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xEEFFFDF4))
