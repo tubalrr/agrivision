@@ -19,18 +19,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import io.github.sceneview.SceneView
-import io.github.sceneview.rememberCameraManipulator
-import io.github.sceneview.rememberCameraNode
-import io.github.sceneview.rememberEngine
-import io.github.sceneview.rememberMaterialLoader
-import io.github.sceneview.node.CubeNode
-import io.github.sceneview.node.CylinderNode
-import io.github.sceneview.node.ConeNode
-import io.github.sceneview.node.PlaneNode
-import io.github.sceneview.node.SphereNode
-import io.github.sceneview.math.Position
-import io.github.sceneview.math.Size
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapType
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberUpdatedMarkerState
 
 private val AgriCream = Color(0xFFF7F4E9)
 private val AgriCard = Color(0xFFFFFCF5)
@@ -42,7 +40,13 @@ private val AgriText = Color(0xFF183526)
 private val AgriMuted = Color(0xFF7A806F)
 private val AgriLine = Color(0xFFE5E2D6)
 
-data class FarmField(val name: String, val crop: String, val area: String)
+data class FarmField(
+    val name: String,
+    val crop: String,
+    val area: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null
+)
 data class FarmInput(val name: String, val quantity: String, val unit: String)
 data class FarmTask(val title: String, val date: String, val done: Boolean)
 
@@ -209,15 +213,19 @@ private fun DashboardScreen(
         }
 
         item {
-            SectionTitle("3D Farm View", "Drag · Pinch · Explore")
+            SectionTitle("Live Google Field Map", "Satellite · Long-press to pin")
             Spacer(Modifier.height(10.dp))
-            Card(
-                Modifier.fillMaxWidth().height(300.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFE5E8D8))
-            ) {
-                Farm3DScene(Modifier.fillMaxSize())
-            }
+            LiveFieldMap(
+                field = fields.firstOrNull(),
+                onFieldLocationSelected = { point ->
+                    if (fields.isNotEmpty()) {
+                        fields[0] = fields[0].copy(
+                            latitude = point.latitude,
+                            longitude = point.longitude
+                        )
+                    }
+                }
+            )
         }
 
         item {
@@ -269,300 +277,130 @@ private fun DashboardScreen(
 }
 
 @Composable
-private fun Farm3DScene(modifier: Modifier = Modifier) {
-    val engine = rememberEngine()
-    val materialLoader = rememberMaterialLoader(engine)
-
-    val grass = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF5E7F49))
-    }
-    val grassLight = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF87A965))
-    }
-    val paddy = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF79A75C))
-    }
-    val rice = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFFB6C878))
-    }
-    val soil = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF8A6C4C))
-    }
-    val path = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFFC3A57B))
-    }
-    val water = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF6AA9BB))
-    }
-    val house = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFFE6D09F))
-    }
-    val roof = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF7D4F35))
-    }
-    val trunk = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF76553A))
-    }
-    val treeTop = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF2F6B3F))
-    }
-    val mountain = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF758B78))
-    }
-    val mountainFar = remember(materialLoader) {
-        materialLoader.createColorInstance(Color(0xFF91A39A))
+private fun LiveFieldMap(
+    field: FarmField?,
+    onFieldLocationSelected: (LatLng) -> Unit
+) {
+    val defaultCenter = LatLng(12.8797, 121.7740)
+    val fieldLocation = remember(field?.latitude, field?.longitude) {
+        if (field?.latitude != null && field.longitude != null) {
+            LatLng(field.latitude, field.longitude)
+        } else {
+            null
+        }
     }
 
-    val cameraNode = rememberCameraNode(engine) {
-        position = Position(x = 6.6f, y = 5.8f, z = 8.2f)
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(
+            fieldLocation ?: defaultCenter,
+            if (fieldLocation != null) 18f else 5.5f
+        )
     }
-    Box(modifier.background(Color(0xFFD9DEC9))) {
-        SceneView(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            materialLoader = materialLoader,
-            cameraNode = cameraNode,
-            cameraManipulator = rememberCameraManipulator()
-        ) {
-            // Base terrain
-            PlaneNode(
-                size = Size(x = 14f, y = 12f),
-                materialInstance = grass,
-                position = Position(y = -0.15f)
-            )
 
-            // Distant hills to make the farm feel like a real landscape
-            ConeNode(
-                radius = 4.8f,
-                height = 3.6f,
-                sideCount = 6,
-                materialInstance = mountainFar,
-                position = Position(x = -5.0f, y = 1.6f, z = -4.8f)
+    LaunchedEffect(fieldLocation) {
+        if (fieldLocation != null) {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(fieldLocation, 19f),
+                700
             )
-            ConeNode(
-                radius = 4.3f,
-                height = 3.2f,
-                sideCount = 6,
-                materialInstance = mountain,
-                position = Position(x = 1.6f, y = 1.35f, z = -5.2f)
-            )
-            ConeNode(
-                radius = 3.8f,
-                height = 2.8f,
-                sideCount = 6,
-                materialInstance = mountainFar,
-                position = Position(x = 6.0f, y = 1.2f, z = -4.8f)
-            )
+        }
+    }
 
-            // Main access road and irrigation canal
-            CubeNode(
-                size = Size(x = 12f, y = 0.08f, z = 0.72f),
-                materialInstance = path,
-                position = Position(x = 0f, y = 0.02f, z = 2.8f)
-            )
-            CubeNode(
-                size = Size(x = 0.48f, y = 0.05f, z = 10f),
-                materialInstance = water,
-                position = Position(x = 4.6f, y = 0.04f, z = -0.3f)
-            )
-
-            // North rice paddy
-            CubeNode(
-                size = Size(x = 4.2f, y = 0.16f, z = 2.3f),
-                materialInstance = paddy,
-                position = Position(x = -2.4f, y = 0.02f, z = -0.2f)
-            )
-            CubeNode(
-                size = Size(x = 3.6f, y = 0.16f, z = 2.2f),
-                materialInstance = rice,
-                position = Position(x = -2.7f, y = 0.12f, z = -0.12f)
-            )
-
-            // South crop block
-            CubeNode(
-                size = Size(x = 4.0f, y = 0.16f, z = 2.4f),
-                materialInstance = soil,
-                position = Position(x = 1.1f, y = 0.02f, z = 0.0f)
-            )
-            repeat(5) { row ->
-                val z = -0.92f + row * 0.46f
-                CubeNode(
-                    size = Size(x = 3.2f, y = 0.05f, z = 0.09f),
-                    materialInstance = paddy,
-                    position = Position(x = 1.1f, y = 0.15f, z = z)
-                )
-                repeat(6) { col ->
-                    val x = -0.25f + col * 0.54f
-                    CylinderNode(
-                        radius = 0.035f,
-                        height = 0.26f,
-                        sideCount = 10,
-                        materialInstance = grass,
-                        position = Position(x = x, y = 0.30f, z = z)
-                    )
-                    SphereNode(
-                        radius = 0.09f,
-                        stacks = 8,
-                        slices = 8,
-                        materialInstance = treeTop,
-                        position = Position(x = x + 0.02f, y = 0.44f, z = z)
+    Card(
+        Modifier.fillMaxWidth().height(320.dp),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFE5E8D8))
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp)),
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(mapType = MapType.SATELLITE),
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = false,
+                    mapToolbarEnabled = false,
+                    compassEnabled = true,
+                    rotationGesturesEnabled = true,
+                    tiltGesturesEnabled = true
+                ),
+                onMapLongClick = onFieldLocationSelected
+            ) {
+                fieldLocation?.let { location ->
+                    Marker(
+                        state = rememberUpdatedMarkerState(position = location),
+                        title = field?.name ?: "Farm Field",
+                        snippet = (field?.crop ?: "Crop") + " · " + (field?.area ?: "")
                     )
                 }
             }
 
-            // Farm house
-            CubeNode(
-                size = Size(x = 1.25f, y = 0.95f, z = 1.05f),
-                materialInstance = house,
-                position = Position(x = -0.9f, y = 0.48f, z = -2.15f)
-            )
-            ConeNode(
-                radius = 1.0f,
-                height = 0.72f,
-                sideCount = 4,
-                materialInstance = roof,
-                position = Position(x = -0.9f, y = 1.28f, z = -2.15f)
-            )
-            CubeNode(
-                size = Size(x = 0.24f, y = 0.42f, z = 0.08f),
-                materialInstance = roof,
-                position = Position(x = -0.9f, y = 0.36f, z = -1.62f)
-            )
-
-            // Small storage shed + silo
-            CubeNode(
-                size = Size(x = 0.85f, y = 0.68f, z = 0.72f),
-                materialInstance = path,
-                position = Position(x = 2.65f, y = 0.35f, z = -1.95f)
-            )
-            ConeNode(
-                radius = 0.63f,
-                height = 0.45f,
-                sideCount = 4,
-                materialInstance = roof,
-                position = Position(x = 2.65f, y = 0.92f, z = -1.95f)
-            )
-            CylinderNode(
-                radius = 0.28f,
-                height = 0.85f,
-                sideCount = 24,
-                materialInstance = house,
-                position = Position(x = 3.48f, y = 0.43f, z = -1.9f)
-            )
-            ConeNode(
-                radius = 0.31f,
-                height = 0.28f,
-                sideCount = 24,
-                materialInstance = roof,
-                position = Position(x = 3.48f, y = 0.98f, z = -1.9f)
-            )
-
-            // Tree row
-            listOf(
-                Position(x = -5.1f, y = 0.42f, z = 1.5f),
-                Position(x = -4.1f, y = 0.42f, z = 1.65f),
-                Position(x = 5.25f, y = 0.42f, z = 1.2f),
-                Position(x = 5.25f, y = 0.42f, z = 0.0f)
-            ).forEach { p ->
-                CylinderNode(
-                    radius = 0.18f,
-                    height = 0.84f,
-                    sideCount = 18,
-                    materialInstance = trunk,
-                    position = p
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xEFFFFFFF))
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier.size(9.dp).clip(CircleShape).background(AgriGreen)
                 )
-                SphereNode(
-                    radius = 0.53f,
-                    stacks = 12,
-                    slices = 12,
-                    materialInstance = treeTop,
-                    position = Position(x = p.x, y = 1.08f, z = p.z)
-                )
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text(
+                        "SATELLITE",
+                        fontWeight = FontWeight.Bold,
+                        color = AgriText,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Text(
+                        if (fieldLocation == null)
+                            "Long-press the actual field to pin it"
+                        else
+                            "Field pinned · " + fieldLocation.latitude + ", " + fieldLocation.longitude,
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
             }
 
-            // Footpaths between farm sections
-            CubeNode(
-                size = Size(x = 0.22f, y = 0.06f, z = 4.8f),
-                materialInstance = path,
-                position = Position(x = -0.15f, y = 0.12f, z = 0.15f)
-            )
-            CubeNode(
-                size = Size(x = 5.4f, y = 0.06f, z = 0.22f),
-                materialInstance = path,
-                position = Position(x = 0.35f, y = 0.12f, z = -1.2f)
-            )
-        }
-
-        // Lightweight map HUD for context and polish.
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(12.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xF0FFFDF4))
-                .padding(horizontal = 12.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                Modifier
-                    .size(9.dp)
-                    .clip(CircleShape)
-                    .background(AgriGreen)
-            )
-            Spacer(Modifier.width(8.dp))
-            Column {
-                Text(
-                    "NORTH FIELD",
-                    fontWeight = FontWeight.Bold,
-                    color = AgriText,
-                    style = MaterialTheme.typography.labelMedium
-                )
-                Text(
-                    "Rice · 1.0 ha · Healthy 92%",
-                    color = AgriMuted,
-                    style = MaterialTheme.typography.labelSmall
-                )
+            if (fieldLocation == null) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xEEFFFDF4))
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("📍", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        "Set the real field location",
+                        fontWeight = FontWeight.Bold,
+                        color = AgriText
+                    )
+                    Text(
+                        "Long-press the actual field on satellite view",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
-        }
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
             Text(
-                "3D",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
+                "Google Satellite · Drag · Pinch · Rotate",
                 modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(AgriGreen)
-                    .padding(horizontal = 11.dp, vertical = 8.dp)
-            )
-            Text(
-                "LIVE MAP",
-                color = AgriGreen,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xF0FFFDF4))
-                    .padding(horizontal = 11.dp, vertical = 8.dp)
+                    .background(Color(0xD9FFFDF4))
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                color = AgriText,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
             )
         }
-
-        Text(
-            "Drag to orbit · Pinch to zoom",
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xD9FFFDF4))
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            color = AgriText,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold
-        )
     }
 }
 
