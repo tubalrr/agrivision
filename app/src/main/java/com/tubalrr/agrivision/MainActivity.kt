@@ -92,6 +92,12 @@ data class FieldIncident(
     val evidenceUri: String = "",
     val reviewNotes: String = ""
 )
+data class IncidentEvent(
+    val incidentId: String,
+    val status: String,
+    val note: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
 data class FarmerProfile(
     val farmerName: String,
     val farmerId: String,
@@ -185,6 +191,9 @@ private fun AgriVisionApp(
     }
     val fieldIncidents = remember {
         mutableStateListOf<FieldIncident>().apply { addAll(loadFieldIncidents(farmPrefs)) }
+    }
+    val incidentEvents = remember {
+        mutableStateListOf<IncidentEvent>().apply { addAll(loadIncidentEvents(farmPrefs)) }
     }
 
     val scheme = lightColorScheme(
@@ -329,15 +338,26 @@ private fun DashboardScreen(
     val verifiedIncidents = fieldIncidents.count { it.status == "Verified" }
     var showIncidentDialog by remember { mutableStateOf(false) }
     var reviewIncident by remember { mutableStateOf<FieldIncident?>(null) }
+    var timelineIncident by remember { mutableStateOf<FieldIncident?>(null) }
 
     if (showIncidentDialog) {
         AddFieldIncidentDialog(
             onDismiss = { showIncidentDialog = false },
             onSave = { incident ->
                 fieldIncidents.add(incident)
+                incidentEvents.add(IncidentEvent(incident.id, "Draft", "Report created"))
                 saveFieldIncidents(farmPrefs, fieldIncidents)
+                saveIncidentEvents(farmPrefs, incidentEvents)
                 showIncidentDialog = false
             }
+        )
+    }
+
+    timelineIncident?.let { incident ->
+        IncidentTimelineDialog(
+            incident = incident,
+            events = incidentEvents.filter { it.incidentId == incident.id }.sortedByDescending { it.timestamp },
+            onDismiss = { timelineIncident = null }
         )
     }
 
@@ -349,6 +369,16 @@ private fun DashboardScreen(
                 val index = fieldIncidents.indexOfFirst { it.id == updated.id }
                 if (index >= 0) {
                     fieldIncidents[index] = updated
+                    if (updated.status != incident.status || updated.reviewNotes != incident.reviewNotes) {
+                        incidentEvents.add(
+                            IncidentEvent(
+                                incidentId = updated.id,
+                                status = updated.status,
+                                note = updated.reviewNotes.ifBlank { "Reviewer updated case status" }
+                            )
+                        )
+                        saveIncidentEvents(farmPrefs, incidentEvents)
+                    }
                     saveFieldIncidents(farmPrefs, fieldIncidents)
                 }
                 reviewIncident = null
@@ -535,10 +565,23 @@ private fun DashboardScreen(
                         val index = fieldIncidents.indexOfFirst { it.id == incident.id }
                         if (index >= 0) {
                             fieldIncidents[index] = incident.copy(status = next)
+                            incidentEvents.add(
+                                IncidentEvent(
+                                    incidentId = incident.id,
+                                    status = next,
+                                    note = when (next) {
+                                        "Submitted" -> "Farmer submitted field report"
+                                        "Resolved" -> "Case marked resolved"
+                                        else -> "Case status updated"
+                                    }
+                                )
+                            )
                             saveFieldIncidents(farmPrefs, fieldIncidents)
+                            saveIncidentEvents(farmPrefs, incidentEvents)
                         }
                     },
                     onReview = { reviewIncident = incident },
+                    onTimeline = { timelineIncident = incident },
                     onCreateAssistance = {
                         if (!assistance.any { it.incidentId == incident.id }) {
                             assistance.add(
@@ -553,6 +596,14 @@ private fun DashboardScreen(
                                 )
                             )
                             saveAssistance(farmPrefs, assistance)
+                            incidentEvents.add(
+                                IncidentEvent(
+                                    incidentId = incident.id,
+                                    status = "Assistance Requested",
+                                    note = "Assistance request linked to verified incident"
+                                )
+                            )
+                            saveIncidentEvents(farmPrefs, incidentEvents)
                         }
                     }
                 )
@@ -681,6 +732,7 @@ private fun FieldIncidentCard(
     hasAssistanceRequest: Boolean,
     onStatusChange: (String) -> Unit,
     onReview: () -> Unit,
+    onTimeline: () -> Unit,
     onCreateAssistance: () -> Unit
 ) {
     Card(
@@ -741,6 +793,7 @@ private fun FieldIncidentCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                TextButton(onClick = onTimeline) { Text("Timeline") }
                 when (incident.status) {
                     "Draft", "Returned" -> {
                         TextButton(onClick = { onStatusChange("Submitted") }) {
@@ -776,6 +829,68 @@ private fun FieldIncidentCard(
             }
         }
     }
+}
+
+@Composable
+private fun IncidentTimelineDialog(
+    incident: FieldIncident,
+    events: List<IncidentEvent>,
+    onDismiss: () -> Unit
+) {
+    val formatter = remember { SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.US) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Case Timeline", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    Text(incident.id, color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        incident.type + " · " + incident.commodity,
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (events.isEmpty()) {
+                    item { Text("No events recorded yet.", color = AgriMuted) }
+                } else {
+                    items(events) { event ->
+                        Row(verticalAlignment = Alignment.Top) {
+                            Box(
+                                Modifier.size(34.dp).clip(CircleShape).background(
+                                    if (event.status == "Verified" || event.status == "Resolved") AgriGreen else AgriGreenSoft
+                                ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    if (event.status == "Verified" || event.status == "Resolved") "✓" else "•",
+                                    color = if (event.status == "Verified" || event.status == "Resolved") Color.White else AgriGreen,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(event.status, fontWeight = FontWeight.Bold)
+                                Text(
+                                    formatter.format(java.util.Date(event.timestamp)),
+                                    color = AgriMuted,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                if (event.note.isNotBlank()) {
+                                    Text(event.note, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
 }
 
 @Composable
@@ -2474,6 +2589,7 @@ private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.
         put("tasks", JSONArray(prefs.getString("tasks", "[]")))
         put("assistance", JSONArray(prefs.getString("assistance", "[]")))
         put("fieldIncidents", JSONArray(prefs.getString("fieldIncidents", "[]")))
+        put("incidentEvents", JSONArray(prefs.getString("incidentEvents", "[]")))
         put("reportSubmission", JSONObject().apply {
             put("status", prefs.getString("reportStatus", "Draft"))
             put("submittedDate", prefs.getString("reportSubmittedDate", ""))
@@ -2504,7 +2620,7 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
         ?: return
     val backup = JSONObject(json)
     val edit = prefs.edit()
-    val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks", "assistance", "fieldIncidents")
+    val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks", "assistance", "fieldIncidents", "incidentEvents")
     keys.forEach { key ->
         if (backup.has(key)) edit.putString(key, backup.getJSONArray(key).toString())
     }
@@ -2530,6 +2646,36 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
         edit.putString("reviewNotes", p.optString("reviewNotes"))
     }
     edit.apply()
+}
+
+private fun loadIncidentEvents(prefs: android.content.SharedPreferences): List<IncidentEvent> {
+    val raw = prefs.getString("incidentEvents", "[]") ?: "[]"
+    val a = JSONArray(raw)
+    return List(a.length()) { i ->
+        val o = a.getJSONObject(i)
+        IncidentEvent(
+            incidentId = o.optString("incidentId"),
+            status = o.optString("status"),
+            note = o.optString("note"),
+            timestamp = o.optLong("timestamp", System.currentTimeMillis())
+        )
+    }
+}
+
+private fun saveIncidentEvents(
+    prefs: android.content.SharedPreferences,
+    list: List<IncidentEvent>
+) {
+    val a = JSONArray()
+    list.forEach { event ->
+        a.put(JSONObject().apply {
+            put("incidentId", event.incidentId)
+            put("status", event.status)
+            put("note", event.note)
+            put("timestamp", event.timestamp)
+        })
+    }
+    prefs.edit().putString("incidentEvents", a.toString()).apply()
 }
 
 private fun loadFieldIncidents(prefs: android.content.SharedPreferences): List<FieldIncident> {
