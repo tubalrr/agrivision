@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -243,20 +245,13 @@ private fun DashboardScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_agrivision_logo),
+                        contentDescription = "AgriVision logo",
+                        modifier = Modifier
                             .size(52.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(AgriGreen),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "AV",
-                            color = Color.White,
-                            fontWeight = FontWeight.ExtraBold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
+                    )
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(
