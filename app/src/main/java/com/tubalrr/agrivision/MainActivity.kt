@@ -138,10 +138,17 @@ class MainActivity : ComponentActivity() {
             if (uri != null) importFarmBackup(this, uri, farmPrefs)
         }
 
+        val exportCasePackage = registerForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json")
+        ) { uri ->
+            if (uri != null) exportDaCasePackage(this, uri, farmPrefs)
+        }
+
         setContent {
             AgriVisionApp(
                 onExportBackup = { exportBackup.launch("agrivision-backup.json") },
-                onImportBackup = { importBackup.launch(arrayOf("application/json", "text/plain")) }
+                onImportBackup = { importBackup.launch(arrayOf("application/json", "text/plain")) },
+                onExportCasePackage = { exportCasePackage.launch("agrivision-da-case-package.json") }
             )
         }
     }
@@ -150,7 +157,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AgriVisionApp(
     onExportBackup: () -> Unit = {},
-    onImportBackup: () -> Unit = {}
+    onImportBackup: () -> Unit = {},
+    onExportCasePackage: () -> Unit = {}
 ) {
     var selected by remember { mutableStateOf(0) }
     val context = LocalContext.current
@@ -254,6 +262,9 @@ private fun AgriVisionApp(
                     farmPrefs = farmPrefs,
                     farmerProfile = farmerProfile,
                     assistance = assistance,
+                    fieldIncidents = fieldIncidents,
+                    incidentEvents = incidentEvents,
+                    onExportCasePackage = onExportCasePackage,
                     reportSubmission = reportSubmission,
                     onSubmissionSaved = {
                         reportSubmission = it
@@ -1428,6 +1439,9 @@ private fun ProductionFinanceScreen(
     farmPrefs: android.content.SharedPreferences,
     farmerProfile: FarmerProfile,
     assistance: List<AssistanceRecord>,
+    fieldIncidents: List<FieldIncident>,
+    incidentEvents: List<IncidentEvent>,
+    onExportCasePackage: () -> Unit,
     reportSubmission: ReportSubmission,
     onSubmissionSaved: (ReportSubmission) -> Unit
 ) {
@@ -1509,6 +1523,20 @@ private fun ProductionFinanceScreen(
                     "Open Tasks" to openTasks.toString()
                 ))
             }
+            item {
+                val verifiedCases = fieldIncidents.count { it.status == "Verified" || it.status == "Resolved" }
+                val hasRegistry = farmerProfile.farmerName.isNotBlank() &&
+                        farmerProfile.farmerId.isNotBlank() &&
+                        farmerProfile.farmName.isNotBlank() &&
+                        listOf(farmerProfile.barangay, farmerProfile.municipality, farmerProfile.province).all { it.isNotBlank() }
+                CasePackageCard(
+                    verifiedCases = verifiedCases,
+                    assistanceCount = assistance.size,
+                    auditEventCount = incidentEvents.size,
+                    ready = hasRegistry && verifiedCases > 0,
+                    onExport = onExportCasePackage
+                )
+            }
             item { SummaryCard("Assistance Received", assistance.size.toString() + " records", "Seeds, fertilizer, livestock, equipment and other agricultural support.") }
             item { SectionTitle("Assistance Records") }
 
@@ -1587,6 +1615,64 @@ private fun ProductionFinanceScreen(
             items(expenses) { expense -> FarmRecordCard(expense.category, "₱" + money(expense.amount), expense.note, Icons.Outlined.ReceiptLong) }
             item { Text("Sales", fontWeight = FontWeight.SemiBold) }
             items(sales) { sale -> FarmRecordCard(sale.product, "₱" + money(sale.amount), sale.date, Icons.Outlined.MonetizationOn) }
+        }
+    }
+}
+
+@Composable
+private fun CasePackageCard(
+    verifiedCases: Int,
+    assistanceCount: Int,
+    auditEventCount: Int,
+    ready: Boolean,
+    onExport: () -> Unit
+) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (ready) AgriGreenSoft else Color(0xFFFFF1D6)
+        )
+    ) {
+        Column(
+            Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Text("DA Case Package", color = AgriGreen, fontWeight = FontWeight.Bold)
+            Text(
+                "Create a structured offline package containing registry, verified field cases, assistance records and audit history.",
+                color = AgriText,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ReportStatCard("Verified cases", verifiedCases.toString(), "", Modifier.weight(1f))
+                ReportStatCard("Assistance", assistanceCount.toString(), "", Modifier.weight(1f))
+                ReportStatCard("Audit events", auditEventCount.toString(), "", Modifier.weight(1f))
+            }
+            Text(
+                if (ready)
+                    "Package is ready for export."
+                else
+                    "Add complete registry information and at least one verified field case first.",
+                color = if (ready) AgriGreen else AgriWarning,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Button(
+                onClick = onExport,
+                enabled = ready,
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text("Export DA Case Package")
+            }
+            Text(
+                "Export creates a local JSON package only; it does not transmit data to the DA.",
+                color = AgriMuted,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
@@ -2795,6 +2881,48 @@ private fun InfoCard(title: String, body: String) {
 
 
 // ---------- Local farm storage ----------
+
+private fun exportDaCasePackage(
+    context: Context,
+    uri: Uri,
+    prefs: android.content.SharedPreferences
+) {
+    val packageJson = JSONObject().apply {
+        put("packageVersion", 1)
+        put("app", "AgriVision")
+        put("packageType", "DA Case Package")
+        put("generatedAt", System.currentTimeMillis())
+
+        put("farmerProfile", JSONObject().apply {
+            put("farmerName", prefs.getString("farmerName", ""))
+            put("farmerId", prefs.getString("farmerId", ""))
+            put("contact", prefs.getString("contact", ""))
+            put("province", prefs.getString("province", ""))
+            put("municipality", prefs.getString("municipality", ""))
+            put("barangay", prefs.getString("barangay", ""))
+            put("farmName", prefs.getString("farmName", ""))
+            put("farmSize", prefs.getString("farmSize", ""))
+            put("landTenure", prefs.getString("landTenure", ""))
+            put("commodities", prefs.getString("commodities", ""))
+            put("registryStatus", prefs.getString("registryStatus", "For Review"))
+            put("reviewNotes", prefs.getString("reviewNotes", ""))
+        })
+
+        put("fieldIncidents", JSONArray(prefs.getString("fieldIncidents", "[]")))
+        put("incidentEvents", JSONArray(prefs.getString("incidentEvents", "[]")))
+        put("assistance", JSONArray(prefs.getString("assistance", "[]")))
+
+        put("operationalRecords", JSONObject().apply {
+            put("livestock", JSONArray(prefs.getString("livestock", "[]")))
+            put("crops", JSONArray(prefs.getString("crops", "[]")))
+            put("production", JSONArray(prefs.getString("production", "[]")))
+        })
+    }
+
+    context.contentResolver.openOutputStream(uri)?.use { output ->
+        output.write(packageJson.toString(2).toByteArray(Charsets.UTF_8))
+    }
+}
 
 private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.SharedPreferences) {
     val backup = JSONObject().apply {
