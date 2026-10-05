@@ -34,6 +34,16 @@ import android.os.CancellationSignal
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapType
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberUpdatedMarkerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Checklist
@@ -322,18 +332,12 @@ private fun DashboardScreen(
         }
 
         item {
-            SectionTitle("Field Location", "Phone GPS")
+            SectionTitle("Field Overview", "Live · Satellite")
             Spacer(Modifier.height(10.dp))
             LiveFieldMap(
                 field = fields.firstOrNull(),
                 onFieldLocationSelected = onFieldLocationSelected
             )
-        }
-
-        item {
-            SectionTitle("Field Overview", "Live · Today")
-            Spacer(Modifier.height(10.dp))
-            FieldOverviewCard(field = fields.firstOrNull())
         }
 
         item {
@@ -470,16 +474,38 @@ private fun LiveFieldMap(
 ) {
     val context = LocalContext.current
     var currentLocation by remember { mutableStateOf<Location?>(null) }
-    var locationMessage by remember { mutableStateOf("Phone GPS not connected yet") }
+    var locationMessage by remember { mutableStateOf("Field location not set") }
     var loading by remember { mutableStateOf(false) }
 
-    fun openGoogleMaps(latitude: Double, longitude: Double) {
-        val uri = Uri.parse(
-            "https://www.google.com/maps/@?api=1&map_action=map" +
-                "&center=" + latitude + "%2C" + longitude +
-                "&zoom=19&basemap=satellite"
+    val savedLocation = remember(field?.latitude, field?.longitude) {
+        if (field?.latitude != null && field.longitude != null) {
+            LatLng(field.latitude, field.longitude)
+        } else null
+    }
+
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(
+            savedLocation ?: LatLng(12.8797, 121.7740),
+            if (savedLocation != null) 18f else 6f
         )
-        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    }
+
+    LaunchedEffect(savedLocation) {
+        savedLocation?.let {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(it, 18f),
+                600
+            )
+        }
+    }
+
+    fun saveLocation(location: Location) {
+        currentLocation = location
+        locationMessage = "Field located · %.6f, %.6f".format(
+            location.latitude,
+            location.longitude
+        )
+        onFieldLocationSelected(location)
     }
 
     fun getPhoneLocation() {
@@ -493,115 +519,72 @@ private fun LiveFieldMap(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (!fine && !coarse) {
-            locationMessage = "Allow location permission to use phone GPS"
+            locationMessage = "Allow phone location permission first"
             loading = false
             return
         }
 
         val locationManager = context.getSystemService(LocationManager::class.java)
-        val locationEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val enabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             locationManager.isLocationEnabled
         } else {
             locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
                 locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         }
-        if (!locationEnabled) {
-            locationMessage = "Turn on Location/GPS in phone settings"
+
+        if (!enabled) {
+            locationMessage = "Turn on Location/GPS"
             loading = false
             return
         }
 
         loading = true
-        locationMessage = "Getting current phone location…"
+        locationMessage = "Finding your field location…"
 
         try {
-            fun useLocation(location: Location, source: String) {
-                loading = false
-                currentLocation = location
-                locationMessage = source + " · %.6f, %.6f".format(
-                    location.latitude,
-                    location.longitude
-                )
-                onFieldLocationSelected(location)
-            }
+            val providers = locationManager.getProviders(true)
+            val lastKnown = providers
+                .mapNotNull { locationManager.getLastKnownLocation(it) }
+                .minByOrNull { it.accuracy.toDouble() }
 
-            fun bestLastKnownLocation(): Location? {
-                return locationManager.getProviders(true)
-                    .mapNotNull { provider ->
-                        locationManager.getLastKnownLocation(provider)
-                    }
-                    .minByOrNull { location -> location.accuracy.toDouble() }
+            if (lastKnown != null) {
+                saveLocation(lastKnown)
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val networkAvailable =
-                    locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-                val gpsAvailable =
-                    locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
-
-                val firstProvider = when {
-                    networkAvailable -> LocationManager.NETWORK_PROVIDER
-                    gpsAvailable -> LocationManager.GPS_PROVIDER
+                val provider = when {
+                    locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ->
+                        LocationManager.NETWORK_PROVIDER
+                    locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ->
+                        LocationManager.GPS_PROVIDER
                     else -> null
                 }
 
-                if (firstProvider == null) {
-                    loading = false
-                    locationMessage = "No location provider is available"
-                    return
-                }
-
-                locationManager.getCurrentLocation(
-                    firstProvider,
-                    CancellationSignal(),
-                    context.mainExecutor
-                ) { location ->
-                    if (location != null) {
-                        useLocation(
-                            location,
-                            if (firstProvider == LocationManager.NETWORK_PROVIDER)
-                                "Phone location"
-                            else
-                                "GPS locked"
-                        )
-                    } else {
-                        val last = bestLastKnownLocation()
-                        if (last != null) {
-                            useLocation(last, "Last known location")
-                        } else if (
-                            firstProvider != LocationManager.GPS_PROVIDER &&
-                            gpsAvailable
-                        ) {
-                            locationMessage = "Network location unavailable. Trying GPS…"
-                            locationManager.getCurrentLocation(
-                                LocationManager.GPS_PROVIDER,
-                                CancellationSignal(),
-                                context.mainExecutor
-                            ) { gpsLocation ->
-                                if (gpsLocation != null) {
-                                    useLocation(gpsLocation, "GPS locked")
-                                } else {
-                                    loading = false
-                                    locationMessage =
-                                        "No location fix yet. Turn on Wi-Fi/mobile data or move near a window."
-                                }
-                            }
-                        } else {
-                            loading = false
+                if (provider != null) {
+                    locationManager.getCurrentLocation(
+                        provider,
+                        CancellationSignal(),
+                        context.mainExecutor
+                    ) { location ->
+                        loading = false
+                        if (location != null) {
+                            saveLocation(location)
+                            cameraPositionState.move(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(location.latitude, location.longitude),
+                                    19f
+                                )
+                            )
+                        } else if (lastKnown == null) {
                             locationMessage =
-                                "No location fix yet. Turn on Wi-Fi/mobile data or move near a window."
+                                "No GPS fix yet. Try outdoors or near a window."
                         }
                     }
+                } else {
+                    loading = false
                 }
             } else {
-                val last = bestLastKnownLocation()
                 loading = false
-                if (last != null) {
-                    useLocation(last, "Phone location")
-                } else {
-                    locationMessage =
-                        "No recent location. Turn on Wi-Fi/mobile data or move outdoors."
-                }
             }
         } catch (_: SecurityException) {
             loading = false
@@ -619,108 +602,147 @@ private fun LiveFieldMap(
         else locationMessage = "Location permission was denied"
     }
 
-    val savedLocation = remember(field?.latitude, field?.longitude) {
-        if (field?.latitude != null && field.longitude != null) {
-            Pair(field.latitude, field.longitude)
-        } else null
-    }
+    val markerLocation = currentLocation?.let {
+        LatLng(it.latitude, it.longitude)
+    } ?: savedLocation
 
     Card(
-        Modifier.fillMaxWidth().height(220.dp),
+        Modifier.fillMaxWidth().height(350.dp),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = AgriCard)
     ) {
-        Column(
-            Modifier.fillMaxSize().padding(18.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    Modifier
-                        .size(50.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(AgriGreenSoft),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("📍", style = MaterialTheme.typography.titleLarge)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "PHONE GPS FIELD LOCATION",
-                        color = AgriGreen,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.labelMedium
+        Box(Modifier.fillMaxSize()) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp)),
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(
+                    mapType = MapType.SATELLITE
+                ),
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = true,
+                    mapToolbarEnabled = false,
+                    compassEnabled = true,
+                    rotationGesturesEnabled = true,
+                    tiltGesturesEnabled = true
+                ),
+                onMapLongClick = { point ->
+                    val location = Location("map").apply {
+                        latitude = point.latitude
+                        longitude = point.longitude
+                        accuracy = 1f
+                    }
+                    saveLocation(location)
+                    cameraPositionState.move(
+                        CameraUpdateFactory.newLatLngZoom(point, 19f)
                     )
-                    Text(
-                        locationMessage,
-                        color = AgriMuted,
-                        style = MaterialTheme.typography.bodySmall
+                }
+            ) {
+                markerLocation?.let { point ->
+                    Marker(
+                        state = rememberUpdatedMarkerState(position = point),
+                        title = field?.name ?: "Farm Field",
+                        snippet = (field?.crop ?: "Rice") + " · " + (field?.area ?: "1.0 ha")
                     )
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = {
-                            val fine = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.ACCESS_FINE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED
-                            val coarse = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED
+            Row(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xEEFFFDF4))
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Outlined.Map,
+                    contentDescription = null,
+                    tint = AgriGreen,
+                    modifier = Modifier.size(19.dp)
+                )
+                Spacer(Modifier.width(7.dp))
+                Column {
+                    Text(
+                        field?.name ?: "Farm Field",
+                        fontWeight = FontWeight.Bold,
+                        color = AgriText,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    Text(
+                        locationMessage,
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
 
-                            if (fine || coarse) getPhoneLocation()
-                            else permissionLauncher.launch(
+            Row(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val fine = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                        val coarse = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (fine || coarse) {
+                            getPhoneLocation()
+                        } else {
+                            permissionLauncher.launch(
                                 arrayOf(
                                     Manifest.permission.ACCESS_FINE_LOCATION,
                                     Manifest.permission.ACCESS_COARSE_LOCATION
                                 )
                             )
-                        },
-                        enabled = !loading,
-                        shape = RoundedCornerShape(13.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (loading) "Locating…" else "Use My Location")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            val location = currentLocation
-                            val lat = location?.latitude ?: savedLocation?.first
-                            val lng = location?.longitude ?: savedLocation?.second
-                            if (lat != null && lng != null) {
-                                openGoogleMaps(lat, lng)
-                            } else {
-                                locationMessage = "Get your phone location first"
-                            }
-                        },
-                        shape = RoundedCornerShape(13.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Map,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text("Open Satellite")
-                    }
+                        }
+                    },
+                    enabled = !loading,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 13.dp, vertical = 8.dp)
+                ) {
+                    Text(if (loading) "Locating…" else "Use My Location")
                 }
 
-                Text(
-                    "Google Maps opens on the phone in satellite mode. No embedded Maps API key.",
-                    color = AgriMuted,
-                    style = MaterialTheme.typography.labelSmall
-                )
+                OutlinedButton(
+                    onClick = {
+                        markerLocation?.let {
+                            cameraPositionState.move(
+                                CameraUpdateFactory.newLatLngZoom(it, 19f)
+                            )
+                        }
+                    },
+                    enabled = markerLocation != null,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 13.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xEEFFFDF4)
+                    )
+                ) {
+                    Text("Field")
+                }
             }
+
+            Text(
+                "Google Satellite · Drag · Pinch · Rotate · Long-press to set field",
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xEEFFFDF4))
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                color = AgriText,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
