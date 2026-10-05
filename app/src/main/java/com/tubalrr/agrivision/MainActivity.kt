@@ -151,7 +151,7 @@ private fun AgriVisionApp(
             when (selected) {
                 0 -> DashboardScreen(
                     padding, livestock, crops, production, expenses, inventory, tasks,
-                    totalAnimals, totalExpenses, openTasks
+                    totalAnimals, totalExpenses, totalSales, netIncome, openTasks
                 )
                 1 -> FarmScreen(
                     padding, livestock, crops, inventory, equipment, farmPrefs
@@ -219,12 +219,16 @@ private fun DashboardScreen(
     tasks: List<FarmTask>,
     totalAnimals: Int,
     totalExpenses: Double,
+    totalSales: Double,
+    netIncome: Double,
     openTasks: Int
 ) {
+    val lowStock = inventory.count { it.status.equals("Low", ignoreCase = true) }
+
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(18.dp, 18.dp, 18.dp, 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(16.dp, 14.dp, 16.dp, 28.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
             Row(
@@ -232,15 +236,15 @@ private fun DashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text("AgriVision", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("Personal Farm Management", color = AgriMuted)
+                Column(Modifier.weight(1f)) {
+                    Text("AgriVision", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = AgriGreen)
+                    Text("Your personal farm dashboard", color = AgriMuted)
                 }
                 Box(
-                    Modifier.size(44.dp).clip(CircleShape).background(AgriGreenSoft),
+                    Modifier.size(46.dp).clip(CircleShape).background(AgriGreenSoft),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("AV", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text("AV", color = AgriGreen, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
@@ -248,54 +252,118 @@ private fun DashboardScreen(
         item {
             Card(
                 Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(26.dp),
+                shape = RoundedCornerShape(28.dp),
                 colors = CardDefaults.cardColors(containerColor = AgriGreen)
             ) {
                 Column(Modifier.padding(20.dp)) {
-                    Text("Good morning, Farmer", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Good morning, Farmer", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
-                    Text("Here's your farm at a glance.", color = Color.White.copy(alpha = .82f))
+                    Text("Everything important about your farm, in one place.", color = Color.White.copy(alpha = .82f))
                     Spacer(Modifier.height(18.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DashboardMiniStat("Animals", totalAnimals.toString(), Modifier.weight(1f))
-                        DashboardMiniStat("Fields", crops.size.toString(), Modifier.weight(1f))
+                        DashboardMiniStat("Crops", crops.size.toString(), Modifier.weight(1f))
                         DashboardMiniStat("Tasks", openTasks.toString(), Modifier.weight(1f))
                     }
                 }
             }
         }
 
-        item { SectionTitle("Farm Analytics") }
+        item { SectionTitle("Farm Overview") }
+
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("Production", production.size.toString(), "records", Icons.Outlined.Assessment, AgriGreenSoft, Modifier.weight(1f))
-                StatCard("Expenses", "₱" + money(totalExpenses), "recorded", Icons.Outlined.MonetizationOn, Color(0xFFE9DFC7), Modifier.weight(1f))
+                DashboardKpiCard("Sales", "₱" + money(totalSales), Icons.Outlined.MonetizationOn, AgriGreenSoft, Modifier.weight(1f))
+                DashboardKpiCard("Expenses", "₱" + money(totalExpenses), Icons.Outlined.ReceiptLong, Color(0xFFE9DFC7), Modifier.weight(1f))
             }
         }
 
-        item { SectionTitle("Farm Status") }
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DashboardKpiCard("Net Income", "₱" + money(netIncome), Icons.Outlined.Assessment, Color(0xFFE1EEDB), Modifier.weight(1f))
+                DashboardKpiCard("Production", production.size.toString(), Icons.Outlined.LocalFlorist, Color(0xFFECE8D9), Modifier.weight(1f))
+            }
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriCard)
+            ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Farm Status", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("Live", color = AgriGreen, fontWeight = FontWeight.SemiBold)
+                    }
                     StatusRow("Livestock", livestock.size.toString() + " groups", Icons.Outlined.Pets, AgriGreen)
                     StatusRow("Crops", crops.size.toString() + " records", Icons.Outlined.LocalFlorist, AgriGreen)
-                    StatusRow("Inventory", inventory.count { it.status == "Low" }.toString() + " low stock", Icons.Outlined.Inventory2, if (inventory.any { it.status == "Low" }) AgriWarning else AgriGreen)
+                    StatusRow("Inventory", lowStock.toString() + " low stock", Icons.Outlined.Inventory2, if (lowStock > 0) AgriWarning else AgriGreen)
                     StatusRow("Tasks", openTasks.toString() + " open", Icons.Outlined.Checklist, if (openTasks > 0) AgriWarning else AgriGreen)
                 }
             }
         }
 
-        item { SectionTitle("Production Today") }
+        item { SectionTitle("Today's Attention") }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (openTasks > 0 || lowStock > 0) Color(0xFFFFE2DA) else AgriGreenSoft
+                )
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (openTasks > 0) "$openTasks farm task(s) need attention."
+                        else "Your farm tasks are up to date.",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (lowStock > 0) "$lowStock inventory item(s) are low."
+                        else "No inventory alerts right now.",
+                        color = AgriMuted
+                    )
+                }
+            }
+        }
+
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SectionTitle("Recent Production")
+                Text(production.size.toString() + " records", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
         items(production.take(3)) { record ->
             SimpleRecordCard(record.product, record.quantity, record.period, Icons.Outlined.Assessment)
         }
+    }
+}
 
-        item { SectionTitle("Today's Attention") }
-        item {
-            AttentionCard(
-                if (openTasks == 0) "Everything is up to date." else openTasks.toString() + " farm task(s) need attention.",
-                inventory.firstOrNull { it.status == "Low" }?.name?.let { "Low stock: " + it } ?: "No inventory alerts."
-            )
+@Composable
+private fun DashboardKpiCard(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    background: Color,
+    modifier: Modifier
+) {
+    Card(
+        modifier,
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = background)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(23.dp))
+            Spacer(Modifier.height(9.dp))
+            Text(title, color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+            Text(value, color = AgriText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
     }
 }
