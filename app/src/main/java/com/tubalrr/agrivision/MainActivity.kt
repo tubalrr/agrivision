@@ -19,6 +19,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.sceneview.SceneView
+import io.github.sceneview.rememberCameraManipulator
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.CubeNode
+import io.github.sceneview.CylinderNode
+import io.github.sceneview.ConeNode
+import io.github.sceneview.PlaneNode
+import io.github.sceneview.math.Position
+import io.github.sceneview.math.Size
+import io.github.sceneview.colorOf
 
 private val AgriCream = Color(0xFFF7F4E9)
 private val AgriCard = Color(0xFFFFFCF5)
@@ -197,6 +208,18 @@ private fun DashboardScreen(
         }
 
         item {
+            SectionTitle("3D Farm View", "Drag · Pinch · Explore")
+            Spacer(Modifier.height(10.dp))
+            Card(
+                Modifier.fillMaxWidth().height(300.dp),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE5E8D8))
+            ) {
+                Farm3DScene(Modifier.fillMaxSize())
+            }
+        }
+
+        item {
             SectionTitle("Field Overview", "Live · Today")
             Spacer(Modifier.height(10.dp))
             Card(
@@ -240,6 +263,86 @@ private fun DashboardScreen(
             SectionTitle("Today's Attention", "")
             Spacer(Modifier.height(8.dp))
             AttentionCard(tasks.count { !it.done }, inputs.size)
+        }
+    }
+}
+
+@Composable
+private fun Farm3DScene(modifier: Modifier = Modifier) {
+    val engine = rememberEngine()
+    val materialLoader = rememberMaterialLoader(engine)
+    val green = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF4F7D45))) }
+    val darkGreen = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF285C3B))) }
+    val soil = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF8A7658))) }
+    val fieldGreen = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF789B58))) }
+    val water = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF7AAFC0))) }
+    val house = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFFE6D2A5))) }
+    val roof = remember(materialLoader) { materialLoader.createColorInstance(colorOf(Color(0xFF8B5E3C))) }
+
+    SceneView(
+        modifier = modifier,
+        engine = engine,
+        materialLoader = materialLoader,
+        cameraManipulator = rememberCameraManipulator()
+    ) {
+        PlaneNode(
+            size = Size(8f, 8f),
+            materialInstance = green,
+            position = Position(y = -0.15f)
+        )
+
+        CubeNode(
+            size = Size(3.2f, 0.12f, 2.2f),
+            materialInstance = fieldGreen,
+            position = Position(x = -1.6f, y = -0.02f, z = -0.4f)
+        )
+        CubeNode(
+            size = Size(2.6f, 0.12f, 2.0f),
+            materialInstance = soil,
+            position = Position(x = 1.45f, y = -0.02f, z = -0.35f)
+        )
+        CubeNode(
+            size = Size(0.35f, 0.05f, 7f),
+            materialInstance = water,
+            position = Position(x = 0f, y = 0f, z = 1.9f)
+        )
+
+        CubeNode(
+            size = Size(0.9f, 0.8f, 0.8f),
+            materialInstance = house,
+            position = Position(x = -0.15f, y = 0.4f, z = -2.0f)
+        )
+        ConeNode(
+            radius = 0.72f,
+            height = 0.55f,
+            materialInstance = roof,
+            position = Position(x = -0.15f, y = 1.05f, z = -2.0f)
+        )
+
+        listOf(
+            Position(x = -2.8f, y = 0.35f, z = -2.0f),
+            Position(x = 2.8f, y = 0.35f, z = -2.0f),
+            Position(x = -3.0f, y = 0.35f, z = 1.0f),
+            Position(x = 3.0f, y = 0.35f, z = 1.0f)
+        ).forEach { p ->
+            CylinderNode(radius = 0.22f, height = 0.7f, materialInstance = darkGreen, position = p)
+            ConeNode(radius = 0.5f, height = 0.75f, materialInstance = green, position = Position(p.x, 0.95f, p.z))
+        }
+
+        repeat(7) { index ->
+            val x = -2.6f + index * 0.8f
+            CylinderNode(
+                radius = 0.045f,
+                height = 0.35f,
+                materialInstance = darkGreen,
+                position = Position(x = x, y = 0.22f, z = -0.45f)
+            )
+            ConeNode(
+                radius = 0.18f,
+                height = 0.28f,
+                materialInstance = green,
+                position = Position(x = x, y = 0.5f, z = -0.45f)
+            )
         }
     }
 }
