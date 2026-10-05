@@ -132,7 +132,7 @@ private fun AgriVisionApp() {
                     padding, livestock, crops, inventory, equipment, farmPrefs
                 )
                 2 -> ProductionFinanceScreen(
-                    padding, production, expenses, sales, totalExpenses, totalSales, netIncome, farmPrefs
+                    padding, production, expenses, sales, totalExpenses, totalSales, netIncome, totalAnimals, openTasks, farmPrefs
                 )
                 3 -> TasksScreen(padding, tasks, inventory, farmPrefs)
                 else -> ProfileScreen(padding, context)
@@ -146,7 +146,7 @@ private fun AgriBottomBar(selected: Int, onSelected: (Int) -> Unit) {
     val items = listOf(
         "Dashboard" to Icons.Outlined.Dashboard,
         "Farm" to Icons.Outlined.Yard,
-        "Production" to Icons.Outlined.Assessment,
+        "Reports" to Icons.Outlined.Assessment,
         "Tasks" to Icons.Outlined.Checklist,
         "Profile" to Icons.Outlined.Person
     )
@@ -535,6 +535,8 @@ private fun ProductionFinanceScreen(
     totalExpenses: Double,
     totalSales: Double,
     netIncome: Double,
+    totalAnimals: Int,
+    openTasks: Int,
     farmPrefs: android.content.SharedPreferences
 ) {
     var tab by remember { mutableStateOf("Production") }
@@ -555,7 +557,29 @@ private fun ProductionFinanceScreen(
         contentPadding = PaddingValues(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { ScreenHeader("Production & Finance", "Track production, sales, expenses and farm income.") }
+        item { ScreenHeader("Farm Reports", "See your farm performance at a glance.") }
+        item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriGreen)) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("Farm Performance", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ReportMetric("Sales", "₱" + money(totalSales), Modifier.weight(1f))
+                        ReportMetric("Expenses", "₱" + money(totalExpenses), Modifier.weight(1f))
+                        ReportMetric("Net", "₱" + money(netIncome), Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ReportStatCard("Animals", totalAnimals.toString(), "heads", Modifier.weight(1f))
+                ReportStatCard("Tasks", openTasks.toString(), "open", Modifier.weight(1f))
+                ReportStatCard("Production", production.size.toString(), "records", Modifier.weight(1f))
+            }
+        }
+
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilterChip(selected = tab == "Production", onClick = { tab = "Production" }, label = { Text("Production") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) })
@@ -589,6 +613,25 @@ private fun ProductionFinanceScreen(
             items(expenses) { expense -> FarmRecordCard(expense.category, "₱" + money(expense.amount), expense.note, Icons.Outlined.ReceiptLong) }
             item { Text("Sales", fontWeight = FontWeight.SemiBold) }
             items(sales) { sale -> FarmRecordCard(sale.product, "₱" + money(sale.amount), sale.date, Icons.Outlined.MonetizationOn) }
+        }
+    }
+}
+
+@Composable
+private fun ReportMetric(title: String, value: String, modifier: Modifier) {
+    Column(modifier) {
+        Text(title, color = Color.White.copy(alpha = .75f), style = MaterialTheme.typography.labelSmall)
+        Text(value, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun ReportStatCard(title: String, value: String, detail: String, modifier: Modifier) {
+    Card(modifier, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+        Column(Modifier.padding(14.dp)) {
+            Text(title, color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+            Text(value, color = AgriGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Text(detail, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
