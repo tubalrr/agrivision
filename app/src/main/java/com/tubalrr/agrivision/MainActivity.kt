@@ -29,6 +29,7 @@ import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.Polygon
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
 
@@ -68,6 +69,18 @@ private fun AgriVisionApp() {
     }
     val savedLatitude = fieldPrefs.getString("latitude", null)?.toDoubleOrNull()
     val savedLongitude = fieldPrefs.getString("longitude", null)?.toDoubleOrNull()
+    val savedBoundary = fieldPrefs.getString("boundary", null)
+        ?.split(";")
+        ?.mapNotNull { pair ->
+            val parts = pair.split(",")
+            if (parts.size == 2) {
+                val lat = parts[0].toDoubleOrNull()
+                val lng = parts[1].toDoubleOrNull()
+                if (lat != null && lng != null) LatLng(lat, lng) else null
+            } else null
+        }
+        ?: emptyList()
+    val fieldBoundary = remember { mutableStateListOf<LatLng>().apply { addAll(savedBoundary) } }
     val fields = remember {
         mutableStateListOf(
             FarmField(
@@ -109,18 +122,31 @@ private fun AgriVisionApp() {
             bottomBar = { AgriBottomBar(selected) { selected = it } }
         ) { padding ->
             when (selected) {
-                0 -> DashboardScreen(padding, fields, inputs, tasks) { point ->
-                    if (fields.isNotEmpty()) {
-                        fields[0] = fields[0].copy(
-                            latitude = point.latitude,
-                            longitude = point.longitude
-                        )
-                        fieldPrefs.edit()
-                            .putString("latitude", point.latitude.toString())
-                            .putString("longitude", point.longitude.toString())
-                            .apply()
+                0 -> DashboardScreen(
+                    padding,
+                    fields,
+                    inputs,
+                    tasks,
+                    fieldBoundary,
+                    onFieldLocationSelected = { point ->
+                        if (fields.isNotEmpty()) {
+                            fields[0] = fields[0].copy(
+                                latitude = point.latitude,
+                                longitude = point.longitude
+                            )
+                            fieldPrefs.edit()
+                                .putString("latitude", point.latitude.toString())
+                                .putString("longitude", point.longitude.toString())
+                                .apply()
+                        }
+                    },
+                    onFieldBoundaryChanged = { points ->
+                        fieldBoundary.clear()
+                        fieldBoundary.addAll(points)
+                        val encoded = points.joinToString(";") { it.latitude.toString() + "," + it.longitude.toString() }
+                        fieldPrefs.edit().putString("boundary", encoded).apply()
                     }
-                }
+                )
                 1 -> FieldsScreen(padding, fields)
                 2 -> InsightsScreen(padding, fields)
                 3 -> TasksScreen(padding, tasks)
@@ -170,7 +196,9 @@ private fun DashboardScreen(
     fields: List<FarmField>,
     inputs: List<FarmInput>,
     tasks: List<FarmTask>,
-    onFieldLocationSelected: (LatLng) -> Unit
+    fieldBoundary: List<LatLng>,
+    onFieldLocationSelected: (LatLng) -> Unit,
+    onFieldBoundaryChanged: (List<LatLng>) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -247,7 +275,9 @@ private fun DashboardScreen(
             Spacer(Modifier.height(10.dp))
             LiveFieldMap(
                 field = fields.firstOrNull(),
-                onFieldLocationSelected = onFieldLocationSelected
+                boundary = fieldBoundary,
+                onFieldLocationSelected = onFieldLocationSelected,
+                onFieldBoundaryChanged = onFieldBoundaryChanged
             )
         }
 
@@ -302,7 +332,9 @@ private fun DashboardScreen(
 @Composable
 private fun LiveFieldMap(
     field: FarmField?,
-    onFieldLocationSelected: (LatLng) -> Unit
+    boundary: List<LatLng>,
+    onFieldLocationSelected: (LatLng) -> Unit,
+    onFieldBoundaryChanged: (List<LatLng>) -> Unit
 ) {
     val defaultCenter = LatLng(12.8797, 121.7740)
     val fieldLocation = remember(field?.latitude, field?.longitude) {
@@ -312,11 +344,12 @@ private fun LiveFieldMap(
             null
         }
     }
+    var drawingBoundary by remember { mutableStateOf(boundary.size >= 2) }
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(
             fieldLocation ?: defaultCenter,
-            if (fieldLocation != null) 18f else 5.5f
+            if (fieldLocation != null) 19f else 5.5f
         )
     }
 
@@ -330,7 +363,7 @@ private fun LiveFieldMap(
     }
 
     Card(
-        Modifier.fillMaxWidth().height(320.dp),
+        Modifier.fillMaxWidth().height(340.dp),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFE5E8D8))
     ) {
@@ -346,14 +379,45 @@ private fun LiveFieldMap(
                     rotationGesturesEnabled = true,
                     tiltGesturesEnabled = true
                 ),
-                onMapLongClick = onFieldLocationSelected
+                onMapClick = { point ->
+                    if (drawingBoundary) {
+                        onFieldBoundaryChanged(boundary + point)
+                        if (fieldLocation == null) {
+                            onFieldLocationSelected(point)
+                        }
+                    }
+                },
+                onMapLongClick = { point ->
+                    if (!drawingBoundary) {
+                        onFieldLocationSelected(point)
+                    }
+                }
             ) {
-                fieldLocation?.let { location ->
-                    Marker(
-                        state = rememberUpdatedMarkerState(position = location),
-                        title = field?.name ?: "Farm Field",
-                        snippet = (field?.crop ?: "Crop") + " · " + (field?.area ?: "")
+                if (boundary.size >= 3) {
+                    Polygon(
+                        points = boundary,
+                        clickable = false,
+                        fillColor = Color(0x664F7D45),
+                        strokeColor = AgriGreen,
+                        strokeWidth = 4f
                     )
+                }
+
+                boundary.forEachIndexed { index, point ->
+                    Marker(
+                        state = rememberUpdatedMarkerState(position = point),
+                        title = "Boundary point " + (index + 1)
+                    )
+                }
+
+                if (boundary.isEmpty()) {
+                    fieldLocation?.let { location ->
+                        Marker(
+                            state = rememberUpdatedMarkerState(position = location),
+                            title = field?.name ?: "Farm Field",
+                            snippet = (field?.crop ?: "Crop") + " · " + (field?.area ?: "")
+                        )
+                    }
                 }
             }
 
@@ -372,50 +436,75 @@ private fun LiveFieldMap(
                 Spacer(Modifier.width(8.dp))
                 Column {
                     Text(
-                        "SATELLITE",
+                        "SATELLITE FIELD",
                         fontWeight = FontWeight.Bold,
                         color = AgriText,
                         style = MaterialTheme.typography.labelMedium
                     )
                     Text(
-                        if (fieldLocation == null)
-                            "Long-press the actual field to pin it"
-                        else
-                            "Field pinned · " + fieldLocation.latitude + ", " + fieldLocation.longitude,
+                        when {
+                            boundary.size >= 3 -> "Field boundary saved · " + boundary.size + " points"
+                            drawingBoundary -> "Tap each corner of the real field"
+                            fieldLocation != null -> "Field pinned · ready to trace boundary"
+                            else -> "Long-press the field to set its location"
+                        },
                         color = AgriMuted,
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
             }
 
-            if (fieldLocation == null) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xEEFFFDF4))
-                        .padding(horizontal = 18.dp, vertical = 14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("📍", style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        "Set the real field location",
-                        fontWeight = FontWeight.Bold,
-                        color = AgriText
-                    )
-                    Text(
-                        "Long-press the actual field on satellite view",
-                        color = AgriMuted,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (drawingBoundary) {
+                    Button(
+                        onClick = {
+                            drawingBoundary = false
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text("Finish")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            drawingBoundary = true
+                            onFieldBoundaryChanged(emptyList())
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text("Trace Field")
+                    }
                 }
             }
 
+            if (boundary.size >= 3 && !drawingBoundary) {
+                Text(
+                    "Real field boundary · " + "%.2f".format(calculateApproxAreaHa(boundary)) + " ha",
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(12.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xEFFFFFFF))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    color = AgriText,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
             Text(
-                "Google Satellite · Drag · Pinch · Rotate",
+                if (drawingBoundary) "Tap corners → Finish"
+                else "Google Satellite · Drag · Pinch · Rotate",
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xD9FFFDF4))
                     .padding(horizontal = 12.dp, vertical = 7.dp),
@@ -425,6 +514,24 @@ private fun LiveFieldMap(
             )
         }
     }
+}
+
+private fun calculateApproxAreaHa(points: List<LatLng>): Double {
+    if (points.size < 3) return 0.0
+    val avgLat = points.map { it.latitude }.average()
+    val latMeters = 111_320.0
+    val lonMeters = 111_320.0 * kotlin.math.cos(Math.toRadians(avgLat))
+    var areaM2 = 0.0
+    for (i in points.indices) {
+        val a = points[i]
+        val b = points[(i + 1) % points.size]
+        val ax = a.longitude * lonMeters
+        val ay = a.latitude * latMeters
+        val bx = b.longitude * lonMeters
+        val by = b.latitude * latMeters
+        areaM2 += ax * by - bx * ay
+    }
+    return kotlin.math.abs(areaM2) / 2.0 / 10_000.0
 }
 
 @Composable
