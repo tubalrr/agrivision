@@ -63,6 +63,18 @@ data class InventoryItem(val name: String, val quantity: String, val status: Str
 data class EquipmentRecord(val name: String, val status: String, val note: String)
 data class FarmTask(val title: String, val category: String, val date: String, val done: Boolean)
 data class SaleRecord(val product: String, val amount: Double, val date: String)
+data class FarmerProfile(
+    val farmerName: String,
+    val farmerId: String,
+    val contact: String,
+    val province: String,
+    val municipality: String,
+    val barangay: String,
+    val farmName: String,
+    val farmSize: String,
+    val landTenure: String,
+    val commodities: String
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -135,6 +147,7 @@ private fun AgriVisionApp(
     val netIncome = totalSales - totalExpenses
     val openTasks = tasks.count { !it.done }
     val totalAnimals = livestock.sumOf { it.count }
+    var farmerProfile by remember { mutableStateOf(loadFarmerProfile(farmPrefs)) }
 
     val scheme = lightColorScheme(
         primary = AgriGreen,
@@ -164,7 +177,13 @@ private fun AgriVisionApp(
                     padding, production, expenses, sales, totalExpenses, totalSales, netIncome, totalAnimals, openTasks, farmPrefs
                 )
                 3 -> TasksScreen(padding, tasks, inventory, farmPrefs)
-                else -> ProfileScreen(padding, onExportBackup, onImportBackup)
+                else -> ProfileScreen(
+                    padding,
+                    farmerProfile,
+                    onProfileSaved = { farmerProfile = it; saveFarmerProfile(farmPrefs, it) },
+                    onExportBackup,
+                    onImportBackup
+                )
             }
         }
     }
@@ -978,55 +997,204 @@ private fun AddTaskDialog(
 @Composable
 private fun ProfileScreen(
     padding: PaddingValues,
+    profile: FarmerProfile,
+    onProfileSaved: (FarmerProfile) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit
 ) {
+    var showEdit by remember { mutableStateOf(false) }
+
+    if (showEdit) {
+        FarmerRegistryDialog(
+            profile = profile,
+            onDismiss = { showEdit = false },
+            onSave = {
+                onProfileSaved(it)
+                showEdit = false
+            }
+        )
+    }
+
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(18.dp, 18.dp, 18.dp, 28.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { ScreenHeader("Profile & Settings", "Personal farm setup.") }
+        item {
+            ScreenHeader(
+                "Farmer & Farm Registry",
+                "DA-ready farm information for organized agricultural records."
+            )
+        }
 
         item {
             Card(
                 Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreen)
             ) {
-                Column(Modifier.padding(20.dp)) {
-                    Text("My Farm", color = AgriGreen, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(5.dp))
-                    Text("Personal farm manager • offline-first", color = AgriMuted)
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("Farmer Profile", color = Color.White.copy(alpha = .75f), style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        profile.farmerName.ifBlank { "Farmer not registered" },
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (profile.farmerId.isBlank()) "No farmer reference ID yet"
+                        else "Farmer ID: " + profile.farmerId,
+                        color = Color.White.copy(alpha = .82f)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { showEdit = true },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = AgriGreen
+                        )
+                    ) { Text(if (profile.farmerName.isBlank()) "Register Farmer" else "Edit Profile") }
                 }
             }
         }
 
+        item { SectionTitle("Farm Registry") }
+
         item {
-            Text("Data", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            RegistryInfoCard("Farm Name", profile.farmName.ifBlank { "Not registered" })
         }
 
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+            RegistryInfoCard(
+                "Location",
+                listOf(profile.barangay, profile.municipality, profile.province)
+                    .filter { it.isNotBlank() }
+                    .joinToString(", ")
+                    .ifBlank { "Barangay / Municipality / Province not registered" }
+            )
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RegistryInfoCard("Farm Size", profile.farmSize.ifBlank { "Not set" }, Modifier.weight(1f))
+                RegistryInfoCard("Land Tenure", profile.landTenure.ifBlank { "Not set" }, Modifier.weight(1f))
+            }
+        }
+
+        item {
+            RegistryInfoCard(
+                "Commodities",
+                profile.commodities.ifBlank { "Add crops, livestock, fisheries or other commodities." }
+            )
+        }
+
+        item {
+            RegistryInfoCard(
+                "Contact",
+                profile.contact.ifBlank { "No contact information saved." }
+            )
+        }
+
+        item { SectionTitle("Data Management") }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriCard)
+            ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Backup & Restore", fontWeight = FontWeight.Bold)
-                    Text("Save all your farm records to a JSON backup file, or restore them later on this device.", color = AgriMuted)
+                    Text(
+                        "Export your farmer, farm and operational records as a local JSON backup.",
+                        color = AgriMuted
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = onExportBackup, shape = RoundedCornerShape(14.dp)) {
-                            Text("Export")
-                        }
-                        OutlinedButton(onClick = onImportBackup, shape = RoundedCornerShape(14.dp)) {
-                            Text("Restore")
-                        }
+                        Button(onClick = onExportBackup, shape = RoundedCornerShape(14.dp)) { Text("Export") }
+                        OutlinedButton(onClick = onImportBackup, shape = RoundedCornerShape(14.dp)) { Text("Restore") }
                     }
                 }
             }
         }
 
-        item { InfoCard("Privacy", "AgriVision does not require GPS, live maps, or a farm location.") }
-        item { InfoCard("Reports", "Daily, weekly and monthly farm performance.") }
-        item { InfoCard("AgriVision", "See Your Farm. Know What To Do.") }
+        item {
+            InfoCard(
+                "Privacy",
+                "Farmer information stays on this device unless you intentionally export or share a backup."
+            )
+        }
     }
+}
+
+@Composable
+private fun RegistryInfoCard(title: String, value: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(title, color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(value, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun FarmerRegistryDialog(
+    profile: FarmerProfile,
+    onDismiss: () -> Unit,
+    onSave: (FarmerProfile) -> Unit
+) {
+    var farmerName by remember { mutableStateOf(profile.farmerName) }
+    var farmerId by remember { mutableStateOf(profile.farmerId) }
+    var contact by remember { mutableStateOf(profile.contact) }
+    var province by remember { mutableStateOf(profile.province) }
+    var municipality by remember { mutableStateOf(profile.municipality) }
+    var barangay by remember { mutableStateOf(profile.barangay) }
+    var farmName by remember { mutableStateOf(profile.farmName) }
+    var farmSize by remember { mutableStateOf(profile.farmSize) }
+    var landTenure by remember { mutableStateOf(profile.landTenure) }
+    var commodities by remember { mutableStateOf(profile.commodities) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Farmer & Farm Registry", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { Text("Farmer Information", color = AgriGreen, fontWeight = FontWeight.Bold) }
+                item { OutlinedTextField(farmerName, { farmerName = it }, Modifier.fillMaxWidth(), label = { Text("Farmer name") }, singleLine = true) }
+                item { OutlinedTextField(farmerId, { farmerId = it }, Modifier.fillMaxWidth(), label = { Text("Farmer ID / reference no.") }, singleLine = true) }
+                item { OutlinedTextField(contact, { contact = it }, Modifier.fillMaxWidth(), label = { Text("Contact number") }, singleLine = true) }
+
+                item { Text("Farm Information", color = AgriGreen, fontWeight = FontWeight.Bold) }
+                item { OutlinedTextField(farmName, { farmName = it }, Modifier.fillMaxWidth(), label = { Text("Farm name") }, singleLine = true) }
+                item { OutlinedTextField(province, { province = it }, Modifier.fillMaxWidth(), label = { Text("Province") }, singleLine = true) }
+                item { OutlinedTextField(municipality, { municipality = it }, Modifier.fillMaxWidth(), label = { Text("Municipality / City") }, singleLine = true) }
+                item { OutlinedTextField(barangay, { barangay = it }, Modifier.fillMaxWidth(), label = { Text("Barangay") }, singleLine = true) }
+                item { OutlinedTextField(farmSize, { farmSize = it }, Modifier.fillMaxWidth(), label = { Text("Farm area / size") }, singleLine = true) }
+                item { OutlinedTextField(landTenure, { landTenure = it }, Modifier.fillMaxWidth(), label = { Text("Land tenure / status") }, singleLine = true) }
+                item { OutlinedTextField(commodities, { commodities = it }, Modifier.fillMaxWidth(), label = { Text("Commodities") }, minLines = 2) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = farmerName.isNotBlank(),
+                onClick = {
+                    onSave(
+                        FarmerProfile(
+                            farmerName.trim(), farmerId.trim(), contact.trim(),
+                            province.trim(), municipality.trim(), barangay.trim(),
+                            farmName.trim(), farmSize.trim(), landTenure.trim(), commodities.trim()
+                        )
+                    )
+                }
+            ) { Text("Save Registry") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -1190,6 +1358,18 @@ private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.
         put("expenses", JSONArray(prefs.getString("expenses", "[]")))
         put("sales", JSONArray(prefs.getString("sales", "[]")))
         put("tasks", JSONArray(prefs.getString("tasks", "[]")))
+        put("farmerProfile", JSONObject().apply {
+            put("farmerName", prefs.getString("farmerName", ""))
+            put("farmerId", prefs.getString("farmerId", ""))
+            put("contact", prefs.getString("contact", ""))
+            put("province", prefs.getString("province", ""))
+            put("municipality", prefs.getString("municipality", ""))
+            put("barangay", prefs.getString("barangay", ""))
+            put("farmName", prefs.getString("farmName", ""))
+            put("farmSize", prefs.getString("farmSize", ""))
+            put("landTenure", prefs.getString("landTenure", ""))
+            put("commodities", prefs.getString("commodities", ""))
+        })
     }
     context.contentResolver.openOutputStream(uri)?.use { output ->
         output.write(backup.toString(2).toByteArray(Charsets.UTF_8))
@@ -1206,6 +1386,36 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
         if (backup.has(key)) edit.putString(key, backup.getJSONArray(key).toString())
     }
     edit.apply()
+}
+
+private fun loadFarmerProfile(prefs: android.content.SharedPreferences): FarmerProfile {
+    return FarmerProfile(
+        prefs.getString("farmerName", "") ?: "",
+        prefs.getString("farmerId", "") ?: "",
+        prefs.getString("contact", "") ?: "",
+        prefs.getString("province", "") ?: "",
+        prefs.getString("municipality", "") ?: "",
+        prefs.getString("barangay", "") ?: "",
+        prefs.getString("farmName", "") ?: "",
+        prefs.getString("farmSize", "") ?: "",
+        prefs.getString("landTenure", "") ?: "",
+        prefs.getString("commodities", "") ?: ""
+    )
+}
+
+private fun saveFarmerProfile(prefs: android.content.SharedPreferences, profile: FarmerProfile) {
+    prefs.edit()
+        .putString("farmerName", profile.farmerName)
+        .putString("farmerId", profile.farmerId)
+        .putString("contact", profile.contact)
+        .putString("province", profile.province)
+        .putString("municipality", profile.municipality)
+        .putString("barangay", profile.barangay)
+        .putString("farmName", profile.farmName)
+        .putString("farmSize", profile.farmSize)
+        .putString("landTenure", profile.landTenure)
+        .putString("commodities", profile.commodities)
+        .apply()
 }
 
 private fun loadLivestock(prefs: android.content.SharedPreferences): List<Livestock> {
