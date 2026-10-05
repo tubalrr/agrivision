@@ -501,13 +501,19 @@ private fun LiveFieldMap(
         )
     }
 
+    class MapBridge(
+        private val onSelect: (Double, Double) -> Unit
+    ) {
+        @JavascriptInterface
+        fun selectLocation(latitude: Double, longitude: Double) {
+            onSelect(latitude, longitude)
+        }
+    }
+
     val mapBridge = remember {
-        object {
-            @JavascriptInterface
-            fun selectLocation(latitude: Double, longitude: Double) {
-                ContextCompat.getMainExecutor(context).execute {
-                    selectLocation(latitude, longitude)
-                }
+        MapBridge { latitude, longitude ->
+            ContextCompat.getMainExecutor(context).execute {
+                selectLocation(latitude, longitude)
             }
         }
     }
