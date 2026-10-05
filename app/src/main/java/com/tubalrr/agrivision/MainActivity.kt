@@ -18,6 +18,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,6 +78,18 @@ data class ReportSubmission(
     val status: String,
     val submittedDate: String,
     val referenceNo: String
+)
+data class FieldIncident(
+    val id: String,
+    val type: String,
+    val commodity: String,
+    val affectedArea: String,
+    val date: String,
+    val severity: String,
+    val description: String,
+    val status: String = "Draft",
+    val evidenceUri: String = "",
+    val reviewNotes: String = ""
 )
 data class FarmerProfile(
     val farmerName: String,
@@ -167,6 +182,9 @@ private fun AgriVisionApp(
     val assistance = remember {
         mutableStateListOf<AssistanceRecord>().apply { addAll(loadAssistance(farmPrefs)) }
     }
+    val fieldIncidents = remember {
+        mutableStateListOf<FieldIncident>().apply { addAll(loadFieldIncidents(farmPrefs)) }
+    }
 
     val scheme = lightColorScheme(
         primary = AgriGreen,
@@ -186,8 +204,20 @@ private fun AgriVisionApp(
         ) { padding ->
             when (selected) {
                 0 -> DashboardScreen(
-                    padding, livestock, crops, production, expenses, inventory, tasks,
-                    totalAnimals, totalExpenses, totalSales, netIncome, openTasks
+                    padding = padding,
+                    livestock = livestock,
+                    crops = crops,
+                    production = production,
+                    expenses = expenses,
+                    inventory = inventory,
+                    tasks = tasks,
+                    fieldIncidents = fieldIncidents,
+                    farmPrefs = farmPrefs,
+                    totalAnimals = totalAnimals,
+                    totalExpenses = totalExpenses,
+                    totalSales = totalSales,
+                    netIncome = netIncome,
+                    openTasks = openTasks
                 )
                 1 -> FarmScreen(
                     padding, livestock, crops, inventory, equipment, farmPrefs
@@ -280,6 +310,8 @@ private fun DashboardScreen(
     expenses: List<ExpenseRecord>,
     inventory: List<InventoryItem>,
     tasks: List<FarmTask>,
+    fieldIncidents: MutableList<FieldIncident>,
+    farmPrefs: android.content.SharedPreferences,
     totalAnimals: Int,
     totalExpenses: Double,
     totalSales: Double,
@@ -289,6 +321,20 @@ private fun DashboardScreen(
     val lowStock = inventory.count { it.status.equals("Low", ignoreCase = true) }
     val completedTasks = tasks.count { it.done }
     val totalTasks = tasks.size
+    val submittedIncidents = fieldIncidents.count { it.status == "Submitted" }
+    val reviewIncidents = fieldIncidents.count { it.status == "Under Review" }
+    var showIncidentDialog by remember { mutableStateOf(false) }
+
+    if (showIncidentDialog) {
+        AddFieldIncidentDialog(
+            onDismiss = { showIncidentDialog = false },
+            onSave = { incident ->
+                fieldIncidents.add(incident)
+                saveFieldIncidents(farmPrefs, fieldIncidents)
+                showIncidentDialog = false
+            }
+        )
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
@@ -296,98 +342,509 @@ private fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Column(Modifier.weight(1f)) {
-                    Text("AgriVision", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = AgriGreen)
-                    Text("Department of Agriculture • Farm Management", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "AgriVision",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = AgriGreen
+                    )
+                    Text(
+                        "Agriculture Operations Platform",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
-                Box(Modifier.size(48.dp).clip(CircleShape).background(AgriGreenSoft), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(48.dp).clip(CircleShape).background(AgriGreenSoft),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("AV", color = AgriGreen, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
 
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), colors = CardDefaults.cardColors(containerColor = AgriGreen)) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Farm at a glance", color = Color.White.copy(alpha = .72f), style = MaterialTheme.typography.labelLarge)
-                    Text("Good morning, Farmer", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("Your agricultural records, reports and daily operations in one place.", color = Color.White.copy(alpha = .84f))
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DashboardMiniStat("Animals", totalAnimals.toString(), Modifier.weight(1f))
-                        DashboardMiniStat("Crops", crops.size.toString(), Modifier.weight(1f))
-                        DashboardMiniStat("Open tasks", openTasks.toString(), Modifier.weight(1f))
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(30.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreen)
+            ) {
+                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text(
+                        "Operations Center",
+                        color = Color.White.copy(alpha = .72f),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    Text(
+                        "From field event to government report.",
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Capture what is happening on the farm, attach evidence, then prepare it for validation and assistance workflows.",
+                        color = Color.White.copy(alpha = .84f)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        DashboardMiniStat("Incidents", fieldIncidents.size.toString(), Modifier.weight(1f))
+                        DashboardMiniStat("Submitted", submittedIncidents.toString(), Modifier.weight(1f))
+                        DashboardMiniStat("For review", reviewIncidents.toString(), Modifier.weight(1f))
                     }
                 }
             }
         }
 
-        item { SectionTitle("Farm Overview") }
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DashboardKpiCard("Sales", "₱" + money(totalSales), Icons.Outlined.MonetizationOn, AgriGreenSoft, Modifier.weight(1f))
-                DashboardKpiCard("Expenses", "₱" + money(totalExpenses), Icons.Outlined.ReceiptLong, Color(0xFFE9DFC7), Modifier.weight(1f))
-            }
-        }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DashboardKpiCard("Net Income", "₱" + money(netIncome), Icons.Outlined.Assessment, Color(0xFFE1EEDB), Modifier.weight(1f))
-                DashboardKpiCard("Production", production.size.toString(), Icons.Outlined.LocalFlorist, Color(0xFFECE8D9), Modifier.weight(1f))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SectionTitle("Action Queue")
+                Text(
+                    (fieldIncidents.count { it.status == "Draft" } + openTasks).toString() + " action(s)",
+                    color = if (openTasks > 0 || fieldIncidents.any { it.status == "Draft" }) AgriWarning else AgriGreen,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriCard)
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ActionQueueRow(
+                        title = "Field incidents",
+                        detail = fieldIncidents.count { it.status == "Draft" }.toString() + " draft report(s)",
+                        action = { showIncidentDialog = true }
+                    )
+                    HorizontalDivider(color = AgriLine)
+                    ActionQueueRow(
+                        title = "Farm tasks",
+                        detail = openTasks.toString() + " open task(s)",
+                        action = {}
+                    )
+                    HorizontalDivider(color = AgriLine)
+                    ActionQueueRow(
+                        title = "Inventory",
+                        detail = if (lowStock == 0) "No low-stock alerts" else lowStock.toString() + " item(s) low",
+                        action = {}
+                    )
+                }
+            }
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1D6))
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Report a field incident", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Pest, disease, flooding, drought, crop damage or animal health events can be logged with date, severity and photo evidence.",
+                        color = AgriText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Button(
+                        onClick = { showIncidentDialog = true },
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("+ New Field Report")
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SectionTitle("Recent Field Reports")
+                Text(
+                    fieldIncidents.size.toString() + " total",
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        if (fieldIncidents.isEmpty()) {
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = AgriCard)
+                ) {
+                    Column(
+                        Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text("No field incidents recorded", fontWeight = FontWeight.Bold)
+                        Text(
+                            "Create the first report when an agricultural issue occurs.",
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        } else {
+            items(fieldIncidents.takeLast(5).asReversed()) { incident ->
+                FieldIncidentCard(
+                    incident = incident,
+                    onStatusChange = { next ->
+                        val index = fieldIncidents.indexOfFirst { it.id == incident.id }
+                        if (index >= 0) {
+                            fieldIncidents[index] = incident.copy(status = next)
+                            saveFieldIncidents(farmPrefs, fieldIncidents)
+                        }
+                    }
+                )
+            }
+        }
+
+        item { SectionTitle("Farm Operations") }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DashboardKpiCard(
+                    "Sales",
+                    "₱" + money(totalSales),
+                    Icons.Outlined.MonetizationOn,
+                    AgriGreenSoft,
+                    Modifier.weight(1f)
+                )
+                DashboardKpiCard(
+                    "Expenses",
+                    "₱" + money(totalExpenses),
+                    Icons.Outlined.ReceiptLong,
+                    Color(0xFFE9DFC7),
+                    Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DashboardKpiCard(
+                    "Net Income",
+                    "₱" + money(netIncome),
+                    Icons.Outlined.Assessment,
+                    Color(0xFFE1EEDB),
+                    Modifier.weight(1f)
+                )
+                DashboardKpiCard(
+                    "Production",
+                    production.size.toString(),
+                    Icons.Outlined.LocalFlorist,
+                    Color(0xFFECE8D9),
+                    Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriCard)
+            ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Farm Health", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text(if (lowStock == 0 && openTasks == 0) "Healthy" else "Needs attention", color = if (lowStock == 0 && openTasks == 0) AgriGreen else AgriWarning, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Farm Health",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            if (lowStock == 0 && openTasks == 0) "Healthy" else "Needs attention",
+                            color = if (lowStock == 0 && openTasks == 0) AgriGreen else AgriWarning,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                     StatusRow("Livestock", totalAnimals.toString() + " heads", Icons.Outlined.Pets, AgriGreen)
                     StatusRow("Crops", crops.size.toString() + " records", Icons.Outlined.LocalFlorist, AgriGreen)
-                    StatusRow("Inventory", if (lowStock == 0) "All stocked" else lowStock.toString() + " low", Icons.Outlined.Inventory2, if (lowStock > 0) AgriWarning else AgriGreen)
-                    StatusRow("Tasks", completedTasks.toString() + "/" + totalTasks + " completed", Icons.Outlined.Checklist, if (openTasks > 0) AgriWarning else AgriGreen)
+                    StatusRow(
+                        "Inventory",
+                        if (lowStock == 0) "All stocked" else lowStock.toString() + " low",
+                        Icons.Outlined.Inventory2,
+                        if (lowStock > 0) AgriWarning else AgriGreen
+                    )
+                    StatusRow(
+                        "Tasks",
+                        completedTasks.toString() + "/" + totalTasks + " completed",
+                        Icons.Outlined.Checklist,
+                        if (openTasks > 0) AgriWarning else AgriGreen
+                    )
                 }
             }
         }
 
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle("Today")
-                Text(if (openTasks == 0) "All clear" else openTasks.toString() + " pending", color = if (openTasks == 0) AgriGreen else AgriWarning, fontWeight = FontWeight.SemiBold)
-            }
-        }
-        item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = if (openTasks > 0 || lowStock > 0) Color(0xFFFFE2DA) else AgriGreenSoft)) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text(if (openTasks > 0) "You have " + openTasks + " farm task(s) to review." else "Your farm schedule is up to date.", fontWeight = FontWeight.Bold)
-                    Text(if (lowStock > 0) lowStock.toString() + " inventory item(s) need restocking." else "No inventory alerts right now.", color = AgriMuted)
-                }
-            }
-        }
-
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle("Recent Production")
-                Text(production.size.toString() + " records", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        items(production.take(3)) { record ->
-            SimpleRecordCard(record.product, record.quantity, record.period, Icons.Outlined.Assessment)
-        }
-
-        item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)) {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+            ) {
                 Column(Modifier.padding(18.dp)) {
-                    Text("DA-ready workflow", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text("Workflow status", color = AgriGreen, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
-                    Text("Keep farmer registry, production, assistance and reports complete for future government reporting workflows.", color = AgriText, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "FARMER → FIELD EVENT → EVIDENCE → VALIDATION → ASSISTANCE → OUTCOME",
+                        color = AgriText,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
     }
 }
+
+@Composable
+private fun ActionQueueRow(
+    title: String,
+    detail: String,
+    action: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Bold)
+            Text(detail, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+        }
+        TextButton(onClick = action) {
+            Text(if (title == "Field incidents") "Report" else "Open")
+        }
+    }
+}
+
+@Composable
+private fun FieldIncidentCard(
+    incident: FieldIncident,
+    onStatusChange: (String) -> Unit
+) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard)
+    ) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(incident.type, fontWeight = FontWeight.Bold)
+                    Text(
+                        listOf(incident.commodity, incident.affectedArea, incident.date)
+                            .filter { it.isNotBlank() }
+                            .joinToString(" · "),
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                StatusBadge(incident.status)
+            }
+            Text(
+                incident.description.ifBlank { "No description provided." },
+                color = AgriText,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Severity: " + incident.severity,
+                    color = if (incident.severity == "Critical" || incident.severity == "High") AgriWarning else AgriGreen,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f)
+                )
+                if (incident.evidenceUri.isNotBlank()) {
+                    Text("Photo evidence attached", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                if (incident.status == "Draft" || incident.status == "Returned") {
+                    TextButton(onClick = { onStatusChange("Submitted") }) { Text("Submit Report") }
+                } else if (incident.status == "Submitted") {
+                    TextButton(onClick = { onStatusChange("Draft") }) { Text("Edit / Reopen") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddFieldIncidentDialog(
+    onDismiss: () -> Unit,
+    onSave: (FieldIncident) -> Unit
+) {
+    val context = LocalContext.current
+    var type by remember { mutableStateOf("Pest / Disease") }
+    var commodity by remember { mutableStateOf("") }
+    var affectedArea by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
+    var severity by remember { mutableStateOf("Moderate") }
+    var description by remember { mutableStateOf("") }
+    var evidenceUri by remember { mutableStateOf("") }
+    var showPicker by remember { mutableStateOf(false) }
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        evidenceUri = uri?.toString().orEmpty()
+    }
+
+    if (showPicker) {
+        val calendar = Calendar.getInstance()
+        try {
+            calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) ?: calendar.time
+        } catch (_: Exception) { }
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                val picked = Calendar.getInstance().apply { set(year, month, day) }
+                date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
+                showPicker = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            setOnDismissListener { showPicker = false }
+            show()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New Field Incident", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 430.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    Text("Issue type", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Pest / Disease", "Flood", "Drought", "Crop Damage", "Animal Health", "Other").forEach { option ->
+                            FilterChip(
+                                selected = type == option,
+                                onClick = { type = option },
+                                label = { Text(option, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                }
+                item {
+                    OutlinedTextField(
+                        commodity,
+                        { commodity = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Commodity / crop / animal") },
+                        singleLine = true
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        affectedArea,
+                        { affectedArea = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Affected area / quantity") },
+                        singleLine = true
+                    )
+                }
+                item {
+                    OutlinedButton(
+                        onClick = { showPicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Date: " + date)
+                    }
+                }
+                item {
+                    Text("Severity", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Low", "Moderate", "High", "Critical").forEach { option ->
+                            FilterChip(
+                                selected = severity == option,
+                                onClick = { severity = option },
+                                label = { Text(option) }
+                            )
+                        }
+                    }
+                }
+                item {
+                    OutlinedTextField(
+                        description,
+                        { description = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("What happened?") },
+                        minLines = 3
+                    )
+                }
+                item {
+                    OutlinedButton(
+                        onClick = { imagePicker.launch("image/*") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(if (evidenceUri.isBlank()) "Attach photo evidence" else "Photo evidence attached")
+                    }
+                }
+                item {
+                    Text(
+                        "The photo is stored as a local file reference. Official DA submission still requires a connected and authorized backend.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = commodity.isNotBlank() && description.isNotBlank(),
+                onClick = {
+                    onSave(
+                        FieldIncident(
+                            id = "INC-" + System.currentTimeMillis(),
+                            type = type,
+                            commodity = commodity.trim(),
+                            affectedArea = affectedArea.trim(),
+                            date = date,
+                            severity = severity,
+                            description = description.trim(),
+                            status = "Draft",
+                            evidenceUri = evidenceUri
+                        )
+                    )
+                }
+            ) { Text("Save Draft") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
 @Composable
 private fun DashboardKpiCard(
     title: String,
@@ -1846,6 +2303,7 @@ private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.
         put("sales", JSONArray(prefs.getString("sales", "[]")))
         put("tasks", JSONArray(prefs.getString("tasks", "[]")))
         put("assistance", JSONArray(prefs.getString("assistance", "[]")))
+        put("fieldIncidents", JSONArray(prefs.getString("fieldIncidents", "[]")))
         put("reportSubmission", JSONObject().apply {
             put("status", prefs.getString("reportStatus", "Draft"))
             put("submittedDate", prefs.getString("reportSubmittedDate", ""))
@@ -1876,7 +2334,7 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
         ?: return
     val backup = JSONObject(json)
     val edit = prefs.edit()
-    val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks", "assistance")
+    val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks", "assistance", "fieldIncidents")
     keys.forEach { key ->
         if (backup.has(key)) edit.putString(key, backup.getJSONArray(key).toString())
     }
@@ -1902,6 +2360,45 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
         edit.putString("reviewNotes", p.optString("reviewNotes"))
     }
     edit.apply()
+}
+
+private fun loadFieldIncidents(prefs: android.content.SharedPreferences): List<FieldIncident> {
+    val raw = prefs.getString("fieldIncidents", "[]") ?: "[]"
+    val a = JSONArray(raw)
+    return List(a.length()) { i ->
+        val o = a.getJSONObject(i)
+        FieldIncident(
+            id = o.optString("id"),
+            type = o.optString("type", "Other"),
+            commodity = o.optString("commodity"),
+            affectedArea = o.optString("affectedArea"),
+            date = o.optString("date"),
+            severity = o.optString("severity", "Moderate"),
+            description = o.optString("description"),
+            status = o.optString("status", "Draft"),
+            evidenceUri = o.optString("evidenceUri"),
+            reviewNotes = o.optString("reviewNotes")
+        )
+    }
+}
+
+private fun saveFieldIncidents(prefs: android.content.SharedPreferences, list: List<FieldIncident>) {
+    val a = JSONArray()
+    list.forEach { incident ->
+        a.put(JSONObject().apply {
+            put("id", incident.id)
+            put("type", incident.type)
+            put("commodity", incident.commodity)
+            put("affectedArea", incident.affectedArea)
+            put("date", incident.date)
+            put("severity", incident.severity)
+            put("description", incident.description)
+            put("status", incident.status)
+            put("evidenceUri", incident.evidenceUri)
+            put("reviewNotes", incident.reviewNotes)
+        })
+    }
+    prefs.edit().putString("fieldIncidents", a.toString()).apply()
 }
 
 private fun loadAssistance(prefs: android.content.SharedPreferences): List<AssistanceRecord> {
