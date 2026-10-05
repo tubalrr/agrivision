@@ -24,19 +24,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
-            AgriVisionTheme {
-                AgriVisionApp()
-            }
+            AgriVisionApp()
         }
     }
 }
@@ -46,26 +44,28 @@ private fun AgriVisionApp() {
     var selected by remember { mutableIntStateOf(0) }
     val items = listOf("Home", "Fields", "Inputs", "Tasks", "More")
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                items.forEachIndexed { index, label ->
-                    NavigationBarItem(
-                        selected = selected == index,
-                        onClick = { selected = index },
-                        icon = { Text(label.take(1)) },
-                        label = { Text(label) }
-                    )
+    MaterialTheme {
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    items.forEachIndexed { index, label ->
+                        NavigationBarItem(
+                            selected = selected == index,
+                            onClick = { selected = index },
+                            icon = { Text(label.take(1)) },
+                            label = { Text(label) }
+                        )
+                    }
                 }
             }
-        }
-    ) { padding ->
-        when (selected) {
-            0 -> DashboardScreen(padding)
-            1 -> PlaceholderScreen("Farm Fields")
-            2 -> PlaceholderScreen("Farm Inputs")
-            3 -> PlaceholderScreen("Farm Tasks")
-            4 -> PlaceholderScreen("More")
+        ) { padding ->
+            when (selected) {
+                0 -> DashboardScreen(padding)
+                1 -> PlaceholderScreen("Farm Fields")
+                2 -> PlaceholderScreen("Farm Inputs")
+                3 -> PlaceholderScreen("Farm Tasks")
+                4 -> PlaceholderScreen("More")
+            }
         }
     }
 }
@@ -80,15 +80,18 @@ private fun DashboardScreen(padding: PaddingValues) {
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text(
-                text = "AgriVision",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "See Your Farm. Know What To Do.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column {
+                Text(
+                    text = "AgriVision",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "See Your Farm. Know What To Do.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         item {
@@ -168,17 +171,4 @@ private fun PlaceholderScreen(title: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
-}
-
-@Composable
-private fun AgriVisionTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = androidx.compose.material3.lightColorScheme(
-            primary = Color(0xFF2F6B3B),
-            secondary = Color(0xFF6E5A3C),
-            background = Color(0xFFF6F4EE),
-            surface = Color(0xFFF6F4EE)
-        ),
-        content = content
-    )
 }
