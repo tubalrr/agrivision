@@ -3,6 +3,7 @@ package com.tubalrr.agrivision
 import android.content.Context
 import android.os.Bundle
 import android.net.Uri
+import android.app.DatePickerDialog
 import org.json.JSONArray
 import org.json.JSONObject
 import androidx.activity.ComponentActivity
@@ -24,6 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Checklist
@@ -785,19 +789,33 @@ private fun TasksScreen(
     inventory: List<InventoryItem>,
     farmPrefs: android.content.SharedPreferences
 ) {
-    val open = tasks.count { !it.done }
-    val lowStock = inventory.filter { it.status.equals("Low", ignoreCase = true) }
+    val todayKey = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time) }
+    var selectedDate by remember { mutableStateOf(todayKey) }
     var showDialog by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val lowStock = inventory.filter { it.status.equals("Low", ignoreCase = true) }
+    val selectedTasks = tasks.filter { it.date == selectedDate || (selectedDate == todayKey && it.date.equals("Today", ignoreCase = true)) }
+    val open = tasks.count { !it.done }
 
     if (showDialog) {
         AddTaskDialog(
             onDismiss = { showDialog = false },
-            onAdd = {
-                tasks.add(it)
-                saveTasks(farmPrefs, tasks)
-                showDialog = false
-            }
+            onAdd = { record -> tasks.add(record); saveTasks(farmPrefs, tasks); showDialog = false }
         )
+    }
+
+    if (showDatePicker) {
+        val calendar = Calendar.getInstance()
+        try { calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedDate) ?: calendar.time } catch (_: Exception) { }
+        DatePickerDialog(
+            LocalContext.current,
+            { _, year, month, day ->
+                val picked = Calendar.getInstance().apply { set(year, month, day) }
+                selectedDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
+                showDatePicker = false
+            },
+            calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply { setOnDismissListener { showDatePicker = false }; show() }
     }
 
     LazyColumn(
@@ -806,84 +824,79 @@ private fun TasksScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Tasks & Alerts", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("Today · " + open + " open task(s)", color = AgriMuted)
+                    Text("Tasks & Calendar", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(open.toString() + " open task(s)", color = AgriMuted)
                 }
-                Button(
-                    onClick = { showDialog = true },
-                    shape = RoundedCornerShape(16.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
-                ) { Text("+ Add") }
+                Button(onClick = { showDialog = true }, shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)) { Text("+ Add") }
             }
         }
 
         item {
-            SectionTitle("Active Alerts")
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Farm Schedule", color = AgriGreen, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        try { SimpleDateFormat("EEEE, MMM d, yyyy", Locale.US).format(SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedDate)!!) }
+                        catch (_: Exception) { selectedDate },
+                        color = AgriText
+                    )
+                    Button(onClick = { showDatePicker = true }, shape = RoundedCornerShape(14.dp)) { Text("Select Date") }
+                }
+            }
         }
 
+        item { SectionTitle("Active Alerts") }
         item {
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE2DA))
-            ) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE2DA))) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     AlertRow(
-                        title = if (open > 0) "Farm work needs attention" else "All farm tasks are clear",
-                        detail = if (open > 0) open.toString() + " task(s) still open today." else "No unfinished tasks.",
-                        warning = open > 0
+                        title = if (selectedTasks.any { !it.done }) "Tasks need attention" else "No unfinished tasks",
+                        detail = if (selectedTasks.any { !it.done }) selectedTasks.count { !it.done }.toString() + " task(s) scheduled for this date." else "This date is clear.",
+                        warning = selectedTasks.any { !it.done }
                     )
                     if (lowStock.isNotEmpty()) {
-                        AlertRow(
-                            title = "Low inventory — " + lowStock.first().name,
-                            detail = "Restock before the next farm activity.",
-                            warning = true
-                        )
+                        AlertRow("Low inventory — " + lowStock.first().name, "Restock before the next farm activity.", true)
                     }
                 }
             }
         }
 
         item {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SectionTitle("Today's Farm Tasks")
-                Text(open.toString() + " open", color = AgriGreen, fontWeight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                SectionTitle("Scheduled Tasks")
+                Text(selectedTasks.size.toString() + " task(s)", color = AgriGreen, fontWeight = FontWeight.SemiBold)
             }
         }
 
-        items(tasks.indices.toList()) { index ->
-            val task = tasks[index]
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriCard)
-            ) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(58.dp)) {
-                        Text(task.date, color = AgriGreen, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
-                        Box(
-                            Modifier.padding(top = 7.dp).size(12.dp).clip(CircleShape)
-                                .background(if (task.done) AgriGreen else AgriSage)
-                        )
+        if (selectedTasks.isEmpty()) {
+            item {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+                    Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("No tasks scheduled", fontWeight = FontWeight.Bold)
+                        Text("Add a farm task for this date.", color = AgriMuted)
                     }
+                }
+            }
+        }
+
+        items(tasks.indices.toList().filter { index ->
+            val date = tasks[index].date
+            date == selectedDate || (selectedDate == todayKey && date.equals("Today", ignoreCase = true))
+        }) { index ->
+            val task = tasks[index]
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(42.dp).clip(CircleShape).background(if (task.done) AgriGreen else AgriSage), contentAlignment = Alignment.Center) {
+                        Text(if (task.done) "✓" else "!", color = if (task.done) Color.White else AgriGreen, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(13.dp))
                     Column(Modifier.weight(1f)) {
                         Text(task.title, fontWeight = FontWeight.Bold)
                         Text(task.category + " · " + if (task.done) "Completed" else "Upcoming", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                     }
-                    TextButton(onClick = {
-                        tasks[index] = task.copy(done = !task.done)
-                        saveTasks(farmPrefs, tasks)
-                    }) {
+                    TextButton(onClick = { tasks[index] = task.copy(done = !task.done); saveTasks(farmPrefs, tasks) }) {
                         Text(if (task.done) "Undo" else "Done")
                     }
                 }
@@ -891,19 +904,11 @@ private fun TasksScreen(
         }
 
         item {
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
-            ) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)) {
                 Column(Modifier.padding(18.dp)) {
                     Text("Farm Reminders", fontWeight = FontWeight.Bold, color = AgriGreen)
                     Spacer(Modifier.height(5.dp))
-                    Text(
-                        "Use tasks for feeding, watering, cleaning, vaccination, planting, harvesting, repairs and general farm work.",
-                        color = AgriText,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text("Schedule feeding, watering, cleaning, vaccination, planting, harvesting, repairs and general farm work by date.", color = AgriText, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -933,43 +938,38 @@ private fun AddTaskDialog(
     onDismiss: () -> Unit,
     onAdd: (FarmTask) -> Unit
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("General") }
-    var date by remember { mutableStateOf("Today") }
+    var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
+    var showPicker by remember { mutableStateOf(false) }
+
+    if (showPicker) {
+        val calendar = Calendar.getInstance()
+        try { calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) ?: calendar.time } catch (_: Exception) { }
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                val picked = Calendar.getInstance().apply { set(year, month, day) }
+                date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
+                showPicker = false
+            },
+            calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply { setOnDismissListener { showPicker = false }; show() }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Farm Task", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Task") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = category,
-                    onValueChange = { category = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Category") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = date,
-                    onValueChange = { date = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Date / time") },
-                    singleLine = true
-                )
+                OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), label = { Text("Task") }, singleLine = true)
+                OutlinedTextField(category, { category = it }, Modifier.fillMaxWidth(), label = { Text("Category") }, singleLine = true)
+                OutlinedButton(onClick = { showPicker = true }, modifier = Modifier.fillMaxWidth()) { Text("Date: " + date) }
             }
         },
         confirmButton = {
-            TextButton(
-                enabled = title.isNotBlank(),
-                onClick = { onAdd(FarmTask(title.trim(), category.trim(), date.trim(), false)) }
-            ) { Text("Save") }
+            TextButton(enabled = title.isNotBlank(), onClick = { onAdd(FarmTask(title.trim(), category.trim(), date, false)) }) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
