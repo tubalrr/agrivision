@@ -412,7 +412,8 @@ private fun LiveFieldMap(
             null
         }
     }
-    var drawingBoundary by remember { mutableStateOf(boundary.size >= 2) }
+    var drawingBoundary by remember { mutableStateOf(false) }
+    var showFieldDetails by remember { mutableStateOf(false) }
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(
@@ -464,28 +465,27 @@ private fun LiveFieldMap(
                 if (boundary.size >= 3) {
                     Polygon(
                         points = boundary,
-                        clickable = false,
+                        clickable = true,
                         fillColor = Color(0x664F7D45),
                         strokeColor = AgriGreen,
-                        strokeWidth = 4f
+                        strokeWidth = 4f,
+                        onClick = { showFieldDetails = true }
                     )
                 }
 
-                boundary.forEachIndexed { index, point ->
-                    Marker(
-                        state = rememberUpdatedMarkerState(position = point),
-                        title = "Boundary point " + (index + 1)
-                    )
-                }
-
-                if (boundary.isEmpty()) {
-                    fieldLocation?.let { location ->
+                if (drawingBoundary) {
+                    boundary.forEachIndexed { index, point ->
                         Marker(
-                            state = rememberUpdatedMarkerState(position = location),
-                            title = field?.name ?: "Farm Field",
-                            snippet = (field?.crop ?: "Crop") + " · " + (field?.area ?: "")
+                            state = rememberUpdatedMarkerState(position = point),
+                            title = "Boundary point " + (index + 1)
                         )
                     }
+                } else if (fieldLocation != null && boundary.size < 3) {
+                    Marker(
+                        state = rememberUpdatedMarkerState(position = fieldLocation),
+                        title = field?.name ?: "Farm Field",
+                        snippet = (field?.crop ?: "Crop") + " · " + (field?.area ?: "")
+                    )
                 }
             }
 
@@ -567,6 +567,37 @@ private fun LiveFieldMap(
                 )
             }
 
+            if (showFieldDetails && field != null && boundary.size >= 3) {
+                AlertDialog(
+                    onDismissRequest = { showFieldDetails = false },
+                    confirmButton = {
+                        TextButton(onClick = { showFieldDetails = false }) {
+                            Text("Close")
+                        }
+                    },
+                    title = {
+                        Text(field.name, fontWeight = FontWeight.Bold)
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            FieldDetailRow("Crop", field.crop)
+                            FieldDetailRow("Mapped Area", "%.2f ha".format(calculateApproxAreaHa(boundary)))
+                            FieldDetailRow("Recorded Area", field.area)
+                            FieldDetailRow(
+                                "Center",
+                                if (fieldLocation != null)
+                                    "%.6f, %.6f".format(fieldLocation.latitude, fieldLocation.longitude)
+                                else "Not set"
+                            )
+                            FieldDetailRow("Health", "92% Healthy")
+                            FieldDetailRow("Map", "Google Satellite")
+                        }
+                    },
+                    shape = RoundedCornerShape(26.dp),
+                    containerColor = AgriCard
+                )
+            }
+
             Text(
                 if (drawingBoundary) "Tap corners → Finish"
                 else "Google Satellite · Drag · Pinch · Rotate",
@@ -581,6 +612,18 @@ private fun LiveFieldMap(
                 fontWeight = FontWeight.SemiBold
             )
         }
+    }
+}
+
+@Composable
+private fun FieldDetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = AgriMuted)
+        Spacer(Modifier.width(16.dp))
+        Text(value, color = AgriText, fontWeight = FontWeight.SemiBold)
     }
 }
 
