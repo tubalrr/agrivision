@@ -582,6 +582,9 @@ private fun DashboardScreen(
                 FieldIncidentCard(
                     incident = incident,
                     hasAssistanceRequest = assistance.any { it.incidentId == incident.id },
+                    assistanceCompleted = assistance.any {
+                        it.incidentId == incident.id && it.status == "Completed"
+                    },
                     onStatusChange = { next ->
                         val index = fieldIncidents.indexOfFirst { it.id == incident.id }
                         if (index >= 0) {
@@ -592,7 +595,7 @@ private fun DashboardScreen(
                                     status = next,
                                     note = when (next) {
                                         "Submitted" -> "Farmer submitted field report"
-                                        "Resolved" -> "Case marked resolved"
+                                        "Resolved" -> "Case closed after closure gate"
                                         else -> "Case status updated"
                                     }
                                 )
@@ -752,6 +755,7 @@ private fun ActionQueueRow(
 private fun FieldIncidentCard(
     incident: FieldIncident,
     hasAssistanceRequest: Boolean,
+    assistanceCompleted: Boolean,
     onStatusChange: (String) -> Unit,
     onReview: () -> Unit,
     onTimeline: () -> Unit,
@@ -837,11 +841,20 @@ private fun FieldIncidentCard(
                             TextButton(onClick = onCreateAssistance) {
                                 Text("Request Assistance")
                             }
+                        } else if (assistanceCompleted) {
+                            Text("Assistance completed", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
                         } else {
-                            Text("Assistance linked", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "Awaiting assistance completion",
+                                color = AgriWarning,
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
-                        TextButton(onClick = { onStatusChange("Resolved") }) {
-                            Text("Mark Resolved")
+
+                        if (!hasAssistanceRequest || assistanceCompleted) {
+                            TextButton(onClick = { onStatusChange("Resolved") }) {
+                                Text("Mark Resolved")
+                            }
                         }
                     }
                     "Resolved" -> {
