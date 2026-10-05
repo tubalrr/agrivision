@@ -2,6 +2,8 @@ package com.tubalrr.agrivision
 
 import android.content.Context
 import android.os.Bundle
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -67,17 +69,19 @@ private fun AgriVisionApp() {
     var selected by remember { mutableStateOf(0) }
     val context = LocalContext.current
 
+    val farmPrefs = remember {
+        context.getSharedPreferences("agrivision_farm", Context.MODE_PRIVATE)
+    }
+
     val livestock = remember {
-        mutableStateListOf(
-            Livestock("Layer Batch 01", "Chickens", 279, "Healthy"),
-            Livestock("Native Chickens", "Chickens", 24, "Monitor")
-        )
+        mutableStateListOf<Livestock>().apply {
+            addAll(loadLivestock(farmPrefs))
+        }
     }
     val crops = remember {
-        mutableStateListOf(
-            CropRecord("North Plot", "Rice", "1.0 ha", "Growing"),
-            CropRecord("Garden", "Vegetables", "0.15 ha", "Active")
-        )
+        mutableStateListOf<CropRecord>().apply {
+            addAll(loadCrops(farmPrefs))
+        }
     }
     val production = remember {
         mutableStateListOf(
@@ -93,18 +97,14 @@ private fun AgriVisionApp() {
         )
     }
     val inventory = remember {
-        mutableStateListOf(
-            InventoryItem("Layer Feed", "6 sacks", "Good"),
-            InventoryItem("Medicine", "3 packs", "Good"),
-            InventoryItem("Fertilizer", "2 bags", "Low")
-        )
+        mutableStateListOf<InventoryItem>().apply {
+            addAll(loadInventory(farmPrefs))
+        }
     }
     val equipment = remember {
-        mutableStateListOf(
-            EquipmentRecord("Water Pump", "Ready", "Last checked recently"),
-            EquipmentRecord("Knapsack Sprayer", "Ready", "Good condition"),
-            EquipmentRecord("Farm Tools", "Needs check", "Inspect before next use")
-        )
+        mutableStateListOf<EquipmentRecord>().apply {
+            addAll(loadEquipment(farmPrefs))
+        }
     }
     val tasks = remember {
         mutableStateListOf(
@@ -141,7 +141,7 @@ private fun AgriVisionApp() {
                     totalAnimals, totalExpenses, openTasks
                 )
                 1 -> FarmScreen(
-                    padding, livestock, crops, inventory, equipment
+                    padding, livestock, crops, inventory, equipment, farmPrefs
                 )
                 2 -> ProductionFinanceScreen(
                     padding, production, expenses, totalExpenses
@@ -293,9 +293,38 @@ private fun FarmScreen(
     livestock: MutableList<Livestock>,
     crops: MutableList<CropRecord>,
     inventory: MutableList<InventoryItem>,
-    equipment: MutableList<EquipmentRecord>
+    equipment: MutableList<EquipmentRecord>,
+    farmPrefs: android.content.SharedPreferences
 ) {
     var category by remember { mutableStateOf("Livestock") }
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    if (showAddDialog) {
+        AddFarmRecordDialog(
+            category = category,
+            onDismiss = { showAddDialog = false },
+            onAddLivestock = { record ->
+                livestock.add(record)
+                saveLivestock(farmPrefs, livestock)
+                showAddDialog = false
+            },
+            onAddCrop = { record ->
+                crops.add(record)
+                saveCrops(farmPrefs, crops)
+                showAddDialog = false
+            },
+            onAddInventory = { record ->
+                inventory.add(record)
+                saveInventory(farmPrefs, inventory)
+                showAddDialog = false
+            },
+            onAddEquipment = { record ->
+                equipment.add(record)
+                saveEquipment(farmPrefs, equipment)
+                showAddDialog = false
+            }
+        )
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
@@ -314,28 +343,64 @@ private fun FarmScreen(
 
         when (category) {
             "Livestock" -> {
-                item { SectionTitle("Livestock Groups") }
+                item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionTitle("Livestock Groups")
+                    TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                }
+            }
                 items(livestock) { animal ->
                     FarmRecordCard(animal.name, animal.kind, animal.count.toString() + " heads · " + animal.status, Icons.Outlined.Pets)
                 }
                 item { AddHint("Add animal groups, feeding, health and mortality records.") }
             }
             "Crops" -> {
-                item { SectionTitle("Crop Records") }
+                item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionTitle("Crop Records")
+                    TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                }
+            }
                 items(crops) { crop ->
                     FarmRecordCard(crop.name, crop.crop, crop.area + " · " + crop.stage, Icons.Outlined.LocalFlorist)
                 }
                 item { AddHint("Track planting, inputs, growth stage and harvest.") }
             }
             "Inventory" -> {
-                item { SectionTitle("Farm Inventory") }
+                item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionTitle("Farm Inventory")
+                    TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                }
+            }
                 items(inventory) { item ->
                     FarmRecordCard(item.name, item.quantity, item.status, Icons.Outlined.Inventory2)
                 }
                 item { AddHint("Feeds, medicine, fertilizer, seeds, tools and supplies.") }
             }
             "Equipment" -> {
-                item { SectionTitle("Farm Equipment") }
+                item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionTitle("Farm Equipment")
+                    TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                }
+            }
                 items(equipment) { item ->
                     FarmRecordCard(item.name, item.status, item.note, Icons.Outlined.PrecisionManufacturing)
                 }
@@ -343,6 +408,134 @@ private fun FarmScreen(
             }
         }
     }
+}
+
+@Composable
+private fun AddFarmRecordDialog(
+    category: String,
+    onDismiss: () -> Unit,
+    onAddLivestock: (Livestock) -> Unit,
+    onAddCrop: (CropRecord) -> Unit,
+    onAddInventory: (InventoryItem) -> Unit,
+    onAddEquipment: (EquipmentRecord) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf("") }
+    var value by remember { mutableStateOf("") }
+    var detail by remember { mutableStateOf("") }
+
+    val title = when (category) {
+        "Livestock" -> "Add Livestock"
+        "Crops" -> "Add Crop"
+        "Inventory" -> "Add Inventory"
+        else -> "Add Equipment"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(if (category == "Crops") "Field / crop name" else "Name") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = type,
+                    onValueChange = { type = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text(
+                            when (category) {
+                                "Livestock" -> "Animal type"
+                                "Crops" -> "Crop type"
+                                "Inventory" -> "Quantity"
+                                else -> "Status"
+                            }
+                        )
+                    },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text(
+                            when (category) {
+                                "Livestock" -> "Quantity / heads"
+                                "Crops" -> "Area"
+                                "Inventory" -> "Stock status"
+                                else -> "Maintenance note"
+                            }
+                        )
+                    },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = detail,
+                    onValueChange = { detail = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text(
+                            when (category) {
+                                "Livestock" -> "Health status"
+                                "Crops" -> "Growth stage"
+                                "Inventory" -> "Item name / unit"
+                                else -> "Equipment name / detail"
+                            }
+                        )
+                    },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    when (category) {
+                        "Livestock" -> onAddLivestock(
+                            Livestock(
+                                name.trim(),
+                                type.ifBlank { "Other" }.trim(),
+                                value.toIntOrNull() ?: 0,
+                                detail.ifBlank { "Healthy" }.trim()
+                            )
+                        )
+                        "Crops" -> onAddCrop(
+                            CropRecord(
+                                name.trim(),
+                                type.ifBlank { "Other" }.trim(),
+                                value.ifBlank { "—" }.trim(),
+                                detail.ifBlank { "Active" }.trim()
+                            )
+                        )
+                        "Inventory" -> onAddInventory(
+                            InventoryItem(
+                                detail.ifBlank { name }.trim(),
+                                type.ifBlank { "1" }.trim(),
+                                value.ifBlank { "Good" }.trim()
+                            )
+                        )
+                        else -> onAddEquipment(
+                            EquipmentRecord(
+                                name.trim(),
+                                type.ifBlank { "Ready" }.trim(),
+                                value.ifBlank { detail }.trim()
+                            )
+                        )
+                    }
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -593,6 +786,91 @@ private fun InfoCard(title: String, body: String) {
             Text(body, color = AgriMuted)
         }
     }
+}
+
+
+// ---------- Local farm storage ----------
+
+private fun loadLivestock(prefs: android.content.SharedPreferences): List<Livestock> {
+    val raw = prefs.getString("livestock", null) ?: return listOf(
+        Livestock("Layer Batch 01", "Chickens", 279, "Healthy"),
+        Livestock("Native Chickens", "Chickens", 24, "Monitor")
+    )
+    val a = JSONArray(raw)
+    return List(a.length()) { i ->
+        val o = a.getJSONObject(i)
+        Livestock(o.getString("name"), o.getString("kind"), o.getInt("count"), o.getString("status"))
+    }
+}
+
+private fun loadCrops(prefs: android.content.SharedPreferences): List<CropRecord> {
+    val raw = prefs.getString("crops", null) ?: return listOf(
+        CropRecord("North Plot", "Rice", "1.0 ha", "Growing"),
+        CropRecord("Garden", "Vegetables", "0.15 ha", "Active")
+    )
+    val a = JSONArray(raw)
+    return List(a.length()) { i ->
+        val o = a.getJSONObject(i)
+        CropRecord(o.getString("name"), o.getString("crop"), o.getString("area"), o.getString("stage"))
+    }
+}
+
+private fun loadInventory(prefs: android.content.SharedPreferences): List<InventoryItem> {
+    val raw = prefs.getString("inventory", null) ?: return listOf(
+        InventoryItem("Layer Feed", "6 sacks", "Good"),
+        InventoryItem("Medicine", "3 packs", "Good"),
+        InventoryItem("Fertilizer", "2 bags", "Low")
+    )
+    val a = JSONArray(raw)
+    return List(a.length()) { i ->
+        val o = a.getJSONObject(i)
+        InventoryItem(o.getString("name"), o.getString("quantity"), o.getString("status"))
+    }
+}
+
+private fun loadEquipment(prefs: android.content.SharedPreferences): List<EquipmentRecord> {
+    val raw = prefs.getString("equipment", null) ?: return listOf(
+        EquipmentRecord("Water Pump", "Ready", "Last checked recently"),
+        EquipmentRecord("Knapsack Sprayer", "Ready", "Good condition"),
+        EquipmentRecord("Farm Tools", "Needs check", "Inspect before next use")
+    )
+    val a = JSONArray(raw)
+    return List(a.length()) { i ->
+        val o = a.getJSONObject(i)
+        EquipmentRecord(o.getString("name"), o.getString("status"), o.getString("note"))
+    }
+}
+
+private fun saveLivestock(prefs: android.content.SharedPreferences, list: List<Livestock>) {
+    val a = JSONArray()
+    list.forEach { a.put(JSONObject().apply {
+        put("name", it.name); put("kind", it.kind); put("count", it.count); put("status", it.status)
+    }) }
+    prefs.edit().putString("livestock", a.toString()).apply()
+}
+
+private fun saveCrops(prefs: android.content.SharedPreferences, list: List<CropRecord>) {
+    val a = JSONArray()
+    list.forEach { a.put(JSONObject().apply {
+        put("name", it.name); put("crop", it.crop); put("area", it.area); put("stage", it.stage)
+    }) }
+    prefs.edit().putString("crops", a.toString()).apply()
+}
+
+private fun saveInventory(prefs: android.content.SharedPreferences, list: List<InventoryItem>) {
+    val a = JSONArray()
+    list.forEach { a.put(JSONObject().apply {
+        put("name", it.name); put("quantity", it.quantity); put("status", it.status)
+    }) }
+    prefs.edit().putString("inventory", a.toString()).apply()
+}
+
+private fun saveEquipment(prefs: android.content.SharedPreferences, list: List<EquipmentRecord>) {
+    val a = JSONArray()
+    list.forEach { a.put(JSONObject().apply {
+        put("name", it.name); put("status", it.status); put("note", it.note)
+    }) }
+    prefs.edit().putString("equipment", a.toString()).apply()
 }
 
 private fun money(value: Double): String {
