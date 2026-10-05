@@ -1227,6 +1227,7 @@ private fun AssistanceSection(
     onAdd: (AssistanceRecord) -> Unit
 ) {
     var showAdd by remember { mutableStateOf(false) }
+    var filter by remember { mutableStateOf("All") }
 
     if (showAdd) {
         AddAssistanceDialog(
@@ -1238,18 +1239,22 @@ private fun AssistanceSection(
         )
     }
 
+    val statuses = listOf("All", "Applied", "Approved", "Received", "Completed")
+    val filtered = if (filter == "All") assistance
+    else assistance.filter { it.status.equals(filter, ignoreCase = true) }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Card(
             Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
         ) {
-            Column(Modifier.padding(18.dp)) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("DA / Agriculture Programs", fontWeight = FontWeight.Bold, color = AgriGreen)
                         Text(
-                            "Record seeds, fertilizer, livestock, equipment and other assistance received.",
+                            "Track applications and assistance from application to completion.",
                             color = AgriMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -1258,27 +1263,80 @@ private fun AssistanceSection(
                         Text("+ Add")
                     }
                 }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    statuses.forEach { status ->
+                        FilterChip(
+                            selected = filter == status,
+                            onClick = { filter = status },
+                            label = { Text(status, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
             }
         }
 
-        if (assistance.isEmpty()) {
-            InfoCard("No assistance records", "Add an assistance record when a program or agricultural office provides support.")
+        if (filtered.isEmpty()) {
+            InfoCard(
+                if (assistance.isEmpty()) "No assistance records" else "No records in $filter",
+                if (assistance.isEmpty())
+                    "Add an agricultural program or assistance record."
+                else
+                    "There are no assistance records with this status."
+            )
         } else {
-            assistance.asReversed().forEach { record ->
-                FarmRecordCard(
-                    record.program,
-                    record.assistanceType,
-                    listOf(record.dateReceived, record.quantity, record.status)
-                        .filter { it.isNotBlank() }
-                        .joinToString(" · "),
-                    Icons.Outlined.Inventory2
-                )
-                if (record.source.isNotBlank()) {
-                    Text("Source: " + record.source, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            filtered.asReversed().forEach { record ->
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = AgriCard)
+                ) {
+                    Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(record.program, fontWeight = FontWeight.Bold)
+                                Text(record.assistanceType, color = AgriGreen, fontWeight = FontWeight.SemiBold)
+                            }
+                            StatusBadge(record.status)
+                        }
+                        Text(
+                            listOf(record.dateReceived, record.quantity)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" · "),
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        if (record.source.isNotBlank()) {
+                            Text("Source: " + record.source, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun StatusBadge(status: String) {
+    val normalized = status.trim().lowercase()
+    val background = when (normalized) {
+        "completed" -> AgriGreenSoft
+        "received" -> Color(0xFFE1EEDB)
+        "approved" -> Color(0xFFE9DFC7)
+        else -> Color(0xFFF0EBDD)
+    }
+    Text(
+        status.ifBlank { "Unknown" },
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(background)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        color = AgriGreen,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold
+    )
 }
 
 @Composable
@@ -1291,7 +1349,7 @@ private fun AddAssistanceDialog(
     var type by remember { mutableStateOf("Seeds") }
     var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
     var quantity by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf("Received") }
+    var status by remember { mutableStateOf("Applied") }
     var source by remember { mutableStateOf("") }
     var showPicker by remember { mutableStateOf(false) }
 
@@ -1320,7 +1378,20 @@ private fun AddAssistanceDialog(
                 item { OutlinedTextField(type, { type = it }, Modifier.fillMaxWidth(), label = { Text("Type") }, singleLine = true) }
                 item { OutlinedButton(onClick = { showPicker = true }, Modifier.fillMaxWidth()) { Text("Date received: " + date) } }
                 item { OutlinedTextField(quantity, { quantity = it }, Modifier.fillMaxWidth(), label = { Text("Quantity / amount") }, singleLine = true) }
-                item { OutlinedTextField(status, { status = it }, Modifier.fillMaxWidth(), label = { Text("Status") }, singleLine = true) }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Status", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            listOf("Applied", "Approved", "Received", "Completed").forEach { option ->
+                                FilterChip(
+                                    selected = status == option,
+                                    onClick = { status = option },
+                                    label = { Text(option, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+                }
                 item { OutlinedTextField(source, { source = it }, Modifier.fillMaxWidth(), label = { Text("Source / office") }, singleLine = true) }
             }
         },
