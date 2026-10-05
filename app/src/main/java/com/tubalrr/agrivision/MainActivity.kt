@@ -57,6 +57,15 @@ private val AgriText = Color(0xFF183526)
 private val AgriMuted = Color(0xFF7A806F)
 private val AgriLine = Color(0xFFE5E2D6)
 
+private class MapBridge(
+    private val onSelect: (Double, Double) -> Unit
+) {
+    @JavascriptInterface
+    fun selectLocation(latitude: Double, longitude: Double) {
+        onSelect(latitude, longitude)
+    }
+}
+
 data class FarmField(
     val name: String,
     val crop: String,
@@ -499,15 +508,6 @@ private fun LiveFieldMap(
             "setFarmLocation(" + location.latitude + ", " + location.longitude + ", true);",
             null
         )
-    }
-
-    class MapBridge(
-        private val onSelect: (Double, Double) -> Unit
-    ) {
-        @JavascriptInterface
-        fun selectLocation(latitude: Double, longitude: Double) {
-            onSelect(latitude, longitude)
-        }
     }
 
     val mapBridge = remember {
