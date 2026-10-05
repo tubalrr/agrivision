@@ -322,7 +322,7 @@ private fun DashboardScreen(
         }
 
         item {
-            SectionTitle("Live Google Field Map", "Satellite · Long-press to pin")
+            SectionTitle("Field Location", "Phone GPS")
             Spacer(Modifier.height(10.dp))
             LiveFieldMap(
                 field = fields.firstOrNull(),
@@ -430,42 +430,92 @@ private fun LiveFieldMap(
         locationMessage = "Getting current phone location…"
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                locationManager.getCurrentLocation(
-                    LocationManager.GPS_PROVIDER,
-                    CancellationSignal(),
-                    context.mainExecutor
-                ) { location ->
-                    loading = false
-                    if (location != null) {
-                        currentLocation = location
-                        locationMessage = "GPS locked · %.6f, %.6f".format(
-                            location.latitude,
-                            location.longitude
-                        )
-                        onFieldLocationSelected(location)
-                    } else {
-                        locationMessage = "GPS could not get a fix. Move outdoors and try again."
-                    }
-                }
-            } else {
-                val providers = locationManager.getProviders(true)
-                val last = providers
+            fun useLocation(location: Location, source: String) {
+                loading = false
+                currentLocation = location
+                locationMessage = source + " · %.6f, %.6f".format(
+                    location.latitude,
+                    location.longitude
+                )
+                onFieldLocationSelected(location)
+            }
+
+            fun bestLastKnownLocation(): Location? {
+                return locationManager.getProviders(true)
                     .mapNotNull { provider ->
                         locationManager.getLastKnownLocation(provider)
                     }
                     .minByOrNull { location -> location.accuracy.toDouble() }
+            }
 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val networkAvailable =
+                    locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+                val gpsAvailable =
+                    locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+
+                val firstProvider = when {
+                    networkAvailable -> LocationManager.NETWORK_PROVIDER
+                    gpsAvailable -> LocationManager.GPS_PROVIDER
+                    else -> null
+                }
+
+                if (firstProvider == null) {
+                    loading = false
+                    locationMessage = "No location provider is available"
+                    return
+                }
+
+                locationManager.getCurrentLocation(
+                    firstProvider,
+                    CancellationSignal(),
+                    context.mainExecutor
+                ) { location ->
+                    if (location != null) {
+                        useLocation(
+                            location,
+                            if (firstProvider == LocationManager.NETWORK_PROVIDER)
+                                "Phone location"
+                            else
+                                "GPS locked"
+                        )
+                    } else {
+                        val last = bestLastKnownLocation()
+                        if (last != null) {
+                            useLocation(last, "Last known location")
+                        } else if (
+                            firstProvider != LocationManager.GPS_PROVIDER &&
+                            gpsAvailable
+                        ) {
+                            locationMessage = "Network location unavailable. Trying GPS…"
+                            locationManager.getCurrentLocation(
+                                LocationManager.GPS_PROVIDER,
+                                CancellationSignal(),
+                                context.mainExecutor
+                            ) { gpsLocation ->
+                                if (gpsLocation != null) {
+                                    useLocation(gpsLocation, "GPS locked")
+                                } else {
+                                    loading = false
+                                    locationMessage =
+                                        "No location fix yet. Turn on Wi-Fi/mobile data or move near a window."
+                                }
+                            }
+                        } else {
+                            loading = false
+                            locationMessage =
+                                "No location fix yet. Turn on Wi-Fi/mobile data or move near a window."
+                        }
+                    }
+                }
+            } else {
+                val last = bestLastKnownLocation()
                 loading = false
                 if (last != null) {
-                    currentLocation = last
-                    locationMessage = "GPS location · %.6f, %.6f".format(
-                        last.latitude,
-                        last.longitude
-                    )
-                    onFieldLocationSelected(last)
+                    useLocation(last, "Phone location")
                 } else {
-                    locationMessage = "No recent GPS location available"
+                    locationMessage =
+                        "No recent location. Turn on Wi-Fi/mobile data or move outdoors."
                 }
             }
         } catch (_: SecurityException) {
