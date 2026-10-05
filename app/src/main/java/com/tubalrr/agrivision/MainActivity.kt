@@ -777,6 +777,19 @@ private fun ProductionFinanceScreen(
             item { SummaryCard("Assistance Received", assistance.size.toString() + " records", "Seeds, fertilizer, livestock, equipment and other agricultural support.") }
             item { SectionTitle("Assistance Records") }
 
+            item { SectionTitle("DA Data Quality") }
+            item {
+                val checks = listOf(
+                    "Farmer name" to farmerProfile.farmerName.isNotBlank(),
+                    "Farmer ID / reference" to farmerProfile.farmerId.isNotBlank(),
+                    "Farm name" to farmerProfile.farmName.isNotBlank(),
+                    "Farm location" to listOf(farmerProfile.barangay, farmerProfile.municipality, farmerProfile.province).all { it.isNotBlank() },
+                    "Farm size" to farmerProfile.farmSize.isNotBlank(),
+                    "Commodities" to farmerProfile.commodities.isNotBlank(),
+                    "Agricultural records" to (totalAnimals > 0 || production.isNotEmpty() || assistance.isNotEmpty())
+                )
+                DataQualityCard(checks)
+            }
             item { SectionTitle("DA Report Submission") }
 
             item {
@@ -824,6 +837,38 @@ private fun ProductionFinanceScreen(
     }
 }
 
+@Composable
+private fun DataQualityCard(checks: List<Pair<String, Boolean>>) {
+    val complete = checks.count { it.second }
+    val missing = checks.filterNot { it.second }.map { it.first }
+    val ready = missing.isEmpty()
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = if (ready) AgriGreenSoft else Color(0xFFFFF1D6))
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Report readiness", fontWeight = FontWeight.Bold)
+                    Text(complete.toString() + "/" + checks.size + " required areas complete", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                }
+                Text(if (ready) "READY" else "NEEDS INFO", color = if (ready) AgriGreen else AgriWarning, fontWeight = FontWeight.Bold)
+            }
+            checks.forEach { (label, ok) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (ok) "✓" else "!", color = if (ok) AgriGreen else AgriWarning, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(10.dp))
+                    Text(label, modifier = Modifier.weight(1f))
+                    Text(if (ok) "Complete" else "Missing", color = if (ok) AgriGreen else AgriWarning, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            if (!ready) {
+                Text("Complete the missing fields in Farmer & Farm Registry before marking the report ready for submission.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
 @Composable
 private fun ReportSubmissionCard(
     submission: ReportSubmission,
