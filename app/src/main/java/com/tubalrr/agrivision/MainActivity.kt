@@ -63,6 +63,14 @@ data class InventoryItem(val name: String, val quantity: String, val status: Str
 data class EquipmentRecord(val name: String, val status: String, val note: String)
 data class FarmTask(val title: String, val category: String, val date: String, val done: Boolean)
 data class SaleRecord(val product: String, val amount: Double, val date: String)
+data class AssistanceRecord(
+    val program: String,
+    val assistanceType: String,
+    val dateReceived: String,
+    val quantity: String,
+    val status: String,
+    val source: String
+)
 data class FarmerProfile(
     val farmerName: String,
     val farmerId: String,
@@ -148,6 +156,9 @@ private fun AgriVisionApp(
     val openTasks = tasks.count { !it.done }
     val totalAnimals = livestock.sumOf { it.count }
     var farmerProfile by remember { mutableStateOf(loadFarmerProfile(farmPrefs)) }
+    val assistance = remember {
+        mutableStateListOf<AssistanceRecord>().apply { addAll(loadAssistance(farmPrefs)) }
+    }
 
     val scheme = lightColorScheme(
         primary = AgriGreen,
@@ -182,7 +193,12 @@ private fun AgriVisionApp(
                     profile = farmerProfile,
                     onProfileSaved = { farmerProfile = it; saveFarmerProfile(farmPrefs, it) },
                     onExportBackup = onExportBackup,
-                    onImportBackup = onImportBackup
+                    onImportBackup = onImportBackup,
+                    assistance = assistance,
+                    onAddAssistance = {
+                        assistance.add(it)
+                        saveAssistance(farmPrefs, assistance)
+                    }
                 )
             }
         }
@@ -1000,7 +1016,9 @@ private fun ProfileScreen(
     profile: FarmerProfile,
     onProfileSaved: (FarmerProfile) -> Unit,
     onExportBackup: () -> Unit,
-    onImportBackup: () -> Unit
+    onImportBackup: () -> Unit,
+    assistance: MutableList<AssistanceRecord>,
+    onAddAssistance: (AssistanceRecord) -> Unit
 ) {
     var showEdit by remember { mutableStateOf(false) }
 
@@ -1119,12 +1137,138 @@ private fun ProfileScreen(
         }
 
         item {
+            SectionTitle("Agricultural Assistance")
+        }
+
+        item {
+            AssistanceSection(
+                assistance = assistance,
+                onAdd = onAddAssistance
+            )
+        }
+
+        item {
             InfoCard(
                 "Privacy",
                 "Farmer information stays on this device unless you intentionally export or share a backup."
             )
         }
     }
+}
+
+@Composable
+private fun AssistanceSection(
+    assistance: List<AssistanceRecord>,
+    onAdd: (AssistanceRecord) -> Unit
+) {
+    var showAdd by remember { mutableStateOf(false) }
+
+    if (showAdd) {
+        AddAssistanceDialog(
+            onDismiss = { showAdd = false },
+            onSave = {
+                onAdd(it)
+                showAdd = false
+            }
+        )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Card(
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+        ) {
+            Column(Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("DA / Agriculture Programs", fontWeight = FontWeight.Bold, color = AgriGreen)
+                        Text(
+                            "Record seeds, fertilizer, livestock, equipment and other assistance received.",
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Button(onClick = { showAdd = true }, shape = RoundedCornerShape(14.dp)) {
+                        Text("+ Add")
+                    }
+                }
+            }
+        }
+
+        if (assistance.isEmpty()) {
+            InfoCard("No assistance records", "Add an assistance record when a program or agricultural office provides support.")
+        } else {
+            assistance.asReversed().forEach { record ->
+                FarmRecordCard(
+                    record.program,
+                    record.assistanceType,
+                    listOf(record.dateReceived, record.quantity, record.status)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · "),
+                    Icons.Outlined.Inventory2
+                )
+                if (record.source.isNotBlank()) {
+                    Text("Source: " + record.source, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddAssistanceDialog(
+    onDismiss: () -> Unit,
+    onSave: (AssistanceRecord) -> Unit
+) {
+    val context = LocalContext.current
+    var program by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf("Seeds") }
+    var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
+    var quantity by remember { mutableStateOf("") }
+    var status by remember { mutableStateOf("Received") }
+    var source by remember { mutableStateOf("") }
+    var showPicker by remember { mutableStateOf(false) }
+
+    if (showPicker) {
+        val calendar = Calendar.getInstance()
+        try { calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) ?: calendar.time } catch (_: Exception) {}
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                val picked = Calendar.getInstance().apply { set(year, month, day) }
+                date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
+                showPicker = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply { setOnDismissListener { showPicker = false }; show() }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Agricultural Assistance", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { OutlinedTextField(program, { program = it }, Modifier.fillMaxWidth(), label = { Text("Program / assistance") }, singleLine = true) }
+                item { OutlinedTextField(type, { type = it }, Modifier.fillMaxWidth(), label = { Text("Type") }, singleLine = true) }
+                item { OutlinedButton(onClick = { showPicker = true }, Modifier.fillMaxWidth()) { Text("Date received: " + date) } }
+                item { OutlinedTextField(quantity, { quantity = it }, Modifier.fillMaxWidth(), label = { Text("Quantity / amount") }, singleLine = true) }
+                item { OutlinedTextField(status, { status = it }, Modifier.fillMaxWidth(), label = { Text("Status") }, singleLine = true) }
+                item { OutlinedTextField(source, { source = it }, Modifier.fillMaxWidth(), label = { Text("Source / office") }, singleLine = true) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = program.isNotBlank(),
+                onClick = {
+                    onSave(AssistanceRecord(program.trim(), type.trim(), date, quantity.trim(), status.trim(), source.trim()))
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -1358,6 +1502,7 @@ private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.
         put("expenses", JSONArray(prefs.getString("expenses", "[]")))
         put("sales", JSONArray(prefs.getString("sales", "[]")))
         put("tasks", JSONArray(prefs.getString("tasks", "[]")))
+        put("assistance", JSONArray(prefs.getString("assistance", "[]")))
         put("farmerProfile", JSONObject().apply {
             put("farmerName", prefs.getString("farmerName", ""))
             put("farmerId", prefs.getString("farmerId", ""))
@@ -1381,7 +1526,7 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
         ?: return
     val backup = JSONObject(json)
     val edit = prefs.edit()
-    val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks")
+    val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks", "assistance")
     keys.forEach { key ->
         if (backup.has(key)) edit.putString(key, backup.getJSONArray(key).toString())
     }
@@ -1399,6 +1544,37 @@ private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.
         edit.putString("commodities", p.optString("commodities"))
     }
     edit.apply()
+}
+
+private fun loadAssistance(prefs: android.content.SharedPreferences): List<AssistanceRecord> {
+    val raw = prefs.getString("assistance", "[]") ?: "[]"
+    val a = JSONArray(raw)
+    return List(a.length()) { i ->
+        val o = a.getJSONObject(i)
+        AssistanceRecord(
+            o.optString("program"),
+            o.optString("assistanceType"),
+            o.optString("dateReceived"),
+            o.optString("quantity"),
+            o.optString("status"),
+            o.optString("source")
+        )
+    }
+}
+
+private fun saveAssistance(prefs: android.content.SharedPreferences, list: List<AssistanceRecord>) {
+    val a = JSONArray()
+    list.forEach {
+        a.put(JSONObject().apply {
+            put("program", it.program)
+            put("assistanceType", it.assistanceType)
+            put("dateReceived", it.dateReceived)
+            put("quantity", it.quantity)
+            put("status", it.status)
+            put("source", it.source)
+        })
+    }
+    prefs.edit().putString("assistance", a.toString()).apply()
 }
 
 private fun loadFarmerProfile(prefs: android.content.SharedPreferences): FarmerProfile {
