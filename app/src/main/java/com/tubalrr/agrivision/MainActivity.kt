@@ -2033,6 +2033,7 @@ private fun ProfileScreen(
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     assistance: MutableList<AssistanceRecord>,
+    farmPrefs: android.content.SharedPreferences,
     onAddAssistance: (AssistanceRecord) -> Unit
 ) {
     var showEdit by remember { mutableStateOf(false) }
@@ -2167,6 +2168,7 @@ private fun ProfileScreen(
         item {
             AssistanceSection(
                 assistance = assistance,
+                farmPrefs = farmPrefs,
                 onAdd = onAddAssistance
             )
         }
@@ -2183,6 +2185,7 @@ private fun ProfileScreen(
 @Composable
 private fun AssistanceSection(
     assistance: MutableList<AssistanceRecord>,
+    farmPrefs: android.content.SharedPreferences,
     onAdd: (AssistanceRecord) -> Unit
 ) {
     var showAdd by remember { mutableStateOf(false) }
@@ -2210,6 +2213,7 @@ private fun AssistanceSection(
                 }
                 if (index >= 0) {
                     assistance[index] = updated
+                    saveAssistance(farmPrefs, assistance)
                 }
                 manageRecord = null
             }
@@ -2449,13 +2453,18 @@ private fun AssistanceWorkflowDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)
+                    val approved = if (status == "Approved" && approvedDate.isBlank()) today else approvedDate.trim()
+                    val distributed = if (status == "Distributed" && distributedDate.isBlank()) today else distributedDate.trim()
+                    val completed = if (status == "Completed" && completedDate.isBlank()) today else completedDate.trim()
+
                     onSave(
                         record.copy(
                             status = status,
                             dateReceived = requestedDate.trim(),
-                            approvedDate = approvedDate.trim(),
-                            distributedDate = distributedDate.trim(),
-                            completedDate = completedDate.trim(),
+                            approvedDate = approved,
+                            distributedDate = distributed,
+                            completedDate = completed,
                             distributionDetails = details.trim(),
                             outcome = outcome.trim(),
                             reviewNotes = notes.trim()
