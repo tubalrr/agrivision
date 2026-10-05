@@ -268,6 +268,7 @@ private fun AgriVisionApp(
                     onExportBackup = onExportBackup,
                     onImportBackup = onImportBackup,
                     assistance = assistance,
+                    farmPrefs = farmPrefs,
                     onAddAssistance = {
                         assistance.add(it)
                         saveAssistance(farmPrefs, assistance)
