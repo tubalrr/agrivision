@@ -23,7 +23,6 @@ import io.github.sceneview.SceneView
 import io.github.sceneview.rememberCameraManipulator
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
-import io.github.sceneview.rememberMainLightNode
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.node.CubeNode
 import io.github.sceneview.node.CylinderNode
@@ -317,20 +316,12 @@ private fun Farm3DScene(modifier: Modifier = Modifier) {
     val cameraNode = rememberCameraNode(engine) {
         position = Position(x = 6.6f, y = 5.8f, z = 8.2f)
     }
-    val mainLight = rememberMainLightNode(engine) {
-        intensity = 100_000f
-        direction(0f, -1f, -0.6f)
-        color(1f, 0.96f, 0.86f)
-        castShadows(true)
-    }
-
     Box(modifier.background(Color(0xFFD9DEC9))) {
         SceneView(
             modifier = Modifier.fillMaxSize(),
             engine = engine,
             materialLoader = materialLoader,
             cameraNode = cameraNode,
-            mainLightNode = mainLight,
             cameraManipulator = rememberCameraManipulator()
         ) {
             // Base terrain
