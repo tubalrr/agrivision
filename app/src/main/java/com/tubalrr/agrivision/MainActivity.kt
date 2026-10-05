@@ -333,47 +333,132 @@ private fun DashboardScreen(
         item {
             SectionTitle("Field Overview", "Live · Today")
             Spacer(Modifier.height(10.dp))
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFDEE5CF))
-            ) {
-                Column {
-                    Box(
-                        Modifier.fillMaxWidth().height(185.dp).padding(10.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFFB7C69A))
-                    ) {
-                        Text("FIELD MAP", Modifier.align(Alignment.TopStart).padding(14.dp), color = AgriGreen, fontWeight = FontWeight.Bold)
-                        Box(
-                            Modifier.align(Alignment.Center).size(110.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(Color(0xFFECF0DF))
-                                .border(2.dp, AgriGreen, RoundedCornerShape(18.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("●", color = AgriGreen)
-                                Text("North Field", fontWeight = FontWeight.Bold, color = AgriText)
-                                Text("Rice · 1.0 ha", style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("NDVI — Good vegetation", color = AgriGreen, fontWeight = FontWeight.SemiBold)
-                        Text("Healthy", color = AgriGreen)
-                    }
-                }
-            }
+            FieldOverviewCard(field = fields.firstOrNull())
         }
 
         item {
             SectionTitle("Today's Attention", "")
             Spacer(Modifier.height(8.dp))
             AttentionCard(tasks.count { !it.done }, inputs.size)
+        }
+    }
+}
+
+@Composable
+private fun FieldOverviewCard(field: FarmField?) {
+    val context = LocalContext.current
+    val hasLocation = field?.latitude != null && field.longitude != null
+
+    fun openSatellite() {
+        val lat = field?.latitude ?: return
+        val lng = field.longitude ?: return
+        val uri = Uri.parse(
+            "https://www.google.com/maps/@?api=1&map_action=map" +
+                "&center=" + lat + "%2C" + lng +
+                "&zoom=19&basemap=satellite"
+        )
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    }
+
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFDEE5CF))
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(50.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .background(AgriGreenSoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Map,
+                        contentDescription = null,
+                        tint = AgriGreen,
+                        modifier = Modifier.size(25.dp)
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        field?.name ?: "North Field",
+                        fontWeight = FontWeight.Bold,
+                        color = AgriText
+                    )
+                    Text(
+                        (field?.crop ?: "Rice") + " · " + (field?.area ?: "1.0 ha"),
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Text(
+                    if (hasLocation) "LOCATED" else "NOT SET",
+                    color = if (hasLocation) AgriGreen else AgriMuted,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(145.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFFB7C69A)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Outlined.Map,
+                        contentDescription = null,
+                        tint = AgriGreen,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (hasLocation) "Field location saved"
+                        else "No field location yet",
+                        color = AgriText,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (hasLocation)
+                            "%.6f, %.6f".format(field!!.latitude, field.longitude)
+                        else
+                            "Press Use My Location above",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Crop health", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text("92% Healthy", color = AgriGreen, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = { if (hasLocation) openSatellite() },
+                    enabled = hasLocation,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Map,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Satellite")
+                }
+            }
         }
     }
 }
