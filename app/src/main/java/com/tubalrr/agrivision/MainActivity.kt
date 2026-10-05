@@ -414,7 +414,13 @@ private fun LiveFieldMap(
         }
 
         val locationManager = context.getSystemService(LocationManager::class.java)
-        if (!locationManager.isLocationEnabled) {
+        val locationEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            locationManager.isLocationEnabled
+        } else {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }
+        if (!locationEnabled) {
             locationMessage = "Turn on Location/GPS in phone settings"
             loading = false
             return
