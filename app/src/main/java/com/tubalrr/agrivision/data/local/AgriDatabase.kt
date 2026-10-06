@@ -28,7 +28,7 @@ import androidx.room.RoomDatabase
         IncidentEventEntity::class,
         ReportSubmissionEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -46,7 +46,7 @@ abstract class AgriDatabase : RoomDatabase() {
                     AgriDatabase::class.java,
                     "agrivision.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -290,6 +290,13 @@ abstract class AgriDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_sourceId ON production_records(sourceId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_fieldId ON production_records(fieldId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_farmId_sourceType_date ON production_records(farmId,sourceType,date)")
+            }
+        }
+
+        private val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sales ADD COLUMN incomeCategory TEXT NOT NULL DEFAULT 'Other Income'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sales_farmId_incomeCategory_date ON sales(farmId,incomeCategory,date)")
             }
         }
 
