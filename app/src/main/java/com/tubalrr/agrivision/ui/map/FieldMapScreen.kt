@@ -7,8 +7,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.LocalFlorist
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -181,9 +182,9 @@ internal fun FieldMapScreen(
 
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatCard("Mapped fields", mappedFieldCount.toString(), "of \${fields.size}", Icons.Outlined.Map, AgriGreenSoft, Modifier.weight(1f))
-                StatCard("Crop links", cropLayerCount.toString(), "mapped", Icons.Outlined.LocalFlorist, AgriGoldSoft, Modifier.weight(1f))
-                StatCard("Incidents", activeIncidents.toString(), "\${mappedIncidentCount} mapped", Icons.Outlined.WarningAmber, Color(0xFFFFEEE5), Modifier.weight(1f))
+                StatCard("Mapped fields", mappedFieldCount.toString(), "of ${fields.size}", Map, AgriGreenSoft, Modifier.weight(1f))
+                StatCard("Crop links", cropLayerCount.toString(), "mapped", LocalFlorist, AgriGoldSoft, Modifier.weight(1f))
+                StatCard("Incidents", activeIncidents.toString(), "${mappedIncidentCount} mapped", WarningAmber, Color(0xFFFFEEE5), Modifier.weight(1f))
             }
         }
 
