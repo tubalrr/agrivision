@@ -346,6 +346,13 @@ data class FieldIncidentEntity(
     val status: String,
     val evidenceUri: String,
     val reviewNotes: String,
+    val farmerId: String = "",
+    val fieldId: String = "",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val reviewer: String = "",
+    val assistanceRequestId: String = "",
+    val resolution: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
@@ -364,7 +371,9 @@ data class IncidentEventEntity(
     val incidentId: String,
     val status: String,
     val note: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val fromStatus: String = "",
+    val actor: String = ""
 )
 
 @Entity(
