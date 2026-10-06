@@ -225,6 +225,7 @@ data class SaleEntity(
     val date: String,
     val product: String,
     val amount: Double,
+    val incomeCategory: String = "Other Income",
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
