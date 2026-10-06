@@ -222,8 +222,8 @@ internal fun ProductionFinanceScreen(
         } else {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SummaryCard("Sales", "₱" + money(totalSales), "Farm product sales.")
-                    SummaryCard("Net", "₱" + money(netIncome), "Sales minus expenses.")
+                    SummaryCard("Income", "₱" + money(totalSales), "Crop, livestock and other income.")
+                    SummaryCard("Expenses", "₱" + money(totalExpenses), "Operating farm costs.")
                 }
             }
             item {
@@ -232,10 +232,54 @@ internal fun ProductionFinanceScreen(
                     TextButton(onClick = { showDialog = true }) { Text("+ Add") }
                 }
             }
-            item { Text("Expenses", fontWeight = FontWeight.SemiBold) }
-            items(expenses) { expense -> FarmRecordCard(expense.category, "₱" + money(expense.amount), expense.note, Icons.Outlined.ReceiptLong) }
-            item { Text("Sales", fontWeight = FontWeight.SemiBold) }
-            items(sales) { sale -> FarmRecordCard(sale.product, "₱" + money(sale.amount), sale.date, Icons.Outlined.MonetizationOn) }
+            item { Text("Income by category", fontWeight = FontWeight.SemiBold) }
+            item {
+                FinanceCategorySummary(
+                    FinancialCategories.incomeCategories.map { category ->
+                        category to sales.filter { it.incomeCategory.equals(category, ignoreCase = true) }.sumOf { it.amount }
+                    }
+                )
+            }
+            item { Text("Expenses by category", fontWeight = FontWeight.SemiBold) }
+            item {
+                FinanceCategorySummary(
+                    FinancialCategories.expenseCategories.map { category ->
+                        category to expenses.filter { it.category.equals(category, ignoreCase = true) }.sumOf { it.amount }
+                    }
+                )
+            }
+            item { Text("Expense records", fontWeight = FontWeight.SemiBold) }
+            items(expenses) { expense ->
+                val detail = listOf(expense.date, expense.note).filter { it.isNotBlank() }.joinToString(" · ")
+                FarmRecordCard(expense.category, "₱" + money(expense.amount), detail, Icons.Outlined.ReceiptLong)
+            }
+            item { Text("Income records", fontWeight = FontWeight.SemiBold) }
+            items(sales) { sale ->
+                FarmRecordCard(
+                    sale.product,
+                    "₱" + money(sale.amount),
+                    sale.incomeCategory + " · " + sale.date,
+                    Icons.Outlined.MonetizationOn
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinanceCategorySummary(rows: List<Pair<String, Double>>) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            rows.forEach { (category, value) ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(category, fontWeight = FontWeight.Medium)
+                    Text("₱" + money(value), fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
     }
 }
@@ -254,6 +298,10 @@ internal fun AddProductionFinanceDialog(
     var quantity by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var period by remember { mutableStateOf("Today") }
+    var note by remember { mutableStateOf("") }
+    var financeType by remember { mutableStateOf("Expense") }
+    var incomeCategory by remember { mutableStateOf(FinancialCategories.incomeCategories.first()) }
+    var expenseCategory by remember { mutableStateOf(FinancialCategories.expenseCategories.first()) }
     var productionType by remember { mutableStateOf("Harvest") }
     var sourceType by remember { mutableStateOf("Crop") }
     var sourceId by remember { mutableStateOf("") }
@@ -267,7 +315,10 @@ internal fun AddProductionFinanceDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 if (tab == "Production") {
                     Text("Production source", color = AgriGreen, fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -372,32 +423,80 @@ internal fun AddProductionFinanceDialog(
                         }
                     }
                 } else {
+                    Text("Record type", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(
+                            selected = financeType == "Income",
+                            onClick = { financeType = "Income" },
+                            label = { Text("Income") }
+                        )
+                        FilterChip(
+                            selected = financeType == "Expense",
+                            onClick = { financeType = "Expense" },
+                            label = { Text("Expense") }
+                        )
+                    }
+
+                    val categories = if (financeType == "Income") {
+                        FinancialCategories.incomeCategories
+                    } else {
+                        FinancialCategories.expenseCategories
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        categories.forEach { category ->
+                            FilterChip(
+                                selected = if (financeType == "Income") {
+                                    incomeCategory == category
+                                } else {
+                                    expenseCategory == category
+                                },
+                                onClick = {
+                                    if (financeType == "Income") {
+                                        incomeCategory = category
+                                    } else {
+                                        expenseCategory = category
+                                    }
+                                },
+                                label = { Text(category) }
+                            )
+                        }
+                    }
+
+                    if (financeType == "Income") {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Product / income source") },
+                            singleLine = true
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = note,
+                            onValueChange = { note = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Expense description") },
+                            supportingText = { Text("Example: 2 farm workers · 3 days") },
+                            singleLine = true
+                        )
+                    }
                     OutlinedTextField(
-                        name,
-                        { name = it },
-                        Modifier.fillMaxWidth(),
-                        label = { Text("Type / category") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        amount,
-                        { amount = it },
-                        Modifier.fillMaxWidth(),
+                        value = amount,
+                        onValueChange = { amount = it },
+                        modifier = Modifier.fillMaxWidth(),
                         label = { Text("Amount (₱)") },
                         singleLine = true
-                    )
-                    Text(
-                        "For a sale, prefix the product with SALE:",
-                        color = AgriMuted,
-                        style = MaterialTheme.typography.bodySmall
                     )
                 }
 
                 OutlinedTextField(
-                    period,
-                    { period = it },
-                    Modifier.fillMaxWidth(),
-                    label = { Text("Production date / period") },
+                    value = period,
+                    onValueChange = { period = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(if (tab == "Production") "Production date / period" else "Date") },
                     singleLine = true
                 )
             }
@@ -408,6 +507,8 @@ internal fun AddProductionFinanceDialog(
             } else {
                 livestock.any { it.groupId == sourceId }
             }
+            val financialAmount = amount.toDoubleOrNull()
+            val financeValid = financialAmount != null && financialAmount > 0.0
             TextButton(
                 enabled = if (tab == "Production") {
                     name.isNotBlank() &&
@@ -415,11 +516,10 @@ internal fun AddProductionFinanceDialog(
                             quantity.contains(" ") &&
                             sourceExists
                 } else {
-                    name.isNotBlank() && amount.toDoubleOrNull() != null
+                    financeValid && if (financeType == "Income") name.isNotBlank() else note.isNotBlank()
                 },
                 onClick = {
                     if (tab == "Production") {
-                        val parsed = quantity.trim().split(" ", limit = 2)
                         val sourceArea = if (sourceType == "Crop") {
                             crops.firstOrNull { it.cropId == sourceId }?.area?.toDoubleOrNull() ?: 0.0
                         } else {
@@ -440,17 +540,25 @@ internal fun AddProductionFinanceDialog(
                             )
                         )
                     } else {
-                        val value = amount.toDouble()
-                        if (name.trim().startsWith("SALE:", ignoreCase = true)) {
+                        val value = financialAmount ?: return@TextButton
+                        if (financeType == "Income") {
                             onSale(
                                 SaleRecord(
-                                    name.trim().substringAfter(":").trim(),
-                                    value,
-                                    period.trim()
+                                    product = name.trim(),
+                                    amount = value,
+                                    date = period.trim(),
+                                    incomeCategory = incomeCategory
                                 )
                             )
                         } else {
-                            onExpense(ExpenseRecord(name.trim(), value, period.trim()))
+                            onExpense(
+                                ExpenseRecord(
+                                    category = expenseCategory,
+                                    amount = value,
+                                    note = note.trim(),
+                                    date = period.trim()
+                                )
+                            )
                         }
                     }
                 }
