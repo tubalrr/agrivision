@@ -45,12 +45,15 @@ internal fun ProductionFinanceScreen(
     exportStatus: String,
     reportSubmission: ReportSubmission,
     onProduction: (ProductionRecord) -> Unit,
+    feedLogs: List<com.tubalrr.agrivision.data.local.FeedLogRecord>,
+    onFeedLog: (com.tubalrr.agrivision.data.local.FeedLogRecord) -> Unit,
     onExpense: (ExpenseRecord) -> Unit,
     onSale: (SaleRecord) -> Unit,
     onSubmissionSaved: (ReportSubmission) -> Unit
 ) {
     var tab by remember { mutableStateOf("Production") }
     var showDialog by remember { mutableStateOf(false) }
+    var showFeedDialog by remember { mutableStateOf(false) }
     var selectedDaReport by remember { mutableStateOf(DaReportExporter.reportTypes.first()) }
     var selectedDaFormat by remember { mutableStateOf(DaReportFormat.PDF) }
 
@@ -63,6 +66,14 @@ internal fun ProductionFinanceScreen(
             onProduction = { record -> onProduction(record); showDialog = false },
             onExpense = { record -> onExpense(record); showDialog = false },
             onSale = { record -> onSale(record); showDialog = false }
+        )
+    }
+
+    if (showFeedDialog) {
+        FeedLogDialog(
+            livestock = livestock,
+            onDismiss = { showFeedDialog = false },
+            onSave = { record -> onFeedLog(record); showFeedDialog = false }
         )
     }
 
@@ -110,6 +121,7 @@ internal fun ProductionFinanceScreen(
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilterChip(selected = tab == "Production", onClick = { tab = "Production" }, label = { Text("Production") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) })
+                FilterChip(selected = tab == "Feed Logs", onClick = { tab = "Feed Logs" }, label = { Text("Feed Logs") }, leadingIcon = { Icon(Icons.Outlined.Restaurant, null) })
                 FilterChip(selected = tab == "Finance", onClick = { tab = "Finance" }, label = { Text("Finance") }, leadingIcon = { Icon(Icons.Outlined.MonetizationOn, null) })
                 FilterChip(selected = tab == "DA Report", onClick = { tab = "DA Report" }, label = { Text("DA Report") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) })
             }
@@ -265,6 +277,37 @@ internal fun ProductionFinanceScreen(
             } else {
                 items(assistance.takeLast(10).asReversed()) { record ->
                     FarmRecordCard(record.program, record.assistanceType, listOf(record.dateReceived, record.quantity, record.status).filter { it.isNotBlank() }.joinToString(" · "), Icons.Outlined.Inventory2)
+                }
+            }
+        } else if (tab == "Feed Logs") {
+            item {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriGreen)) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("FEED MANAGEMENT", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text("Track livestock feed consumption.", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                        Text("Room-backed records are included in backup and DA reports.", color = Color.White.copy(alpha = .78f))
+                    }
+                }
+            }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("Feed History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(feedLogs.size.toString() + " records", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Button(onClick = { showFeedDialog = true }) { Text("+ Add Feed") }
+                }
+            }
+            if (feedLogs.isEmpty()) {
+                item { InfoCard("No feed records yet", "Add feed consumption for a livestock group to start tracking.") }
+            } else {
+                items(feedLogs.sortedByDescending { it.createdAt }) { log ->
+                    FarmRecordCard(
+                        log.feedName.ifBlank { "Feed record" },
+                        String.format(Locale.US, "%.2f %s", log.quantityKg, log.unit),
+                        listOf(log.date, log.livestockId.ifBlank { "Unlinked livestock" }, log.notes).filter { it.isNotBlank() }.joinToString(" · "),
+                        Icons.Outlined.Restaurant
+                    )
                 }
             }
         } else if (tab == "Production") {
@@ -635,6 +678,56 @@ internal fun AddProductionFinanceDialog(
                             )
                         }
                     }
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+
+@Composable
+private fun FeedLogDialog(
+    livestock: List<Livestock>,
+    onDismiss: () -> Unit,
+    onSave: (com.tubalrr.agrivision.data.local.FeedLogRecord) -> Unit
+) {
+    var livestockId by remember { mutableStateOf(livestock.firstOrNull()?.groupId.orEmpty()) }
+    var feedName by remember { mutableStateOf("") }
+    var quantity by remember { mutableStateOf("") }
+    var unit by remember { mutableStateOf("kg") }
+    var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
+    var notes by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Feed Record", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(livestockId, { livestockId = it }, label = { Text("Livestock / Group ID") }, singleLine = true)
+                OutlinedTextField(feedName, { feedName = it }, label = { Text("Feed name") }, singleLine = true)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(quantity, { quantity = it }, label = { Text("Quantity") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(unit, { unit = it }, label = { Text("Unit") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                OutlinedTextField(date, { date = it }, label = { Text("Date") }, singleLine = true)
+                OutlinedTextField(notes, { notes = it }, label = { Text("Notes") }, minLines = 2)
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = feedName.isNotBlank() && (quantity.toDoubleOrNull() ?: 0.0) > 0.0,
+                onClick = {
+                    onSave(
+                        com.tubalrr.agrivision.data.local.FeedLogRecord(
+                            livestockId = livestockId.trim(),
+                            date = date.trim(),
+                            feedName = feedName.trim(),
+                            quantityKg = quantity.toDoubleOrNull() ?: 0.0,
+                            unit = unit.trim().ifBlank { "kg" },
+                            notes = notes.trim()
+                        )
+                    )
                 }
             ) { Text("Save") }
         },
