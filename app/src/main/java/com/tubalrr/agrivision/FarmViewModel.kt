@@ -240,6 +240,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
                 put("expenses", JSONArray(snapshot.expenses.map { it.toJson() }))
                 put("sales", JSONArray(snapshot.sales.map { it.toJson() }))
                 put("inventory", JSONArray(snapshot.inventory.map { it.toJson() }))
+                put("inventoryTransactions", JSONArray(snapshot.inventoryTransactions.map { it.toJson() }))
             })
         }
         getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
@@ -285,7 +286,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
     JSONObject().apply {
-        put("version", 5)
+        put("version", 6)
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
