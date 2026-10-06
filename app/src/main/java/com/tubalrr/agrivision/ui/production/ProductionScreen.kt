@@ -27,6 +27,8 @@ import androidx.compose.material.icons.outlined.*
 internal fun ProductionFinanceScreen(
     padding: PaddingValues,
     production: List<ProductionRecord>,
+    crops: List<CropRecord>,
+    livestock: List<Livestock>,
     expenses: List<ExpenseRecord>,
     sales: List<SaleRecord>,
     totalExpenses: Double,
@@ -51,6 +53,8 @@ internal fun ProductionFinanceScreen(
     if (showDialog) {
         AddProductionFinanceDialog(
             tab = tab,
+            crops = crops,
+            livestock = livestock,
             onDismiss = { showDialog = false },
             onProduction = { record -> onProduction(record); showDialog = false },
             onExpense = { record -> onExpense(record); showDialog = false },
@@ -197,7 +201,24 @@ internal fun ProductionFinanceScreen(
                 }
             }
             item { SectionTitle("Production Records") }
-            items(production) { record -> FarmRecordCard(record.product, record.quantity, record.period, Icons.Outlined.Assessment) }
+            items(production) { record ->
+                val sourceLabel = when (record.sourceType) {
+                    "Crop" -> "Crop " + record.sourceId
+                    "Livestock" -> "Livestock " + record.sourceId
+                    else -> "Legacy / unlinked"
+                }
+                val areaLabel = if (record.areaHectares > 0.0) {
+                    String.format(Locale.US, "%.2f ha", record.areaHectares)
+                } else {
+                    "Area not recorded"
+                }
+                FarmRecordCard(
+                    record.product,
+                    record.quantity + " · " + areaLabel,
+                    record.period + " · " + sourceLabel + " · " + record.productionType,
+                    Icons.Outlined.Assessment
+                )
+            }
         } else {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -222,6 +243,8 @@ internal fun ProductionFinanceScreen(
 @Composable
 internal fun AddProductionFinanceDialog(
     tab: String,
+    crops: List<CropRecord>,
+    livestock: List<Livestock>,
     onDismiss: () -> Unit,
     onProduction: (ProductionRecord) -> Unit,
     onExpense: (ExpenseRecord) -> Unit,
@@ -231,32 +254,201 @@ internal fun AddProductionFinanceDialog(
     var quantity by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var period by remember { mutableStateOf("Today") }
+    var productionType by remember { mutableStateOf("Harvest") }
+    var sourceType by remember { mutableStateOf("Crop") }
+    var sourceId by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (tab == "Production") "Add Production" else "Add Finance Record", fontWeight = FontWeight.Bold) },
+        title = {
+            Text(
+                if (tab == "Production") "Record Farm Production" else "Add Finance Record",
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(if (tab == "Production") "Product" else "Type / category") }, singleLine = true)
                 if (tab == "Production") {
-                    OutlinedTextField(quantity, { quantity = it }, Modifier.fillMaxWidth(), label = { Text("Quantity") }, singleLine = true)
+                    Text("Production source", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(
+                            selected = sourceType == "Crop",
+                            onClick = {
+                                sourceType = "Crop"
+                                sourceId = crops.firstOrNull()?.cropId.orEmpty()
+                            },
+                            label = { Text("Crop") }
+                        )
+                        FilterChip(
+                            selected = sourceType == "Livestock",
+                            onClick = {
+                                sourceType = "Livestock"
+                                sourceId = livestock.firstOrNull()?.groupId.orEmpty()
+                            },
+                            label = { Text("Livestock") }
+                        )
+                    }
+
+                    if (sourceType == "Crop") {
+                        if (crops.isEmpty()) {
+                            Text(
+                                "Register a crop cycle first in Farm → Crops.",
+                                color = AgriMuted,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                crops.forEach { crop ->
+                                    FilterChip(
+                                        selected = sourceId == crop.cropId,
+                                        onClick = { sourceId = crop.cropId },
+                                        label = {
+                                            Text(
+                                                crop.name + " · " + crop.crop,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        if (livestock.isEmpty()) {
+                            Text(
+                                "Register a livestock group first in Farm → Livestock.",
+                                color = AgriMuted,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                livestock.forEach { group ->
+                                    FilterChip(
+                                        selected = sourceId == group.groupId,
+                                        onClick = { sourceId = group.groupId },
+                                        label = {
+                                            Text(
+                                                group.name + " · " + group.kind,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Product / commodity") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = quantity,
+                        onValueChange = { quantity = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Harvest quantity") },
+                        supportingText = { Text("Example: 4200 kg") },
+                        singleLine = true
+                    )
+                    Text("Production type", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Harvest", "Milk", "Eggs", "Meat", "Other").forEach { option ->
+                            FilterChip(
+                                selected = productionType == option,
+                                onClick = { productionType = option },
+                                label = { Text(option) }
+                            )
+                        }
+                    }
                 } else {
-                    OutlinedTextField(amount, { amount = it }, Modifier.fillMaxWidth(), label = { Text("Amount (₱)") }, singleLine = true)
+                    OutlinedTextField(
+                        name,
+                        { name = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Type / category") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        amount,
+                        { amount = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Amount (₱)") },
+                        singleLine = true
+                    )
+                    Text(
+                        "For a sale, prefix the product with SALE:",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
-                OutlinedTextField(period, { period = it }, Modifier.fillMaxWidth(), label = { Text("Date / period") }, singleLine = true)
-                if (tab == "Finance") Text("For a sale, prefix the product with SALE:", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+
+                OutlinedTextField(
+                    period,
+                    { period = it },
+                    Modifier.fillMaxWidth(),
+                    label = { Text("Production date / period") },
+                    singleLine = true
+                )
             }
         },
         confirmButton = {
+            val sourceExists = if (sourceType == "Crop") {
+                crops.any { it.cropId == sourceId }
+            } else {
+                livestock.any { it.groupId == sourceId }
+            }
             TextButton(
-                enabled = name.isNotBlank() && (tab == "Production" && quantity.isNotBlank() || tab == "Finance" && amount.toDoubleOrNull() != null),
+                enabled = if (tab == "Production") {
+                    name.isNotBlank() &&
+                            quantity.isNotBlank() &&
+                            quantity.contains(" ") &&
+                            sourceExists
+                } else {
+                    name.isNotBlank() && amount.toDoubleOrNull() != null
+                },
                 onClick = {
                     if (tab == "Production") {
-                        onProduction(ProductionRecord(name.trim(), quantity.trim(), period.trim()))
+                        val parsed = quantity.trim().split(" ", limit = 2)
+                        val sourceArea = if (sourceType == "Crop") {
+                            crops.firstOrNull { it.cropId == sourceId }?.area?.toDoubleOrNull() ?: 0.0
+                        } else {
+                            0.0
+                        }
+                        onProduction(
+                            ProductionRecord(
+                                product = name.trim(),
+                                quantity = quantity.trim(),
+                                period = period.trim(),
+                                sourceType = sourceType,
+                                sourceId = sourceId,
+                                fieldId = if (sourceType == "Crop") {
+                                    crops.firstOrNull { it.cropId == sourceId }?.fieldId.orEmpty()
+                                } else "",
+                                areaHectares = sourceArea,
+                                productionType = productionType
+                            )
+                        )
                     } else {
                         val value = amount.toDouble()
                         if (name.trim().startsWith("SALE:", ignoreCase = true)) {
-                            onSale(SaleRecord(name.trim().substringAfter(":").trim(), value, period.trim()))
+                            onSale(
+                                SaleRecord(
+                                    name.trim().substringAfter(":").trim(),
+                                    value,
+                                    period.trim()
+                                )
+                            )
                         } else {
                             onExpense(ExpenseRecord(name.trim(), value, period.trim()))
                         }
