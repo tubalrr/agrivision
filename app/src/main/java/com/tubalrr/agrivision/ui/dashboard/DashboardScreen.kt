@@ -126,63 +126,37 @@ internal fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "AgriVision",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = AgriGreen
-                    )
-                    Text(
-                        "Agriculture Operations Platform",
-                        color = AgriMuted,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Box(
-                    Modifier.size(48.dp).clip(CircleShape).background(AgriGreenSoft),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("AV", color = AgriGreen, fontWeight = FontWeight.ExtraBold)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Good day, Farmer", color = AgriMuted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                    Column(Modifier.weight(1f)) {
+                        Text(farm.farmName.ifBlank { "Your Farm" }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = AgriText)
+                        Text("Farm operations at a glance", color = AgriMuted)
+                    }
+                    Box(Modifier.size(46.dp).clip(CircleShape).background(AgriGreen), contentAlignment = Alignment.Center) {
+                        Text("AV", color = Color.White, fontWeight = FontWeight.ExtraBold)
+                    }
                 }
             }
         }
 
         item {
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(30.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriGreen)
-            ) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenDeep), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("FARM OPERATIONS", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "Operations Center",
-                        color = Color.White.copy(alpha = .72f),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                    Text(
-                        "From field event to government report.",
+                        if (fieldIncidents.isEmpty()) "Your farm is ready for the next activity."
+                        else "\${fieldIncidents.size} field report(s) need your attention.",
                         color = Color.White,
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold
                     )
-                    Text(
-                        "Capture what is happening on the farm, attach evidence, then prepare it for validation and assistance workflows.",
-                        color = Color.White.copy(alpha = .84f)
-                    )
+                    Text("Track crops, livestock, incidents, finances and DA-ready records from one place.", color = Color.White.copy(alpha = .78f))
                     Spacer(Modifier.height(8.dp))
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        DashboardMiniStat("Incidents", fieldIncidents.size.toString(), Modifier.weight(1f))
-                        DashboardMiniStat("Submitted", submittedIncidents.toString(), Modifier.weight(1f))
-                        DashboardMiniStat("For review", reviewIncidents.toString(), Modifier.weight(1f))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DashboardMiniStat("Fields", fields.size.toString(), Modifier.weight(1f))
+                        DashboardMiniStat("Livestock", totalAnimals.toString(), Modifier.weight(1f))
+                        DashboardMiniStat("Open tasks", openTasks.toString(), Modifier.weight(1f))
                     }
                 }
             }
