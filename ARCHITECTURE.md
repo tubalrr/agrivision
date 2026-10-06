@@ -26,6 +26,30 @@ Farmer stores person/beneficiary identity, Farm stores the agricultural holding,
 
 Coordinates are stored as explicit registry data. The field form does not request GPS permission; coordinates can be entered manually. This keeps the registry offline-first while making field records ready for a future map layer.
 
+## Livestock lifecycle
+
+Livestock is modeled as a group with a stable group ID, initial population, current population, and status rather than only a count.
+
+The lifecycle is represented as:
+
+```
+Livestock Group
+  ↓
+Population
+  ↓
+Feed
+  ↓
+Health
+  ↓
+Mortality
+  ↓
+Production
+  ↓
+Sales
+```
+
+A separate livestock lifecycle event table records the operational history for each group, including stage, date, notes, feed/medicine/product reference, quantity, unit, and amount. Population events can set the current population while mortality events reduce it, keeping the group count synchronized with recorded events.
+
 ## Crop lifecycle
 
 Crop records are field-linked and no longer model a crop as only a name, area, and stage.
