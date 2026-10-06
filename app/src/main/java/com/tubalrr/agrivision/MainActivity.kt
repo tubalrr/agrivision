@@ -9,6 +9,9 @@ import org.json.JSONObject
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -58,27 +61,27 @@ private val AgriLine = Color(0xFFE5E2D6)
 private val AgriWarning = Color(0xFFD18A27)
 
 class MainActivity : ComponentActivity() {
+    private val farmViewModel: FarmViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val farmPrefs = getSharedPreferences("agrivision_farm", Context.MODE_PRIVATE)
 
         val exportBackup = registerForActivityResult(
             ActivityResultContracts.CreateDocument("application/json")
         ) { uri ->
-            if (uri != null) exportFarmBackup(this, uri, farmPrefs)
+            if (uri != null) farmViewModel.exportBackup(uri)
         }
 
         val importBackup = registerForActivityResult(
             ActivityResultContracts.OpenDocument()
         ) { uri ->
-            if (uri != null) importFarmBackup(this, uri, farmPrefs)
+            if (uri != null) farmViewModel.importBackup(uri)
         }
 
         val exportCasePackage = registerForActivityResult(
             ActivityResultContracts.CreateDocument("application/json")
         ) { uri ->
-            if (uri != null) exportDaCasePackage(this, uri, farmPrefs)
+            if (uri != null) farmViewModel.exportCasePackage(uri)
         }
 
         setContent {
@@ -95,58 +98,30 @@ class MainActivity : ComponentActivity() {
 private fun AgriVisionApp(
     onExportBackup: () -> Unit = {},
     onImportBackup: () -> Unit = {},
-    onExportCasePackage: () -> Unit = {}
+    onExportCasePackage: () -> Unit = {},
+    farmViewModel: FarmViewModel = viewModel()
 ) {
     var selected by remember { mutableStateOf(0) }
-    val context = LocalContext.current
 
-    val farmPrefs = remember {
-        context.getSharedPreferences("agrivision_farm", Context.MODE_PRIVATE)
-    }
-
-    val livestock = remember {
-        mutableStateListOf<Livestock>().apply {
-            addAll(loadLivestock(farmPrefs))
-        }
-    }
-    val crops = remember {
-        mutableStateListOf<CropRecord>().apply {
-            addAll(loadCrops(farmPrefs))
-        }
-    }
-    val production = remember { mutableStateListOf<ProductionRecord>().apply { addAll(loadProduction(farmPrefs)) } }
-    val expenses = remember { mutableStateListOf<ExpenseRecord>().apply { addAll(loadExpenses(farmPrefs)) } }
-    val sales = remember { mutableStateListOf<SaleRecord>().apply { addAll(loadSales(farmPrefs)) } }
-    val inventory = remember {
-        mutableStateListOf<InventoryItem>().apply {
-            addAll(loadInventory(farmPrefs))
-        }
-    }
-    val equipment = remember {
-        mutableStateListOf<EquipmentRecord>().apply {
-            addAll(loadEquipment(farmPrefs))
-        }
-    }
-    val tasks = remember {
-        mutableStateListOf<FarmTask>().apply { addAll(loadTasks(farmPrefs)) }
-    }
-
-    val totalExpenses = expenses.sumOf { it.amount }
-    val totalSales = sales.sumOf { it.amount }
+    val livestock by farmViewModel.livestock.collectAsStateWithLifecycle()
+    val crops by farmViewModel.crops.collectAsStateWithLifecycle()
+    val production by farmViewModel.production.collectAsStateWithLifecycle()
+    val expenses by farmViewModel.expenses.collectAsStateWithLifecycle()
+    val sales by farmViewModel.sales.collectAsStateWithLifecycle()
+    val inventory by farmViewModel.inventory.collectAsStateWithLifecycle()
+    val equipment by farmViewModel.equipment.collectAsStateWithLifecycle()
+    val tasks by farmViewModel.tasks.collectAsStateWithLifecycle()
+    val assistance by farmViewModel.assistance.collectAsStateWithLifecycle()
+    val fieldIncidents by farmViewModel.fieldIncidents.collectAsStateWithLifecycle()
+    val incidentEvents by farmViewModel.incidentEvents.collectAsStateWithLifecycle()
+    val farmerProfile by farmViewModel.profile.collectAsStateWithLifecycle()
+    val reportSubmission by farmViewModel.reportSubmission.collectAsStateWithLifecycle()
+    val totalSales by farmViewModel.totalSales.collectAsStateWithLifecycle()
+    val totalExpenses by farmViewModel.totalExpenses.collectAsStateWithLifecycle()
+    val productionCount by farmViewModel.productionCount.collectAsStateWithLifecycle()
+    val totalLivestock by farmViewModel.totalLivestock.collectAsStateWithLifecycle()
     val netIncome = totalSales - totalExpenses
     val openTasks = tasks.count { !it.done }
-    val totalAnimals = livestock.sumOf { it.count }
-    var farmerProfile by remember { mutableStateOf(loadFarmerProfile(farmPrefs)) }
-    var reportSubmission by remember { mutableStateOf(loadReportSubmission(farmPrefs)) }
-    val assistance = remember {
-        mutableStateListOf<AssistanceRecord>().apply { addAll(loadAssistance(farmPrefs)) }
-    }
-    val fieldIncidents = remember {
-        mutableStateListOf<FieldIncident>().apply { addAll(loadFieldIncidents(farmPrefs)) }
-    }
-    val incidentEvents = remember {
-        mutableStateListOf<IncidentEvent>().apply { addAll(loadIncidentEvents(farmPrefs)) }
-    }
 
     val scheme = lightColorScheme(
         primary = AgriGreen,
@@ -176,15 +151,23 @@ private fun AgriVisionApp(
                     fieldIncidents = fieldIncidents,
                     incidentEvents = incidentEvents,
                     assistance = assistance,
-                    farmPrefs = farmPrefs,
-                    totalAnimals = totalAnimals,
+                    farmViewModel = farmViewModel,
+                    totalAnimals = totalLivestock,
                     totalExpenses = totalExpenses,
                     totalSales = totalSales,
                     netIncome = netIncome,
                     openTasks = openTasks
                 )
                 1 -> FarmScreen(
-                    padding, livestock, crops, inventory, equipment, farmPrefs
+                    padding = padding,
+                    livestock = livestock,
+                    crops = crops,
+                    inventory = inventory,
+                    equipment = equipment,
+                    onAddLivestock = farmViewModel::addLivestock,
+                    onAddCrop = farmViewModel::addCrop,
+                    onAddInventory = farmViewModel::addInventory,
+                    onAddEquipment = farmViewModel::addEquipment
                 )
                 2 -> ProductionFinanceScreen(
                     padding = padding,
@@ -194,33 +177,35 @@ private fun AgriVisionApp(
                     totalExpenses = totalExpenses,
                     totalSales = totalSales,
                     netIncome = netIncome,
-                    totalAnimals = totalAnimals,
+                    totalAnimals = totalLivestock,
                     openTasks = openTasks,
-                    farmPrefs = farmPrefs,
                     farmerProfile = farmerProfile,
                     assistance = assistance,
                     fieldIncidents = fieldIncidents,
                     incidentEvents = incidentEvents,
                     onExportCasePackage = onExportCasePackage,
                     reportSubmission = reportSubmission,
-                    onSubmissionSaved = {
-                        reportSubmission = it
-                        saveReportSubmission(farmPrefs, it)
-                    }
+                    onProduction = farmViewModel::addProduction,
+                    onExpense = farmViewModel::addExpense,
+                    onSale = farmViewModel::addSale,
+                    onSubmissionSaved = farmViewModel::saveReportSubmission
                 )
-                3 -> TasksScreen(padding, tasks, inventory, farmPrefs)
+                3 -> TasksScreen(
+                    padding = padding,
+                    tasks = tasks,
+                    inventory = inventory,
+                    onAddTask = farmViewModel::addTask,
+                    onToggleTask = farmViewModel::toggleTask
+                )
                 else -> ProfileScreen(
                     padding = padding,
                     profile = farmerProfile,
-                    onProfileSaved = { farmerProfile = it; saveFarmerProfile(farmPrefs, it) },
+                    onProfileSaved = farmViewModel::saveProfile,
                     onExportBackup = onExportBackup,
                     onImportBackup = onImportBackup,
                     assistance = assistance,
-                    farmPrefs = farmPrefs,
-                    onAddAssistance = {
-                        assistance.add(it)
-                        saveAssistance(farmPrefs, assistance)
-                    }
+                    onAddAssistance = farmViewModel::addAssistance,
+                    onUpdateAssistance = farmViewModel::updateAssistance
                 )
             }
         }
