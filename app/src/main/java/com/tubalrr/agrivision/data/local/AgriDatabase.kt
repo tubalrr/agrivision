@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [
+        AppMetaEntity::class,
         FarmEntity::class,
         LivestockEntity::class,
         CropEntity::class,
@@ -14,9 +15,15 @@ import androidx.room.RoomDatabase
         ProductionEntity::class,
         ExpenseEntity::class,
         SaleEntity::class,
-        InventoryEntity::class
+        InventoryEntity::class,
+        EquipmentEntity::class,
+        FarmTaskEntity::class,
+        AssistanceEntity::class,
+        FieldIncidentEntity::class,
+        IncidentEventEntity::class,
+        ReportSubmissionEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -33,7 +40,110 @@ abstract class AgriDatabase : RoomDatabase() {
                     context.applicationContext,
                     AgriDatabase::class.java,
                     "agrivision.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { INSTANCE = it }
+            }
+        }
+
+        private val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS app_meta (metaKey TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(metaKey))")
+                db.execSQL("ALTER TABLE farms ADD COLUMN contact TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE farms ADD COLUMN registryStatus TEXT NOT NULL DEFAULT 'For Review'")
+                db.execSQL("ALTER TABLE farms ADD COLUMN reviewNotes TEXT NOT NULL DEFAULT ''")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS equipment (
+                        equipmentId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(equipmentId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_equipment_farmId ON equipment(farmId)")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS farm_tasks (
+                        taskId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        done INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(taskId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_farm_tasks_farmId_date ON farm_tasks(farmId,date)")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS assistance (
+                        requestId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        incidentId TEXT NOT NULL,
+                        program TEXT NOT NULL,
+                        assistanceType TEXT NOT NULL,
+                        dateReceived TEXT NOT NULL,
+                        quantity TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        source TEXT NOT NULL,
+                        approvedDate TEXT NOT NULL,
+                        distributedDate TEXT NOT NULL,
+                        completedDate TEXT NOT NULL,
+                        distributionDetails TEXT NOT NULL,
+                        outcome TEXT NOT NULL,
+                        reviewNotes TEXT NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(requestId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_assistance_farmId ON assistance(farmId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_assistance_incidentId ON assistance(incidentId)")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS field_incidents (
+                        incidentId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        commodity TEXT NOT NULL,
+                        affectedArea TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        severity TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        evidenceUri TEXT NOT NULL,
+                        reviewNotes TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(incidentId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_field_incidents_farmId_status_date ON field_incidents(farmId,status,date)")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS incident_events (
+                        eventId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        incidentId TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        PRIMARY KEY(eventId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_incident_events_farmId_incidentId ON incident_events(farmId,incidentId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_incident_events_timestamp ON incident_events(timestamp)")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS report_submissions (
+                        submissionId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        submittedDate TEXT NOT NULL,
+                        referenceNo TEXT NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(submissionId)
+                    )"""
+                )
             }
         }
     }
