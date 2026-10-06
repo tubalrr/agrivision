@@ -1,27 +1,21 @@
 package com.tubalrr.agrivision
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.shape.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.LocalFlorist
+import androidx.compose.material.icons.outlined.Pets
+import androidx.compose.material.icons.outlined.PrecisionManufacturing
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
-
 
 @Composable
 internal fun FarmScreen(
@@ -30,10 +24,13 @@ internal fun FarmScreen(
     crops: List<CropRecord>,
     inventory: List<InventoryItem>,
     equipment: List<EquipmentRecord>,
+    fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
+    cropLifecycleEvents: List<CropLifecycleEvent>,
     onAddLivestock: (Livestock) -> Unit,
     onAddCrop: (CropRecord) -> Unit,
     onAddInventory: (InventoryItem) -> Unit,
-    onAddEquipment: (EquipmentRecord) -> Unit
+    onAddEquipment: (EquipmentRecord) -> Unit,
+    onAddCropLifecycleEvent: (CropLifecycleEvent) -> Unit
 ) {
     var category by remember { mutableStateOf("Livestock") }
     var showAddDialog by remember { mutableStateOf(false) }
@@ -42,20 +39,20 @@ internal fun FarmScreen(
         AddFarmRecordDialog(
             category = category,
             onDismiss = { showAddDialog = false },
-            onAddLivestock = { record ->
-                onAddLivestock(record)
+            onAddLivestock = {
+                onAddLivestock(it)
                 showAddDialog = false
             },
-            onAddCrop = { record ->
-                onAddCrop(record)
+            onAddCrop = {
+                onAddCrop(it)
                 showAddDialog = false
             },
-            onAddInventory = { record ->
-                onAddInventory(record)
+            onAddInventory = {
+                onAddInventory(it)
                 showAddDialog = false
             },
-            onAddEquipment = { record ->
-                onAddEquipment(record)
+            onAddEquipment = {
+                onAddEquipment(it)
                 showAddDialog = false
             }
         )
@@ -67,8 +64,12 @@ internal fun FarmScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item { ScreenHeader("My Farm", "Everything on your farm, not just crops.") }
+
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 FarmCategory("Livestock", Icons.Outlined.Pets, category == "Livestock") { category = "Livestock" }
                 FarmCategory("Crops", Icons.Outlined.LocalFlorist, category == "Crops") { category = "Crops" }
                 FarmCategory("Inventory", Icons.Outlined.Inventory2, category == "Inventory") { category = "Inventory" }
@@ -79,63 +80,66 @@ internal fun FarmScreen(
         when (category) {
             "Livestock" -> {
                 item {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SectionTitle("Livestock Groups")
-                    TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SectionTitle("Livestock Groups")
+                        TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                    }
                 }
-            }
                 items(livestock) { animal ->
-                    FarmRecordCard(animal.name, animal.kind, animal.count.toString() + " heads · " + animal.status, Icons.Outlined.Pets)
+                    FarmRecordCard(
+                        animal.name,
+                        animal.kind,
+                        animal.count.toString() + " heads · " + animal.status,
+                        Icons.Outlined.Pets
+                    )
                 }
                 item { AddHint("Add animal groups, feeding, health and mortality records.") }
             }
+
             "Crops" -> {
                 item {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SectionTitle("Crop Records")
-                    TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                    CropLifecycleSection(
+                        crops = crops,
+                        fields = fields,
+                        lifecycleEvents = cropLifecycleEvents,
+                        onAddCrop = onAddCrop,
+                        onAddLifecycleEvent = onAddCropLifecycleEvent
+                    )
                 }
             }
-                items(crops) { crop ->
-                    FarmRecordCard(crop.name, crop.crop, crop.area + " · " + crop.stage, Icons.Outlined.LocalFlorist)
-                }
-                item { AddHint("Track planting, inputs, growth stage and harvest.") }
-            }
+
             "Inventory" -> {
                 item {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SectionTitle("Farm Inventory")
-                    TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SectionTitle("Farm Inventory")
+                        TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                    }
                 }
-            }
                 items(inventory) { item ->
                     FarmRecordCard(item.name, item.quantity, item.status, Icons.Outlined.Inventory2)
                 }
                 item { AddHint("Feeds, medicine, fertilizer, seeds, tools and supplies.") }
             }
+
             "Equipment" -> {
                 item {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SectionTitle("Farm Equipment")
-                    TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SectionTitle("Farm Equipment")
+                        TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
+                    }
                 }
-            }
                 items(equipment) { item ->
                     FarmRecordCard(item.name, item.status, item.note, Icons.Outlined.PrecisionManufacturing)
                 }
@@ -246,7 +250,7 @@ internal fun AddFarmRecordDialog(
                                 name.trim(),
                                 type.ifBlank { "Other" }.trim(),
                                 value.ifBlank { "—" }.trim(),
-                                detail.ifBlank { "Active" }.trim()
+                                detail.ifBlank { "Land Preparation" }.trim()
                             )
                         )
                         "Inventory" -> onAddInventory(
@@ -274,12 +278,19 @@ internal fun AddFarmRecordDialog(
 }
 
 @Composable
-internal fun FarmCategory(name: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
+internal fun FarmCategory(
+    name: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
     Card(
         onClick = onClick,
         modifier = Modifier.width(90.dp).height(86.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = if (selected) AgriGreenSoft else AgriCard)
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) AgriGreenSoft else AgriCard
+        )
     ) {
         Column(
             Modifier.fillMaxSize().padding(8.dp),
@@ -288,7 +299,11 @@ internal fun FarmCategory(name: String, icon: androidx.compose.ui.graphics.vecto
         ) {
             Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(23.dp))
             Spacer(Modifier.height(6.dp))
-            Text(name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+            Text(
+                name,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
