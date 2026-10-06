@@ -532,23 +532,45 @@ suspend fun saveField(record: FieldRecord) {
         inventoryId: String = record.inventoryId.ifBlank { UUID.randomUUID().toString() }
     ) {
         database.withTransaction {
-            saveInventory(record, inventoryId)
             val parsed = parseQuantity(record.quantity)
-            val stock = if (record.inventoryId.isNotBlank()) record.stock else parsed.first
-            val unit = record.unit.ifBlank { parsed.second }.ifBlank { "unit" }
-            if (stock > 0.0) {
+            val incomingStock = if (record.inventoryId.isNotBlank()) record.stock else parsed.first
+            val incomingUnit = record.unit.ifBlank { parsed.second }.ifBlank { "unit" }
+            val existing = dao.findInventoryByName(DEFAULT_FARM_ID, record.name.trim())
+            val sameUnit = existing != null &&
+                    normalizeInventoryUnit(existing.unit) == normalizeInventoryUnit(incomingUnit)
+
+            val effectiveId = if (sameUnit) existing!!.inventoryId else inventoryId
+            val newStock = if (sameUnit) existing!!.quantity + incomingStock else incomingStock
+
+            dao.upsertInventory(
+                InventoryEntity(
+                    inventoryId = effectiveId,
+                    farmId = DEFAULT_FARM_ID,
+                    name = record.name.trim(),
+                    quantity = newStock.coerceAtLeast(0.0),
+                    unit = incomingUnit,
+                    status = if (newStock <= 0.0) "Out of Stock" else "In Stock",
+                    category = record.category,
+                    purchasePrice = record.purchasePrice.coerceAtLeast(0.0),
+                    supplier = record.supplier.trim(),
+                    dateAcquired = record.dateAcquired,
+                    expiryDate = record.expiryDate
+                )
+            )
+
+            if (incomingStock > 0.0) {
                 dao.upsertInventoryTransaction(
                     InventoryTransactionEntity(
                         transactionId = UUID.randomUUID().toString(),
                         farmId = DEFAULT_FARM_ID,
-                        inventoryId = inventoryId,
+                        inventoryId = effectiveId,
                         type = "PURCHASE",
-                        quantity = stock,
-                        unit = unit,
+                        quantity = incomingStock,
+                        unit = incomingUnit,
                         date = record.dateAcquired,
                         sourceType = "Inventory",
-                        sourceId = inventoryId,
-                        notes = "Stock acquired"
+                        sourceId = effectiveId,
+                        notes = if (sameUnit) "Additional stock acquired" else "Stock acquired"
                     )
                 )
             }
