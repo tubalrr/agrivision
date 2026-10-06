@@ -88,6 +88,13 @@ interface FarmDao {
     @Query("SELECT * FROM production_records WHERE farmId = :farmId ORDER BY date DESC, createdAt DESC")
     fun observeProduction(farmId: String): Flow<List<ProductionEntity>>
 
+    @Query("SELECT * FROM production_records WHERE farmId = :farmId AND sourceType = :sourceType AND sourceId = :sourceId ORDER BY date DESC, createdAt DESC")
+    fun observeProductionForSource(
+        farmId: String,
+        sourceType: String,
+        sourceId: String
+    ): Flow<List<ProductionEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertProduction(record: ProductionEntity)
 
