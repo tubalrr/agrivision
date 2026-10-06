@@ -40,6 +40,18 @@ interface FarmDao {
     @Query("SELECT * FROM crops WHERE farmId = :farmId ORDER BY updatedAt DESC")
     fun observeCrops(farmId: String): Flow<List<CropEntity>>
 
+    @Query("SELECT * FROM crops WHERE cropId = :cropId LIMIT 1")
+    suspend fun getCrop(cropId: String): CropEntity?
+
+    @Query("SELECT * FROM crop_lifecycle_events WHERE farmId = :farmId ORDER BY date DESC, createdAt DESC")
+    fun observeCropLifecycleEvents(farmId: String): Flow<List<CropLifecycleEventEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCropLifecycleEvent(event: CropLifecycleEventEntity)
+
+    @Query("DELETE FROM crop_lifecycle_events")
+    suspend fun clearCropLifecycleEvents()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCrop(record: CropEntity)
 
