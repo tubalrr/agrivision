@@ -38,6 +38,7 @@ internal fun ProfileScreen(
     onProfileSaved: (FarmerProfile) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    backupStatus: String,
     assistance: List<AssistanceRecord>,
     onAddAssistance: (AssistanceRecord) -> Unit,
     onUpdateAssistance: (AssistanceRecord) -> Unit,
@@ -182,12 +183,15 @@ internal fun ProfileScreen(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Backup & Restore", fontWeight = FontWeight.Bold)
                     Text(
-                        "Export your farmer, farm and operational records as a local JSON backup.",
+                        "Export AgriVision Backup creates a versioned Room-data snapshot. Import restores that snapshot into Room.",
                         color = AgriMuted
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = onExportBackup, shape = RoundedCornerShape(14.dp)) { Text("Export") }
-                        OutlinedButton(onClick = onImportBackup, shape = RoundedCornerShape(14.dp)) { Text("Restore") }
+                        Button(onClick = onExportBackup, shape = RoundedCornerShape(14.dp)) { Text("Export AgriVision Backup") }
+                        OutlinedButton(onClick = onImportBackup, shape = RoundedCornerShape(14.dp)) { Text("Import AgriVision Backup") }
+                    }
+                    if (backupStatus.isNotBlank()) {
+                        Text(backupStatus, color = AgriGreen, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
