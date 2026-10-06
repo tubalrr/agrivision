@@ -41,6 +41,7 @@ internal fun ProductionFinanceScreen(
     fieldIncidents: List<FieldIncident>,
     incidentEvents: List<IncidentEvent>,
     onExportCasePackage: () -> Unit,
+    onExportDaReport: (String, DaReportFormat) -> Unit,
     reportSubmission: ReportSubmission,
     onProduction: (ProductionRecord) -> Unit,
     onExpense: (ExpenseRecord) -> Unit,
@@ -49,6 +50,8 @@ internal fun ProductionFinanceScreen(
 ) {
     var tab by remember { mutableStateOf("Production") }
     var showDialog by remember { mutableStateOf(false) }
+    var selectedDaReport by remember { mutableStateOf(DaReportExporter.reportTypes.first()) }
+    var selectedDaFormat by remember { mutableStateOf(DaReportFormat.PDF) }
 
     if (showDialog) {
         AddProductionFinanceDialog(
@@ -144,6 +147,55 @@ internal fun ProductionFinanceScreen(
             item { SummaryCard("Assistance Received", assistance.size.toString() + " records", "Seeds, fertilizer, livestock, equipment and other agricultural support.") }
             item { SectionTitle("Assistance Records") }
 
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = AgriCard)
+                ) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("DA-Ready Export", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Export individual official-style reports directly from Room data.",
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text("Report", fontWeight = FontWeight.SemiBold)
+                        DaReportExporter.reportTypes.chunked(2).forEach { row ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { type ->
+                                    FilterChip(
+                                        selected = selectedDaReport == type,
+                                        onClick = { selectedDaReport = type },
+                                        label = { Text(type, maxLines = 1) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                        Text("Format", fontWeight = FontWeight.SemiBold)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            DaReportFormat.values().forEach { format ->
+                                FilterChip(
+                                    selected = selectedDaFormat == format,
+                                    onClick = { selectedDaFormat = format },
+                                    label = { Text(format.extension.uppercase()) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { onExportDaReport(selectedDaReport, selectedDaFormat) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Outlined.FileDownload, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Export " + selectedDaReport)
+                        }
+                    }
+                }
+            }
             item { SectionTitle("DA Data Quality") }
             item {
                 val checks = listOf(
