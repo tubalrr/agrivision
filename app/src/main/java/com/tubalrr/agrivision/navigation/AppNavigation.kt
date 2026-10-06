@@ -161,6 +161,7 @@ internal fun AgriVisionApp(
                     onProfileSaved = farmViewModel::saveProfile,
                     onExportBackup = onExportBackup,
                     onImportBackup = onImportBackup,
+                    backupStatus = farmViewModel.backupStatus.collectAsStateWithLifecycle().value,
                     assistance = assistance,
                     onAddAssistance = farmViewModel::addAssistance,
                     onUpdateAssistance = farmViewModel::updateAssistance,
