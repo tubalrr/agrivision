@@ -168,7 +168,7 @@ internal fun FieldMapScreen(
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(14.dp, 12.dp, 14.dp, 24.dp),
+        contentPadding = PaddingValues(18.dp, 16.dp, 18.dp, 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
