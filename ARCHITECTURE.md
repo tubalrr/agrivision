@@ -183,7 +183,7 @@ Map
       └── severity/status
 ```
 
-Mapping actions are performed in the Map editor. A long press adds a coordinate point to the current draft. Farm and incident areas require at least three points for a polygon; a field can be saved with one point for location-only mapping or three or more points for a boundary. Saving a field/incident polygon also stores its centroid as the record's latitude/longitude so both the area and its representative GPS coordinate remain available.
+Mapping actions are performed in the Map editor. A long press adds a coordinate point to the current draft. Farm and incident areas require at least three points for a polygon; a field can be saved with one point for location-only mapping or three or more points for a boundary. Saving a field/incident polygon also stores its centroid as the record's latitude/longitude so both the area and its representative coordinate remain available.
 
 Geometry is serialized into Room text columns for the offline-first schema and is included in backup/case-package JSON. The map intentionally does not request device location permission and never depends on live GPS for rendering existing records.
 
