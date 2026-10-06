@@ -23,6 +23,7 @@ internal fun CropLifecycleSection(
     crops: List<CropRecord>,
     fields: List<FieldRecord>,
     lifecycleEvents: List<CropLifecycleEvent>,
+    inventory: List<InventoryItem>,
     onAddCrop: (CropRecord) -> Unit,
     onAddLifecycleEvent: (CropLifecycleEvent) -> Unit
 ) {
@@ -44,6 +45,7 @@ internal fun CropLifecycleSection(
         CropLifecycleEventDialog(
             crop = crop,
             field = fields.firstOrNull { it.fieldId == crop.fieldId },
+            inventory = inventory,
             onDismiss = { manageCrop = null },
             onSave = {
                 onAddLifecycleEvent(it)
@@ -326,6 +328,7 @@ private fun AddCropLifecycleDialog(
 private fun CropLifecycleEventDialog(
     crop: CropRecord,
     field: FieldRecord?,
+    inventory: List<InventoryItem>,
     onDismiss: () -> Unit,
     onSave: (CropLifecycleEvent) -> Unit
 ) {
@@ -413,6 +416,40 @@ private fun CropLifecycleEventDialog(
                     )
                 }
                 item {
+                    val inventoryStage =
+                        stage == "Land Preparation" ||
+                                stage == "Planting" ||
+                                stage == "Fertilization" ||
+                                stage == "Pest/Disease Monitoring"
+
+                    if (inventoryStage && inventory.isNotEmpty()) {
+                        Text("Inventory input", color = AgriGreen, fontWeight = FontWeight.Bold)
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(
+                                androidx.compose.foundation.rememberScrollState()
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            inventory.forEach { item ->
+                                FilterChip(
+                                    selected = inputName.equals(item.name, ignoreCase = true),
+                                    onClick = {
+                                        inputName = item.name
+                                        unit = item.unit
+                                    },
+                                    label = {
+                                        Text(
+                                            item.name + " (" +
+                                                    formatInventoryNumber(item.stock) + " " +
+                                                    item.unit + ")",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = inputName,
                         onValueChange = { inputName = it },
@@ -470,6 +507,10 @@ private fun CropLifecycleEventDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
+
+private fun formatInventoryNumber(value: Double): String =
+    if (value % 1.0 == 0.0) value.toInt().toString()
+    else String.format(Locale.US, "%.2f", value)
 
 private fun formatCropArea(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() + " ha"
