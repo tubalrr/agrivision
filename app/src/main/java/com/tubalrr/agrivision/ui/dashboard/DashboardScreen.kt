@@ -39,6 +39,7 @@ internal fun DashboardScreen(
     farm: com.tubalrr.agrivision.domain.model.FarmRecord,
     fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
     farmViewModel: FarmViewModel,
+    onOpenTasks: () -> Unit = {},
     totalAnimals: Int,
     totalExpenses: Double,
     totalSales: Double,
@@ -194,7 +195,7 @@ internal fun DashboardScreen(
                     ActionQueueRow(
                         title = "Farm tasks",
                         detail = openTasks.toString() + " open task(s)",
-                        action = {}
+                        action = onOpenTasks
                     )
                     HorizontalDivider(color = AgriLine)
                     ActionQueueRow(
