@@ -33,6 +33,9 @@ internal fun AgriVisionApp(
 ) {
     var selected by remember { mutableStateOf(0) }
 
+    val farmer by farmViewModel.farmer.collectAsStateWithLifecycle()
+    val farm by farmViewModel.farm.collectAsStateWithLifecycle()
+    val fields by farmViewModel.fields.collectAsStateWithLifecycle()
     val livestock by farmViewModel.livestock.collectAsStateWithLifecycle()
     val crops by farmViewModel.crops.collectAsStateWithLifecycle()
     val production by farmViewModel.production.collectAsStateWithLifecycle()
@@ -130,12 +133,17 @@ internal fun AgriVisionApp(
                 else -> ProfileScreen(
                     padding = padding,
                     profile = farmerProfile,
+                    farmer = farmer,
+                    farm = farm,
+                    fields = fields,
                     onProfileSaved = farmViewModel::saveProfile,
                     onExportBackup = onExportBackup,
                     onImportBackup = onImportBackup,
                     assistance = assistance,
                     onAddAssistance = farmViewModel::addAssistance,
-                    onUpdateAssistance = farmViewModel::updateAssistance
+                    onUpdateAssistance = farmViewModel::updateAssistance,
+                    onAddField = farmViewModel::addField,
+                    onUpdateField = farmViewModel::updateField
                 )
             }
         }
