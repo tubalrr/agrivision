@@ -29,6 +29,7 @@ private val LivestockLifecycleStages = listOf(
 internal fun LivestockLifecycleSection(
     livestock: List<Livestock>,
     lifecycleEvents: List<LivestockLifecycleEvent>,
+    inventory: List<InventoryItem>,
     onAddLivestock: (Livestock) -> Unit,
     onAddLifecycleEvent: (LivestockLifecycleEvent) -> Unit
 ) {
@@ -48,6 +49,7 @@ internal fun LivestockLifecycleSection(
     manageGroup?.let { group ->
         LivestockLifecycleEventDialog(
             group = group,
+            inventory = inventory,
             onDismiss = { manageGroup = null },
             onSave = {
                 onAddLifecycleEvent(it)
@@ -266,6 +268,7 @@ private fun AddLivestockGroupDialog(
 @Composable
 private fun LivestockLifecycleEventDialog(
     group: Livestock,
+    inventory: List<InventoryItem>,
     onDismiss: () -> Unit,
     onSave: (LivestockLifecycleEvent) -> Unit
 ) {
@@ -340,6 +343,35 @@ private fun LivestockLifecycleEventDialog(
                     ) { Text("Record date: " + date) }
                 }
                 item {
+                    val inventoryStage = stage == "Feed" || stage == "Health"
+                    if (inventoryStage && inventory.isNotEmpty()) {
+                        Text("Inventory input", color = AgriGreen, fontWeight = FontWeight.Bold)
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(
+                                androidx.compose.foundation.rememberScrollState()
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            inventory.forEach { item ->
+                                FilterChip(
+                                    selected = inputName.equals(item.name, ignoreCase = true),
+                                    onClick = {
+                                        inputName = item.name
+                                        unit = item.unit
+                                    },
+                                    label = {
+                                        Text(
+                                            item.name + " (" +
+                                                    formatInventoryNumber(item.stock) + " " +
+                                                    item.unit + ")",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = inputName,
                         onValueChange = { inputName = it },
@@ -440,6 +472,10 @@ private fun LivestockLifecycleEventDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
+
+private fun formatInventoryNumber(value: Double): String =
+    if (value % 1.0 == 0.0) value.toInt().toString()
+    else String.format(Locale.US, "%.2f", value)
 
 private fun normalizeLivestockStage(stage: String): String =
     LivestockLifecycleStages.firstOrNull { it.equals(stage, ignoreCase = true) } ?: stage
