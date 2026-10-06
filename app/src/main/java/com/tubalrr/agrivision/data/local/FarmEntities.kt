@@ -4,6 +4,15 @@ import androidx.room.Entity
 import androidx.room.Index
 
 @Entity(
+    tableName = "app_meta",
+    primaryKeys = ["key"]
+)
+data class AppMetaEntity(
+    val key: String,
+    val value: String
+)
+
+@Entity(
     tableName = "farms",
     primaryKeys = ["farmId"],
     indices = [Index(value = ["farmerId"])]
@@ -19,6 +28,9 @@ data class FarmEntity(
     val farmSize: String,
     val landTenure: String,
     val commodities: String,
+    val contact: String = "",
+    val registryStatus: String = "For Review",
+    val reviewNotes: String = "",
     val updatedAt: Long = System.currentTimeMillis()
 )
 
@@ -132,5 +144,112 @@ data class InventoryEntity(
     val quantity: Double,
     val unit: String,
     val status: String,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "equipment",
+    primaryKeys = ["equipmentId"],
+    indices = [Index(value = ["farmId"])]
+)
+data class EquipmentEntity(
+    val equipmentId: String,
+    val farmId: String,
+    val name: String,
+    val status: String,
+    val note: String,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "farm_tasks",
+    primaryKeys = ["taskId"],
+    indices = [Index(value = ["farmId", "date"])]
+)
+data class FarmTaskEntity(
+    val taskId: String,
+    val farmId: String,
+    val title: String,
+    val category: String,
+    val date: String,
+    val done: Boolean,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "assistance",
+    primaryKeys = ["requestId"],
+    indices = [
+        Index(value = ["farmId"]),
+        Index(value = ["incidentId"])
+    ]
+)
+data class AssistanceEntity(
+    val requestId: String,
+    val farmId: String,
+    val incidentId: String,
+    val program: String,
+    val assistanceType: String,
+    val dateReceived: String,
+    val quantity: String,
+    val status: String,
+    val source: String,
+    val approvedDate: String = "",
+    val distributedDate: String = "",
+    val completedDate: String = "",
+    val distributionDetails: String = "",
+    val outcome: String = "",
+    val reviewNotes: String = "",
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "field_incidents",
+    primaryKeys = ["incidentId"],
+    indices = [Index(value = ["farmId", "status", "date"])]
+)
+data class FieldIncidentEntity(
+    val incidentId: String,
+    val farmId: String,
+    val type: String,
+    val commodity: String,
+    val affectedArea: String,
+    val date: String,
+    val severity: String,
+    val description: String,
+    val status: String,
+    val evidenceUri: String,
+    val reviewNotes: String,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "incident_events",
+    primaryKeys = ["eventId"],
+    indices = [
+        Index(value = ["farmId", "incidentId"]),
+        Index(value = ["timestamp"])
+    ]
+)
+data class IncidentEventEntity(
+    val eventId: String,
+    val farmId: String,
+    val incidentId: String,
+    val status: String,
+    val note: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "report_submissions",
+    primaryKeys = ["submissionId"]
+)
+data class ReportSubmissionEntity(
+    val submissionId: String = "default",
+    val farmId: String,
+    val status: String = "Draft",
+    val submittedDate: String = "",
+    val referenceNo: String = "",
     val updatedAt: Long = System.currentTimeMillis()
 )
