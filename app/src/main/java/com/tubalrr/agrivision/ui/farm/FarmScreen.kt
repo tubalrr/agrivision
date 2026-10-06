@@ -21,12 +21,14 @@ import androidx.compose.foundation.rememberScrollState
 internal fun FarmScreen(
     padding: PaddingValues,
     livestock: List<Livestock>,
+    livestockLifecycleEvents: List<LivestockLifecycleEvent>,
     crops: List<CropRecord>,
     inventory: List<InventoryItem>,
     equipment: List<EquipmentRecord>,
     fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
     cropLifecycleEvents: List<CropLifecycleEvent>,
     onAddLivestock: (Livestock) -> Unit,
+    onAddLivestockLifecycleEvent: (LivestockLifecycleEvent) -> Unit,
     onAddCrop: (CropRecord) -> Unit,
     onAddInventory: (InventoryItem) -> Unit,
     onAddEquipment: (EquipmentRecord) -> Unit,
@@ -80,24 +82,13 @@ internal fun FarmScreen(
         when (category) {
             "Livestock" -> {
                 item {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SectionTitle("Livestock Groups")
-                        TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
-                    }
-                }
-                items(livestock) { animal ->
-                    FarmRecordCard(
-                        animal.name,
-                        animal.kind,
-                        animal.count.toString() + " heads · " + animal.status,
-                        Icons.Outlined.Pets
+                    LivestockLifecycleSection(
+                        livestock = livestock,
+                        lifecycleEvents = livestockLifecycleEvents,
+                        onAddLivestock = onAddLivestock,
+                        onAddLifecycleEvent = onAddLivestockLifecycleEvent
                     )
                 }
-                item { AddHint("Add animal groups, feeding, health and mortality records.") }
             }
 
             "Crops" -> {
