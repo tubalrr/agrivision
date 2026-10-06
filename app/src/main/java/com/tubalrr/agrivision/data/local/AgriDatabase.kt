@@ -189,5 +189,35 @@ abstract class AgriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE crops ADD COLUMN fieldId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE crops ADD COLUMN plantingDate TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE crops ADD COLUMN expectedHarvest TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE crops ADD COLUMN currentStatus TEXT NOT NULL DEFAULT 'Land Preparation'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_crops_fieldId ON crops(fieldId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_crops_farmId_currentStatus ON crops(farmId,currentStatus)")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS crop_lifecycle_events (
+                        eventId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        cropId TEXT NOT NULL,
+                        fieldId TEXT NOT NULL,
+                        stage TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        notes TEXT NOT NULL,
+                        inputName TEXT NOT NULL,
+                        quantity TEXT NOT NULL,
+                        unit TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        PRIMARY KEY(eventId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_crop_lifecycle_events_cropId ON crop_lifecycle_events(cropId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_crop_lifecycle_events_fieldId ON crop_lifecycle_events(fieldId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_crop_lifecycle_events_cropId_date ON crop_lifecycle_events(cropId,date)")
+            }
+        }
+
     }
 }
