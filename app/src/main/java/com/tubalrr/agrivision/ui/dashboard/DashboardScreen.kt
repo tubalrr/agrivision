@@ -180,8 +180,9 @@ internal fun DashboardScreen(
         item {
             Card(
                 Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriCard)
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriCard),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     ActionQueueRow(
@@ -233,7 +234,7 @@ internal fun DashboardScreen(
                     )
                     Button(
                         onClick = { showIncidentDialog = true },
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("+ New Field Report")
                     }
@@ -538,10 +539,11 @@ internal fun DashboardKpiCard(
 ) {
     Card(
         modifier,
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = background)
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = background),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(23.dp))
             Spacer(Modifier.height(9.dp))
             Text(title, color = AgriMuted, style = MaterialTheme.typography.labelMedium)
