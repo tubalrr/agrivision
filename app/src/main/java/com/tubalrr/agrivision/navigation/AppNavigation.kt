@@ -37,6 +37,7 @@ internal fun AgriVisionApp(
     val farm by farmViewModel.farm.collectAsStateWithLifecycle()
     val fields by farmViewModel.fields.collectAsStateWithLifecycle()
     val cropLifecycleEvents by farmViewModel.cropLifecycleEvents.collectAsStateWithLifecycle()
+    val livestockLifecycleEvents by farmViewModel.livestockLifecycleEvents.collectAsStateWithLifecycle()
     val livestock by farmViewModel.livestock.collectAsStateWithLifecycle()
     val crops by farmViewModel.crops.collectAsStateWithLifecycle()
     val production by farmViewModel.production.collectAsStateWithLifecycle()
@@ -95,12 +96,14 @@ internal fun AgriVisionApp(
                 1 -> FarmScreen(
                     padding = padding,
                     livestock = livestock,
+                    livestockLifecycleEvents = livestockLifecycleEvents,
                     crops = crops,
                     inventory = inventory,
                     equipment = equipment,
                     fields = fields,
                     cropLifecycleEvents = cropLifecycleEvents,
                     onAddLivestock = farmViewModel::addLivestock,
+                    onAddLivestockLifecycleEvent = farmViewModel::addLivestockLifecycleEvent,
                     onAddCrop = farmViewModel::addCrop,
                     onAddInventory = farmViewModel::addInventory,
                     onAddEquipment = farmViewModel::addEquipment,
