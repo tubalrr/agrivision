@@ -189,7 +189,8 @@ internal fun AgriBottomBar(selected: Int, onSelected: (Int) -> Unit) {
     NavigationBar(
         containerColor = AgriCard,
         tonalElevation = 0.dp,
-        modifier = Modifier.height(78.dp)
+        modifier = Modifier.height(82.dp),
+        windowInsets = NavigationBarDefaults.windowInsets
     ) {
         items.forEachIndexed { index, item ->
             NavigationBarItem(
