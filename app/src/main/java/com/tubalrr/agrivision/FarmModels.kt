@@ -58,7 +58,13 @@ data class ProductionRecord(
     val areaHectares: Double = 0.0,
     val productionType: String = "Harvest"
 )
-data class ExpenseRecord(\n    val category: String,\n    val amount: Double,\n    val note: String,\n    val date: String = ""\n)\ndata class InventoryItem(
+data class ExpenseRecord(
+    val category: String,
+    val amount: Double,
+    val note: String,
+    val date: String = ""
+)
+data class InventoryItem(
     val name: String,
     val quantity: String,
     val status: String,
@@ -86,7 +92,13 @@ data class InventoryTransaction(
 )
 data class EquipmentRecord(val name: String, val status: String, val note: String)
 data class FarmTask(val title: String, val category: String, val date: String, val done: Boolean)
-data class SaleRecord(\n    val product: String,\n    val amount: Double,\n    val date: String,\n    val incomeCategory: String = "Other Income"\n)\ndata class AssistanceRecord(
+data class SaleRecord(
+    val product: String,
+    val amount: Double,
+    val date: String,
+    val incomeCategory: String = "Other Income"
+)
+data class AssistanceRecord(
     val program: String,
     val assistanceType: String,
     val dateReceived: String,
@@ -140,4 +152,21 @@ data class FarmerProfile(
     val reviewNotes: String = ""
 )
 
-\nobject FinancialCategories {\n    val incomeCategories = listOf(\n        "Crop Sales",\n        "Livestock Sales",\n        "Other Income"\n    )\n\n    val expenseCategories = listOf(\n        "Seeds",\n        "Fertilizer",\n        "Feed",\n        "Labor",\n        "Fuel",\n        "Medicine",\n        "Equipment"\n    )\n}\n
+
+object FinancialCategories {
+    val incomeCategories = listOf(
+        "Crop Sales",
+        "Livestock Sales",
+        "Other Income"
+    )
+
+    val expenseCategories = listOf(
+        "Seeds",
+        "Fertilizer",
+        "Feed",
+        "Labor",
+        "Fuel",
+        "Medicine",
+        "Equipment"
+    )
+}
