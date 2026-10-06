@@ -422,7 +422,15 @@ private fun CropLifecycleEvent.toJson() = JSONObject().apply {
     put("createdAt", createdAt)
 }
 private fun ProductionRecord.toJson() = JSONObject().apply {
-    put("product", product); put("quantity", quantity); put("period", period)
+    put("product", product)
+    put("quantity", quantity)
+    put("period", period)
+    put("productionId", productionId)
+    put("sourceType", sourceType)
+    put("sourceId", sourceId)
+    put("fieldId", fieldId)
+    put("areaHectares", areaHectares)
+    put("productionType", productionType)
 }
 private fun ExpenseRecord.toJson() = JSONObject().apply {
     put("category", category); put("amount", amount); put("note", note)
@@ -582,7 +590,19 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
         )
     }
     val production = mutableListOf<ProductionRecord>()
-    parseList(productionArray) { o, _ -> production += ProductionRecord(o.optString("product"), o.optString("quantity"), o.optString("period")) }
+    parseList(productionArray) { o, _ ->
+        production += ProductionRecord(
+            product = o.optString("product"),
+            quantity = o.optString("quantity"),
+            period = o.optString("period"),
+            productionId = o.optString("productionId"),
+            sourceType = o.optString("sourceType"),
+            sourceId = o.optString("sourceId"),
+            fieldId = o.optString("fieldId"),
+            areaHectares = o.optDouble("areaHectares", 0.0),
+            productionType = o.optString("productionType", "Harvest")
+        )
+    }
     val expenses = mutableListOf<ExpenseRecord>()
     parseList(expensesArray) { o, _ -> expenses += ExpenseRecord(o.optString("category"), o.optDouble("amount"), o.optString("note")) }
     val sales = mutableListOf<SaleRecord>()
