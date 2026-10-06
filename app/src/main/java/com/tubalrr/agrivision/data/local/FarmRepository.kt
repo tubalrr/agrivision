@@ -319,7 +319,15 @@ class FarmRepository(
                     description = it.description,
                     status = it.status,
                     evidenceUri = it.evidenceUri,
-                    reviewNotes = it.reviewNotes
+                    reviewNotes = it.reviewNotes,
+                    farmerId = it.farmerId,
+                    farmId = it.farmId,
+                    fieldId = it.fieldId,
+                    latitude = it.latitude,
+                    longitude = it.longitude,
+                    reviewer = it.reviewer,
+                    assistanceRequestId = it.assistanceRequestId,
+                    resolution = it.resolution
                 )
             }
         }
@@ -793,7 +801,7 @@ suspend fun saveField(record: FieldRecord) {
         dao.upsertFieldIncident(
             FieldIncidentEntity(
                 incidentId = record.id,
-                farmId = DEFAULT_FARM_ID,
+                farmId = record.farmId.ifBlank { DEFAULT_FARM_ID },
                 type = record.type,
                 commodity = record.commodity,
                 affectedArea = record.affectedArea,
@@ -803,20 +811,97 @@ suspend fun saveField(record: FieldRecord) {
                 status = record.status,
                 evidenceUri = record.evidenceUri,
                 reviewNotes = record.reviewNotes,
+                farmerId = record.farmerId,
+                fieldId = record.fieldId,
+                latitude = record.latitude,
+                longitude = record.longitude,
+                reviewer = record.reviewer,
+                assistanceRequestId = record.assistanceRequestId,
+                resolution = record.resolution,
                 updatedAt = now
             )
         )
     }
 
+    suspend fun createIncident(record: FieldIncident) {
+        require(record.id.isNotBlank()) { "Incident ID is required." }
+        require(record.farmerId.isNotBlank()) { "Farmer is required." }
+        require(record.farmId.isNotBlank()) { "Farm is required." }
+        require(record.fieldId.isNotBlank()) { "Field is required." }
+        require(record.commodity.isNotBlank()) { "Commodity is required." }
+        require(record.description.isNotBlank()) { "Incident description is required." }
+        database.withTransaction {
+            saveFieldIncident(record.copy(status = "Draft"))
+            saveIncidentEvent(
+                IncidentEvent(
+                    incidentId = record.id,
+                    status = "Draft",
+                    note = "Incident draft created",
+                    fromStatus = "",
+                    actor = record.farmerId
+                )
+            )
+        }
+    }
+
+    suspend fun transitionIncident(
+        incidentId: String,
+        nextStatus: String,
+        actor: String = "",
+        note: String = "",
+        resolution: String? = null
+    ) {
+        val current = dao.getFieldIncident(incidentId)
+            ?: error("Incident not found.")
+        val allowed = when (current.status) {
+            "Draft" -> setOf("Submitted")
+            "Submitted" -> setOf("Under Review")
+            "Under Review" -> setOf("Verified", "Returned")
+            "Returned" -> setOf("Submitted")
+            "Verified" -> setOf("Assistance")
+            "Assistance" -> setOf("Completed")
+            "Completed" -> emptySet()
+            else -> emptySet()
+        }
+        require(nextStatus in allowed) {
+            "Invalid incident transition: " + current.status + " → " + nextStatus
+        }
+        if (nextStatus == "Completed") {
+            require(!resolution.isNullOrBlank()) { "Resolution is required before completion." }
+        }
+
+        database.withTransaction {
+            dao.upsertFieldIncident(
+                current.copy(
+                    status = nextStatus,
+                    reviewer = if (actor.isNotBlank()) actor else current.reviewer,
+                    resolution = resolution?.trim()?.ifBlank { current.resolution } ?: current.resolution,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            saveIncidentEvent(
+                IncidentEvent(
+                    incidentId = incidentId,
+                    fromStatus = current.status,
+                    status = nextStatus,
+                    note = note.ifBlank { "Status changed to " + nextStatus },
+                    actor = actor
+                )
+            )
+        }
+    }
+
     suspend fun saveIncidentEvent(event: IncidentEvent) {
         dao.upsertIncidentEvent(
             IncidentEventEntity(
-                eventId = UUID.randomUUID().toString(),
+                eventId = event.eventId.ifBlank { UUID.randomUUID().toString() },
                 farmId = DEFAULT_FARM_ID,
                 incidentId = event.incidentId,
                 status = event.status,
                 note = event.note,
-                timestamp = event.timestamp
+                timestamp = event.timestamp,
+                fromStatus = event.fromStatus,
+                actor = event.actor
             )
         )
     }
@@ -834,6 +919,11 @@ suspend fun saveField(record: FieldRecord) {
     }
 
     suspend fun createAssistanceForIncident(incident: FieldIncident): AssistanceRecord {
+        val current = dao.getFieldIncident(incident.id)
+            ?: error("Incident not found.")
+        require(current.status == "Verified") {
+            "Assistance can only be requested after verification."
+        }
         val request = AssistanceRecord(
             program = "Field Incident Assistance",
             assistanceType = incident.type,
@@ -844,8 +934,46 @@ suspend fun saveField(record: FieldRecord) {
             incidentId = incident.id,
             requestId = "DAR-" + System.currentTimeMillis()
         )
-        saveAssistance(request)
+        database.withTransaction {
+            saveAssistance(request)
+            dao.upsertFieldIncident(
+                current.copy(
+                    status = "Assistance",
+                    assistanceRequestId = request.requestId,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            saveIncidentEvent(
+                IncidentEvent(
+                    incidentId = incident.id,
+                    fromStatus = "Verified",
+                    status = "Assistance",
+                    note = "Assistance request linked: " + request.requestId,
+                    actor = request.requestId
+                )
+            )
+        }
         return request
+    }
+
+    suspend fun completeIncident(incidentId: String, resolution: String, reviewer: String) {
+        val current = dao.getFieldIncident(incidentId)
+            ?: error("Incident not found.")
+        require(current.status == "Assistance") {
+            "Incident must be in Assistance before completion."
+        }
+        val assistance = dao.getAssistanceForIncident(DEFAULT_FARM_ID, incidentId)
+            .firstOrNull { it.status.equals("Completed", ignoreCase = true) }
+        require(assistance != null) {
+            "Linked assistance must be completed before closing the incident."
+        }
+        transitionIncident(
+            incidentId = incidentId,
+            nextStatus = "Completed",
+            actor = reviewer,
+            note = "Resolution recorded",
+            resolution = resolution
+        )
     }
 
     suspend fun replaceAll(snapshot: FarmSnapshot) {
