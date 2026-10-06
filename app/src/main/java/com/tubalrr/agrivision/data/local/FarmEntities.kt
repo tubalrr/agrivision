@@ -5,10 +5,10 @@ import androidx.room.Index
 
 @Entity(
     tableName = "app_meta",
-    primaryKeys = ["key"]
+    primaryKeys = ["metaKey"]
 )
 data class AppMetaEntity(
-    val key: String,
+    val metaKey: String,
     val value: String
 )
 
