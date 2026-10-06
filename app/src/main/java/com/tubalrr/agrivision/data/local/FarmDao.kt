@@ -13,8 +13,8 @@ interface FarmDao {
     @Query("SELECT * FROM farms ORDER BY updatedAt DESC")
     fun observeFarms(): Flow<List<FarmEntity>>
 
-    @Query("SELECT * FROM farmers ORDER BY updatedAt DESC LIMIT 1")
-    fun observeFarmer(): Flow<FarmerEntity?>
+    @Query("SELECT * FROM farmers WHERE farmerId = :farmerId LIMIT 1")
+    fun observeFarmer(farmerId: String): Flow<FarmerEntity?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertFarmer(farmer: FarmerEntity)
