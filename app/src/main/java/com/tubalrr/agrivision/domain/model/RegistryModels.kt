@@ -1,5 +1,10 @@
 package com.tubalrr.agrivision.domain.model
 
+data class MapPoint(
+    val latitude: Double,
+    val longitude: Double
+)
+
 data class FarmerRecord(
     val farmerId: String,
     val fullName: String,
@@ -17,7 +22,8 @@ data class FarmRecord(
     val landTenure: String = "",
     val commodities: String = "",
     val registryStatus: String = "For Review",
-    val reviewNotes: String = ""
+    val reviewNotes: String = "",
+    val boundaryPoints: List<MapPoint> = emptyList()
 )
 
 data class FieldRecord(
@@ -32,5 +38,6 @@ data class FieldRecord(
     val crop: String = "",
     val plantingDate: String = "",
     val expectedHarvest: String = "",
-    val currentStatus: String = "Planned"
+    val currentStatus: String = "Planned",
+    val boundaryPoints: List<MapPoint> = emptyList()
 )
