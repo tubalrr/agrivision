@@ -47,7 +47,17 @@ data class CropLifecycleEvent(
     val unit: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
-data class ProductionRecord(val product: String, val quantity: String, val period: String)
+data class ProductionRecord(
+    val product: String,
+    val quantity: String,
+    val period: String,
+    val productionId: String = "",
+    val sourceType: String = "",
+    val sourceId: String = "",
+    val fieldId: String = "",
+    val areaHectares: Double = 0.0,
+    val productionType: String = "Harvest"
+)
 data class ExpenseRecord(val category: String, val amount: Double, val note: String)
 data class InventoryItem(
     val name: String,
