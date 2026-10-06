@@ -28,7 +28,7 @@ import androidx.room.RoomDatabase
         IncidentEventEntity::class,
         ReportSubmissionEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -46,7 +46,7 @@ abstract class AgriDatabase : RoomDatabase() {
                     AgriDatabase::class.java,
                     "agrivision.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -314,6 +314,15 @@ abstract class AgriDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE incident_events ADD COLUMN fromStatus TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE incident_events ADD COLUMN actor TEXT NOT NULL DEFAULT ''")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_incident_events_incidentId_timestamp ON incident_events(incidentId,timestamp)")
+            }
+        }
+
+
+        private val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE farms ADD COLUMN boundaryPointsJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE fields ADD COLUMN boundaryPointsJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE field_incidents ADD COLUMN affectedAreaBoundaryJson TEXT NOT NULL DEFAULT '[]'")
             }
         }
 
