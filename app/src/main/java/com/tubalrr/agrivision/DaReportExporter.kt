@@ -19,7 +19,9 @@ enum class DaReportFormat(val extension: String, val mimeType: String) {
 object DaReportExporter {
     val reportTypes = listOf(
         "Farmer Profile", "Farm Registry", "Crop Production", "Livestock Inventory",
-        "Farm Inputs", "Expenses", "Sales", "Incidents", "Assistance", "Harvest", "Field Summary"
+        "Farm Inputs", "Feed Logs", "Crop Lifecycle", "Livestock Lifecycle",
+        "Inventory Transactions", "Expenses", "Sales", "Incidents", "Incident Audit",
+        "Assistance", "Harvest", "Field Summary"
     )
 
     fun fileName(type: String, format: DaReportFormat) =
@@ -73,11 +75,41 @@ object DaReportExporter {
                 .map { listOf("Livestock Input", it.inputName, it.stage, it.quantity.toString(), it.unit, "", it.date, it.notes) }
             Data(listOf("Record Type", "Input", "Category/Stage", "Quantity", "Unit", "Supplier", "Date", "Notes"), inventory + crop + livestock)
         }
+        "Feed Logs" -> Data(
+            listOf("Feed Log ID", "Livestock ID", "Date", "Feed", "Quantity", "Unit", "Notes"),
+            s.feedLogs.map { listOf(it.feedLogId, it.livestockId, it.date, it.feedName, number(it.quantityKg), it.unit, it.notes) }
+        )
+        "Crop Lifecycle" -> Data(
+            listOf("Event ID", "Crop ID", "Field ID", "Stage", "Date", "Input", "Quantity", "Unit", "Notes"),
+            s.cropLifecycleEvents.map { listOf(it.eventId, it.cropId, it.fieldId, it.stage, it.date, it.inputName, it.quantity, it.unit, it.notes) }
+        )
+        "Livestock Lifecycle" -> Data(
+            listOf("Event ID", "Livestock ID", "Stage", "Date", "Input", "Quantity", "Unit", "Amount", "Notes"),
+            s.livestockLifecycleEvents.map { listOf(it.eventId, it.livestockId, it.stage, it.date, it.inputName, number(it.quantity), it.unit, money(it.amount), it.notes) }
+        )
+        "Inventory Transactions" -> Data(
+            listOf("Transaction ID", "Inventory ID", "Type", "Quantity", "Unit", "Date", "Source Type", "Source ID", "Notes"),
+            s.inventoryTransactions.map { listOf(it.transactionId, it.inventoryId, it.type, number(it.quantity), it.unit, it.date, it.sourceType, it.sourceId, it.notes) }
+        )
         "Expenses" -> Data(listOf("Date", "Category", "Amount", "Note"), s.expenses.map { listOf(it.date, it.category, money(it.amount), it.note) })
         "Sales" -> Data(listOf("Date", "Product", "Amount", "Income Category"), s.sales.map { listOf(it.date, it.product, money(it.amount), it.incomeCategory) })
         "Incidents" -> Data(
             listOf("Incident ID", "Date", "Type", "Commodity", "Field ID", "Severity", "Status", "Affected Area", "Description", "Reviewer"),
             s.fieldIncidents.map { listOf(it.id, it.date, it.type, it.commodity, it.fieldId, it.severity, it.status, it.affectedArea, it.description, it.reviewer) }
+        )
+        "Incident Audit" -> Data(
+            listOf("Event ID", "Incident ID", "From Status", "Status", "Actor", "Timestamp", "Note"),
+            s.incidentEvents.map {
+                listOf(
+                    it.eventId,
+                    it.incidentId,
+                    it.fromStatus,
+                    it.status,
+                    it.actor,
+                    it.timestamp.toString(),
+                    it.note
+                )
+            }
         )
         "Assistance" -> Data(
             listOf("Request ID", "Program", "Type", "Date Received", "Quantity", "Status", "Source", "Incident ID", "Outcome"),
