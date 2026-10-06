@@ -112,6 +112,10 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addLivestock(value: Livestock) = launch { repository.saveLivestock(value) }
     fun addCrop(value: CropRecord) = launch { repository.saveCrop(value) }
+
+    fun addCropLifecycleEvent(value: CropLifecycleEvent) = launch {
+        repository.saveCropLifecycleEvent(value)
+    }
     fun addInventory(value: InventoryItem) = launch { repository.saveInventory(value) }
     fun addEquipment(value: EquipmentRecord) = launch { repository.saveEquipment(value) }
 
@@ -248,7 +252,8 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             fieldIncidents = repository.observeFieldIncidents().first(),
             incidentEvents = repository.observeIncidentEvents().first(),
             reportSubmission = reportSubmission.value,
-            fields = repository.observeFields().first()
+            fields = repository.observeFields().first(),
+            cropLifecycleEvents = repository.observeCropLifecycleEvents().first()
         )
     }
 
@@ -349,7 +354,28 @@ private fun Livestock.toJson() = JSONObject().apply {
     put("name", name); put("kind", kind); put("count", count); put("status", status)
 }
 private fun CropRecord.toJson() = JSONObject().apply {
-    put("name", name); put("crop", crop); put("area", area); put("stage", stage)
+    put("name", name)
+    put("crop", crop)
+    put("area", area)
+    put("stage", stage)
+    put("cropId", cropId)
+    put("fieldId", fieldId)
+    put("plantingDate", plantingDate)
+    put("expectedHarvest", expectedHarvest)
+    put("currentStatus", currentStatus)
+}
+
+private fun CropLifecycleEvent.toJson() = JSONObject().apply {
+    put("eventId", eventId)
+    put("cropId", cropId)
+    put("fieldId", fieldId)
+    put("stage", stage)
+    put("date", date)
+    put("notes", notes)
+    put("inputName", inputName)
+    put("quantity", quantity)
+    put("unit", unit)
+    put("createdAt", createdAt)
 }
 private fun ProductionRecord.toJson() = JSONObject().apply {
     put("product", product); put("quantity", quantity); put("period", period)
@@ -430,7 +456,36 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
     val livestock = mutableListOf<Livestock>()
     parseList(livestockArray) { o, _ -> livestock += Livestock(o.optString("name"), o.optString("kind"), o.optInt("count"), o.optString("status")) }
     val crops = mutableListOf<CropRecord>()
-    parseList(cropsArray) { o, _ -> crops += CropRecord(o.optString("name"), o.optString("crop"), o.optString("area"), o.optString("stage")) }
+    parseList(cropsArray) { o, _ ->
+        val legacyStage = o.optString("stage", "Land Preparation")
+        crops += CropRecord(
+            name = o.optString("name"),
+            crop = o.optString("crop"),
+            area = o.optString("area"),
+            stage = legacyStage,
+            cropId = o.optString("cropId"),
+            fieldId = o.optString("fieldId"),
+            plantingDate = o.optString("plantingDate"),
+            expectedHarvest = o.optString("expectedHarvest"),
+            currentStatus = o.optString("currentStatus", legacyStage)
+        )
+    }
+
+    val cropLifecycleEvents = mutableListOf<CropLifecycleEvent>()
+    parseList(array("cropLifecycleEvents")) { o, _ ->
+        cropLifecycleEvents += CropLifecycleEvent(
+            eventId = o.optString("eventId"),
+            cropId = o.optString("cropId"),
+            fieldId = o.optString("fieldId"),
+            stage = o.optString("stage", "Land Preparation"),
+            date = o.optString("date"),
+            notes = o.optString("notes"),
+            inputName = o.optString("inputName"),
+            quantity = o.optString("quantity"),
+            unit = o.optString("unit"),
+            createdAt = o.optLong("createdAt", System.currentTimeMillis())
+        )
+    }
     val production = mutableListOf<ProductionRecord>()
     parseList(productionArray) { o, _ -> production += ProductionRecord(o.optString("product"), o.optString("quantity"), o.optString("period")) }
     val expenses = mutableListOf<ExpenseRecord>()
@@ -497,6 +552,7 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             report.optString("submittedDate"),
             report.optString("referenceNo")
         ),
-        fields
+        fields,
+        cropLifecycleEvents
     )
 }
