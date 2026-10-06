@@ -63,16 +63,21 @@ internal fun TasksScreen(
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(18.dp, 18.dp, 18.dp, 28.dp),
+        contentPadding = PaddingValues(18.dp, 14.dp, 18.dp, 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Tasks & Calendar", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(open.toString() + " open task(s)", color = AgriMuted)
+                    ScreenHeader("Tasks & Calendar", "Plan farm work, schedules and daily follow-ups.")
+                    Spacer(Modifier.height(4.dp))
+                    Text(open.toString() + " open task(s)", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                 }
-                Button(onClick = { showDialog = true }, shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)) { Text("+ Add") }
+                Button(
+                    onClick = { showDialog = true },
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+                ) { Text("+ Add") }
             }
         }
 
