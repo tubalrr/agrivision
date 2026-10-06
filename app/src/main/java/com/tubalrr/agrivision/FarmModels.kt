@@ -1,5 +1,7 @@
 package com.tubalrr.agrivision
 
+import com.tubalrr.agrivision.domain.model.MapPoint
+
 data class FarmAsset(val name: String, val type: String, val detail: String)
 data class Livestock(
     val name: String,
@@ -137,7 +139,8 @@ data class FieldIncident(
     val longitude: Double? = null,
     val reviewer: String = "",
     val assistanceRequestId: String = "",
-    val resolution: String = ""
+    val resolution: String = "",
+    val affectedAreaBoundary: List<MapPoint> = emptyList()
 )
 data class IncidentEvent(
     val incidentId: String,
