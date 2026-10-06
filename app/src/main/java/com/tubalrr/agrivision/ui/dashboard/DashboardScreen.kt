@@ -40,6 +40,7 @@ internal fun DashboardScreen(
     fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
     farmViewModel: FarmViewModel,
     onOpenTasks: () -> Unit = {},
+    onOpenInventory: () -> Unit = {},
     totalAnimals: Int,
     totalExpenses: Double,
     totalSales: Double,
@@ -201,7 +202,7 @@ internal fun DashboardScreen(
                     ActionQueueRow(
                         title = "Inventory",
                         detail = if (lowStock == 0) "No low-stock alerts" else lowStock.toString() + " item(s) low",
-                        action = {}
+                        action = onOpenInventory
                     )
                 }
             }
