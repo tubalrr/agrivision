@@ -359,6 +359,7 @@ private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("farm", (snapshot.farm ?: snapshot.profile.toFarmRecord()).toJson())
+        put("fields", JSONArray(snapshot.fields.map { it.toJson() }))
         put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
         put("livestockLifecycleEvents", JSONArray(snapshot.livestockLifecycleEvents.map { it.toJson() }))
         put("crops", JSONArray(snapshot.crops.map { it.toJson() }))
