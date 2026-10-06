@@ -251,5 +251,35 @@ abstract class AgriDatabase : RoomDatabase() {
             }
         }
 
+
+        private val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE inventory ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'")
+                db.execSQL("ALTER TABLE inventory ADD COLUMN purchasePrice REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE inventory ADD COLUMN supplier TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE inventory ADD COLUMN dateAcquired TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE inventory ADD COLUMN expiryDate TEXT NOT NULL DEFAULT ''")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS inventory_transactions (
+                        transactionId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        inventoryId TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        unit TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        sourceType TEXT NOT NULL,
+                        sourceId TEXT NOT NULL,
+                        notes TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        PRIMARY KEY(transactionId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_inventory_transactions_farmId ON inventory_transactions(farmId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_inventory_transactions_inventoryId ON inventory_transactions(inventoryId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_inventory_transactions_inventoryId_date ON inventory_transactions(inventoryId,date)")
+            }
+        }
+
     }
 }
