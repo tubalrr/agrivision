@@ -103,6 +103,38 @@ Sales
 
 A crop keeps its linked `fieldId`, crop identity, planting/expected-harvest dates, current lifecycle status, and operational area. A separate lifecycle-event table records each stage update with date, notes, input/activity, quantity, and unit. This provides an auditable crop history and gives future production, sales, incident, and map workflows a stable crop/field relationship.
 
+## Financial system
+
+Financial records are categorized instead of using free-form labels.
+
+Income:
+```
+Income
+ ├── Crop Sales
+ ├── Livestock Sales
+ └── Other Income
+```
+
+Expenses:
+```
+Expenses
+ ├── Seeds
+ ├── Fertilizer
+ ├── Feed
+ ├── Labor
+ ├── Fuel
+ ├── Medicine
+ └── Equipment
+```
+
+The current financial KPI remains:
+
+Income - Expenses = Net Income
+
+Expense records now keep a separate date and note, while income records persist their income category. The finance screen shows totals by category so the farm can see where money is earned and spent.
+
+The data model is intentionally ready for the next costing phase: expenses can later be allocated to a crop, field, or production cycle so AgriVision can calculate cost per crop/field/production cycle without replacing the financial ledger.
+
 ## Core domain
 
 AgriVision is designed around **Farm Operations**, not a livestock-only model:
@@ -188,8 +220,13 @@ The current source has completed the persistence architecture migration for the 
 4. One-time legacy preferences migration
 5. UI read-only state + ViewModel intents
 6. Room-backed backup and restore
+7. Structured financial categories
 
 The next phase can add dedicated Feed Log UI and richer production records without reintroducing a second datastore.
+
+## Database versioning
+
+The current Room schema is version 8. Migration 7 → 8 adds persisted `incomeCategory` to sales while leaving existing expense columns backward compatible.
 
 ## Government integration
 
