@@ -12,6 +12,7 @@ import com.tubalrr.agrivision.FarmerProfile
 import com.tubalrr.agrivision.FieldIncident
 import com.tubalrr.agrivision.IncidentEvent
 import com.tubalrr.agrivision.InventoryItem
+import com.tubalrr.agrivision.InventoryTransaction
 import com.tubalrr.agrivision.Livestock
 import com.tubalrr.agrivision.ProductionRecord
 import com.tubalrr.agrivision.ReportSubmission
@@ -43,7 +44,8 @@ data class FarmSnapshot(
     val reportSubmission: ReportSubmission,
     val fields: List<FieldRecord> = emptyList(),
     val cropLifecycleEvents: List<CropLifecycleEvent> = emptyList(),
-    val livestockLifecycleEvents: List<LivestockLifecycleEvent> = emptyList()
+    val livestockLifecycleEvents: List<LivestockLifecycleEvent> = emptyList(),
+    val inventoryTransactions: List<InventoryTransaction> = emptyList()
 )
 
 class FarmRepository(
@@ -211,7 +213,39 @@ class FarmRepository(
 
     fun observeInventory(): Flow<List<InventoryItem>> =
         dao.observeInventory(DEFAULT_FARM_ID).map { list ->
-            list.map { InventoryItem(it.name, formatQuantity(it.quantity, it.unit), it.status) }
+            list.map {
+                InventoryItem(
+                    name = it.name,
+                    quantity = formatQuantity(it.quantity, it.unit),
+                    status = if (it.quantity <= 0.0) "Out of Stock" else it.status,
+                    inventoryId = it.inventoryId,
+                    category = it.category,
+                    stock = it.quantity,
+                    unit = it.unit,
+                    purchasePrice = it.purchasePrice,
+                    supplier = it.supplier,
+                    dateAcquired = it.dateAcquired,
+                    expiryDate = it.expiryDate
+                )
+            }
+        }
+
+    fun observeInventoryTransactions(): Flow<List<InventoryTransaction>> =
+        dao.observeInventoryTransactions(DEFAULT_FARM_ID).map { list ->
+            list.map {
+                InventoryTransaction(
+                    transactionId = it.transactionId,
+                    inventoryId = it.inventoryId,
+                    type = it.type,
+                    quantity = it.quantity,
+                    unit = it.unit,
+                    date = it.date,
+                    sourceType = it.sourceType,
+                    sourceId = it.sourceId,
+                    notes = it.notes,
+                    createdAt = it.createdAt
+                )
+            }
         }
 
     fun observeEquipment(): Flow<List<EquipmentRecord>> =
@@ -359,7 +393,7 @@ suspend fun saveField(record: FieldRecord) {
                 farmId = DEFAULT_FARM_ID,
                 name = record.name,
                 kind = record.kind,
-                count = record.currentPopulation,
+                count = record.currentPopulation.coerceAtLeast(0),
                 status = record.status,
                 groupId = livestockId,
                 initialPopulation = record.initialPopulation.coerceAtLeast(0),
@@ -370,38 +404,53 @@ suspend fun saveField(record: FieldRecord) {
 
     suspend fun saveLivestockLifecycleEvent(event: LivestockLifecycleEvent) {
         val livestock = dao.getLivestock(event.livestockId) ?: return
-        dao.upsertLivestockLifecycleEvent(
-            LivestockLifecycleEventEntity(
-                eventId = event.eventId.ifBlank { UUID.randomUUID().toString() },
-                farmId = DEFAULT_FARM_ID,
-                livestockId = event.livestockId,
-                stage = event.stage,
-                date = event.date,
-                notes = event.notes,
-                inputName = event.inputName,
-                quantity = event.quantity,
-                unit = event.unit,
-                amount = event.amount,
-                createdAt = event.createdAt
-            )
-        )
+        database.withTransaction {
+            val inventoryNote = if (event.stage.equals("Feed", true) || event.stage.equals("Health", true)) {
+                consumeInventoryForActivity(
+                    inputName = event.inputName,
+                    quantity = event.quantity,
+                    unit = event.unit,
+                    sourceType = "Livestock",
+                    sourceId = event.livestockId,
+                    date = event.date
+                )
+            } else {
+                null
+            }
 
-        val updatedPopulation = when {
-            event.stage.equals("Mortality", ignoreCase = true) ->
-                (livestock.currentPopulation - event.quantity.toInt().coerceAtLeast(0)).coerceAtLeast(0)
-            event.stage.equals("Population", ignoreCase = true) ->
-                event.quantity.toInt().coerceAtLeast(0)
-            else -> livestock.currentPopulation
-        }
-
-        if (updatedPopulation != livestock.currentPopulation) {
-            dao.upsertLivestock(
-                livestock.copy(
-                    count = updatedPopulation,
-                    currentPopulation = updatedPopulation,
-                    updatedAt = System.currentTimeMillis()
+            dao.upsertLivestockLifecycleEvent(
+                LivestockLifecycleEventEntity(
+                    eventId = event.eventId.ifBlank { UUID.randomUUID().toString() },
+                    farmId = DEFAULT_FARM_ID,
+                    livestockId = event.livestockId,
+                    stage = event.stage,
+                    date = event.date,
+                    notes = appendInventoryNote(event.notes, inventoryNote),
+                    inputName = event.inputName,
+                    quantity = event.quantity,
+                    unit = event.unit,
+                    amount = event.amount,
+                    createdAt = event.createdAt
                 )
             )
+
+            val updatedPopulation = when {
+                event.stage.equals("Mortality", true) ->
+                    (livestock.currentPopulation - event.quantity.toInt().coerceAtLeast(0)).coerceAtLeast(0)
+                event.stage.equals("Population", true) ->
+                    event.quantity.toInt().coerceAtLeast(0)
+                else -> livestock.currentPopulation
+            }
+
+            if (updatedPopulation != livestock.currentPopulation) {
+                dao.upsertLivestock(
+                    livestock.copy(
+                        count = updatedPopulation,
+                        currentPopulation = updatedPopulation,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
         }
     }
 
@@ -453,19 +502,122 @@ suspend fun saveField(record: FieldRecord) {
         )
     }
 
-    suspend fun saveInventory(record: InventoryItem, inventoryId: String = UUID.randomUUID().toString()) {
+    suspend fun saveInventory(
+        record: InventoryItem,
+        inventoryId: String = record.inventoryId.ifBlank { UUID.randomUUID().toString() }
+    ) {
         val parsed = parseQuantity(record.quantity)
+        val stock = if (record.inventoryId.isNotBlank()) record.stock else parsed.first
+        val unit = record.unit.ifBlank { parsed.second }.ifBlank { "unit" }
+
         dao.upsertInventory(
             InventoryEntity(
                 inventoryId = inventoryId,
                 farmId = DEFAULT_FARM_ID,
-                name = record.name,
-                quantity = parsed.first,
-                unit = parsed.second,
-                status = record.status
+                name = record.name.trim(),
+                quantity = stock.coerceAtLeast(0.0),
+                unit = unit,
+                status = if (stock <= 0.0) "Out of Stock" else record.status,
+                category = record.category,
+                purchasePrice = record.purchasePrice.coerceAtLeast(0.0),
+                supplier = record.supplier.trim(),
+                dateAcquired = record.dateAcquired,
+                expiryDate = record.expiryDate
             )
         )
     }
+
+    suspend fun saveInventoryWithPurchase(
+        record: InventoryItem,
+        inventoryId: String = record.inventoryId.ifBlank { UUID.randomUUID().toString() }
+    ) {
+        database.withTransaction {
+            saveInventory(record, inventoryId)
+            val parsed = parseQuantity(record.quantity)
+            val stock = if (record.inventoryId.isNotBlank()) record.stock else parsed.first
+            val unit = record.unit.ifBlank { parsed.second }.ifBlank { "unit" }
+            if (stock > 0.0) {
+                dao.upsertInventoryTransaction(
+                    InventoryTransactionEntity(
+                        transactionId = UUID.randomUUID().toString(),
+                        farmId = DEFAULT_FARM_ID,
+                        inventoryId = inventoryId,
+                        type = "PURCHASE",
+                        quantity = stock,
+                        unit = unit,
+                        date = record.dateAcquired,
+                        sourceType = "Inventory",
+                        sourceId = inventoryId,
+                        notes = "Stock acquired"
+                    )
+                )
+            }
+        }
+    }
+
+    private fun normalizeInventoryUnit(unit: String): String =
+        unit.trim().lowercase().let {
+            when (it) {
+                "kilogram", "kilograms", "kg", "kgs" -> "kg"
+                "liter", "liters", "l" -> "l"
+                "piece", "pieces", "pc" -> "pc"
+                "bag", "bags" -> "bag"
+                "sack", "sacks" -> "sack"
+                else -> it
+            }
+        }
+
+    private suspend fun consumeInventoryForActivity(
+        inputName: String,
+        quantity: Double,
+        unit: String,
+        sourceType: String,
+        sourceId: String,
+        date: String
+    ): String? {
+        if (inputName.isBlank() || quantity <= 0.0) return null
+
+        val item = dao.findInventoryByName(DEFAULT_FARM_ID, inputName.trim())
+            ?: return "Inventory not deducted: " + inputName.trim() + " was not found."
+
+        if (normalizeInventoryUnit(item.unit) != normalizeInventoryUnit(unit)) {
+            return "Inventory not deducted: unit mismatch (" + item.unit + " vs " + unit.ifBlank { "unknown" } + ")."
+        }
+
+        if (item.quantity < quantity) {
+            return "Inventory not deducted: insufficient " + item.name + " stock (" +
+                    formatQuantity(item.quantity, item.unit) + " remaining)."
+        }
+
+        dao.upsertInventory(
+            item.copy(
+                quantity = (item.quantity - quantity).coerceAtLeast(0.0),
+                status = if (item.quantity - quantity <= 0.0) "Out of Stock" else item.status,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+
+        dao.upsertInventoryTransaction(
+            InventoryTransactionEntity(
+                transactionId = UUID.randomUUID().toString(),
+                farmId = DEFAULT_FARM_ID,
+                inventoryId = item.inventoryId,
+                type = "USAGE",
+                quantity = quantity,
+                unit = item.unit,
+                date = date,
+                sourceType = sourceType,
+                sourceId = sourceId,
+                notes = "Automatic deduction from farm activity"
+            )
+        )
+        return null
+    }
+
+    private fun appendInventoryNote(original: String, note: String?): String =
+        if (note.isNullOrBlank()) original
+        else if (original.isBlank()) note
+        else original + " • " + note
 
     suspend fun saveEquipment(record: EquipmentRecord, equipmentId: String = UUID.randomUUID().toString()) {
         dao.upsertEquipment(
@@ -640,6 +792,7 @@ suspend fun saveField(record: FieldRecord) {
             dao.clearProduction()
             dao.clearExpenses()
             dao.clearSales()
+            dao.clearInventoryTransactions()
             dao.clearInventory()
             dao.clearEquipment()
             dao.clearTasks()
@@ -658,6 +811,23 @@ suspend fun saveField(record: FieldRecord) {
             snapshot.expenses.forEach { saveExpense(it) }
             snapshot.sales.forEach { saveSale(it) }
             snapshot.inventory.forEach { saveInventory(it) }
+            snapshot.inventoryTransactions.forEach {
+                dao.upsertInventoryTransaction(
+                    InventoryTransactionEntity(
+                        transactionId = it.transactionId.ifBlank { UUID.randomUUID().toString() },
+                        farmId = DEFAULT_FARM_ID,
+                        inventoryId = it.inventoryId,
+                        type = it.type,
+                        quantity = it.quantity,
+                        unit = it.unit,
+                        date = it.date,
+                        sourceType = it.sourceType,
+                        sourceId = it.sourceId,
+                        notes = it.notes,
+                        createdAt = it.createdAt
+                    )
+                )
+            }
             snapshot.equipment.forEach { saveEquipment(it) }
             snapshot.tasks.forEach { saveTask(it) }
             snapshot.assistance.forEach { saveAssistance(it) }
