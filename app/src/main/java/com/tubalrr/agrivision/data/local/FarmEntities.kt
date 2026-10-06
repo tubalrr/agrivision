@@ -42,6 +42,7 @@ data class FarmEntity(
     val contact: String = "",
     val registryStatus: String = "For Review",
     val reviewNotes: String = "",
+    val boundaryPointsJson: String = "[]",
     val updatedAt: Long = System.currentTimeMillis()
 )
 
@@ -154,6 +155,7 @@ data class FieldEntity(
     val plantingDate: String,
     val expectedHarvest: String,
     val currentStatus: String,
+    val boundaryPointsJson: String = "[]",
     val updatedAt: Long = System.currentTimeMillis()
 )
 
@@ -353,6 +355,7 @@ data class FieldIncidentEntity(
     val reviewer: String = "",
     val assistanceRequestId: String = "",
     val resolution: String = "",
+    val affectedAreaBoundaryJson: String = "[]",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
