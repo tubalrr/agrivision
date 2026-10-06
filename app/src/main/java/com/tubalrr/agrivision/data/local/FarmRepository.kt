@@ -19,6 +19,7 @@ import com.tubalrr.agrivision.domain.model.FieldRecord
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -51,10 +52,14 @@ class FarmRepository(
     }
 
     fun observeFarmer(): Flow<FarmerRecord> =
-        dao.observeFarmer().map { farmer ->
-            if (farmer == null) FarmerRecord("", "")
-            else FarmerRecord(farmer.farmerId, farmer.fullName, farmer.contact)
-        }
+        dao.observeFarm(DEFAULT_FARM_ID)
+            .flatMapLatest { farm ->
+                dao.observeFarmer(farm?.farmerId.orEmpty())
+            }
+            .map { farmer ->
+                if (farmer == null) FarmerRecord("", "")
+                else FarmerRecord(farmer.farmerId, farmer.fullName, farmer.contact)
+            }
 
     fun observeFarm(): Flow<FarmRecord> =
         dao.observeFarm(DEFAULT_FARM_ID).map { farm ->
