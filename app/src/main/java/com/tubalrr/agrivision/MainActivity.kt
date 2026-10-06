@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 
 class MainActivity : ComponentActivity() {
+    private var pendingReportType: String? = null
     private val farmViewModel: FarmViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
