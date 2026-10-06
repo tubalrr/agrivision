@@ -50,6 +50,10 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     val crops: StateFlow<List<CropRecord>> = repository.observeCrops().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
+
+    val cropLifecycleEvents: StateFlow<List<CropLifecycleEvent>> = repository.observeCropLifecycleEvents().stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
+    )
     val production: StateFlow<List<ProductionRecord>> = repository.observeProduction().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
@@ -203,7 +207,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun exportCasePackage(uri: Uri) = launch {
         val snapshot = currentSnapshot()
         val json = JSONObject().apply {
-            put("packageVersion", 3)
+            put("packageVersion", 4)
             put("app", "AgriVision")
             put("packageType", "DA Case Package")
             put("generatedAt", System.currentTimeMillis())
@@ -264,11 +268,12 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
     JSONObject().apply {
-        put("version", 3)
+        put("version", 4)
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
         put("crops", JSONArray(snapshot.crops.map { it.toJson() }))
+        put("cropLifecycleEvents", JSONArray(snapshot.cropLifecycleEvents.map { it.toJson() }))
         put("production", JSONArray(snapshot.production.map { it.toJson() }))
         put("expenses", JSONArray(snapshot.expenses.map { it.toJson() }))
         put("sales", JSONArray(snapshot.sales.map { it.toJson() }))
