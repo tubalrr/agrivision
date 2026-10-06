@@ -57,7 +57,33 @@ data class LivestockEntity(
     val kind: String,
     val count: Int,
     val status: String,
+    val groupId: String = "",
+    val initialPopulation: Int = count,
+    val currentPopulation: Int = count,
     val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "livestock_lifecycle_events",
+    primaryKeys = ["eventId"],
+    indices = [
+        Index(value = ["farmId"]),
+        Index(value = ["livestockId"]),
+        Index(value = ["livestockId", "date"])
+    ]
+)
+data class LivestockLifecycleEventEntity(
+    val eventId: String,
+    val farmId: String,
+    val livestockId: String,
+    val stage: String,
+    val date: String,
+    val notes: String,
+    val inputName: String,
+    val quantity: Double,
+    val unit: String,
+    val amount: Double,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(
