@@ -79,7 +79,7 @@ internal fun ProductionFinanceScreen(
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(18.dp),
+        contentPadding = PaddingValues(18.dp, 16.dp, 18.dp, 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
@@ -97,8 +97,8 @@ internal fun ProductionFinanceScreen(
             }
         }
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriGreen)) {
-                Column(Modifier.padding(20.dp)) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriGreen), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("Farm Performance", color = Color.White.copy(alpha = .72f), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -120,10 +120,10 @@ internal fun ProductionFinanceScreen(
 
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilterChip(selected = tab == "Production", onClick = { tab = "Production" }, label = { Text("Production") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) })
-                FilterChip(selected = tab == "Feed Logs", onClick = { tab = "Feed Logs" }, label = { Text("Feed Logs") }, leadingIcon = { Icon(Icons.Outlined.Restaurant, null) })
-                FilterChip(selected = tab == "Finance", onClick = { tab = "Finance" }, label = { Text("Finance") }, leadingIcon = { Icon(Icons.Outlined.MonetizationOn, null) })
-                FilterChip(selected = tab == "DA Report", onClick = { tab = "DA Report" }, label = { Text("DA Report") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) })
+                FilterChip(selected = tab == "Production", onClick = { tab = "Production" }, label = { Text("Production") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) }, shape = RoundedCornerShape(12.dp))
+                FilterChip(selected = tab == "Feed Logs", onClick = { tab = "Feed Logs" }, label = { Text("Feed Logs") }, leadingIcon = { Icon(Icons.Outlined.Restaurant, null) }, shape = RoundedCornerShape(12.dp))
+                FilterChip(selected = tab == "Finance", onClick = { tab = "Finance" }, label = { Text("Finance") }, leadingIcon = { Icon(Icons.Outlined.MonetizationOn, null) }, shape = RoundedCornerShape(12.dp))
+                FilterChip(selected = tab == "DA Report", onClick = { tab = "DA Report" }, label = { Text("DA Report") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) }, shape = RoundedCornerShape(12.dp))
             }
         }
 
@@ -176,8 +176,9 @@ internal fun ProductionFinanceScreen(
             item {
                 Card(
                     Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = AgriCard)
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = AgriCard),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("DA-Ready Export", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -221,7 +222,8 @@ internal fun ProductionFinanceScreen(
                         }
                         Button(
                             onClick = { onExportDaReport(selectedDaReport, selectedDaFormat) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Icon(Icons.Outlined.FileDownload, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
