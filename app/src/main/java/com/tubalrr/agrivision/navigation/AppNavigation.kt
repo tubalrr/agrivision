@@ -93,6 +93,7 @@ internal fun AgriVisionApp(
                     farm = farm,
                     fields = fields,
                     farmViewModel = farmViewModel,
+                    onOpenTasks = { selected = 4 },
                     totalAnimals = totalLivestock,
                     totalExpenses = totalExpenses,
                     totalSales = totalSales,
