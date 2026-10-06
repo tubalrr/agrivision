@@ -219,7 +219,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun exportCasePackage(uri: Uri) = launch {
         val snapshot = currentSnapshot()
         val json = JSONObject().apply {
-            put("packageVersion", 7)
+            put("packageVersion", 8)
             put("app", "AgriVision")
             put("packageType", "DA Case Package")
             put("generatedAt", System.currentTimeMillis())
@@ -284,7 +284,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
     JSONObject().apply {
-        put("version", 7)
+        put("version", 8)
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
