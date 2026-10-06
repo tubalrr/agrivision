@@ -63,16 +63,47 @@ data class LivestockEntity(
 @Entity(
     tableName = "crops",
     primaryKeys = ["cropId"],
-    indices = [Index(value = ["farmId"])]
+    indices = [
+        Index(value = ["farmId"]),
+        Index(value = ["fieldId"]),
+        Index(value = ["farmId", "currentStatus"])
+    ]
 )
 data class CropEntity(
     val cropId: String,
     val farmId: String,
+    val fieldId: String = "",
     val name: String,
     val crop: String,
     val area: String,
     val stage: String,
+    val plantingDate: String = "",
+    val expectedHarvest: String = "",
+    val currentStatus: String = "Land Preparation",
     val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "crop_lifecycle_events",
+    primaryKeys = ["eventId"],
+    indices = [
+        Index(value = ["cropId"]),
+        Index(value = ["fieldId"]),
+        Index(value = ["cropId", "date"])
+    ]
+)
+data class CropLifecycleEventEntity(
+    val eventId: String,
+    val farmId: String,
+    val cropId: String,
+    val fieldId: String,
+    val stage: String,
+    val date: String,
+    val notes: String,
+    val inputName: String,
+    val quantity: String,
+    val unit: String,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(
