@@ -10,6 +10,22 @@ The application boundary is:
 
 The UI only observes immutable state and sends user intents to the ViewModel. It does not read SharedPreferences, parse JSON storage, or write directly to Room.
 
+## Registry hierarchy
+
+The registry follows:
+
+```
+Farmer
+└── Farm
+    ├── Field 1
+    ├── Field 2
+    └── Field 3
+```
+
+Farmer stores person/beneficiary identity, Farm stores the agricultural holding, and Field stores the spatial production unit. Each field has a stable field ID, area in hectares, local location text, optional latitude/longitude, land tenure, crop, planting date, expected harvest, and current status.
+
+Coordinates are stored as explicit registry data. The field form does not request GPS permission; coordinates can be entered manually. This keeps the registry offline-first while making field records ready for a future map layer.
+
 ## Core domain
 
 AgriVision is designed around **Farm Operations**, not a livestock-only model:
