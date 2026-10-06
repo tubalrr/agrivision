@@ -186,7 +186,6 @@ data class ProductionEntity(
     val productionId: String,
     val farmId: String,
     val date: String,
-    val productionType: String,
     val commodity: String,
     val quantity: Double,
     val unit: String,
