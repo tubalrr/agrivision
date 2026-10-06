@@ -300,7 +300,10 @@ internal fun FieldMapScreen(
                                             title = field.name + if (field.fieldId.isBlank()) "" else " · " + field.fieldId,
                                             snippet = "Crop: " + (crop?.crop ?: field.crop).ifBlank { "Not recorded" } +
                                                     " · Stage: " + (crop?.currentStatus ?: field.currentStatus),
-                                            onClick = { false }
+                                            onClick = {
+                                                selectedFieldId = field.fieldId
+                                                true
+                                            }
                                         )
                                     }
                                 }
@@ -329,7 +332,10 @@ internal fun FieldMapScreen(
                                                     " · Field: " + incident.fieldId.ifBlank { "—" } +
                                                     " · Severity: " + incident.severity +
                                                     " · " + incident.status,
-                                            onClick = { false }
+                                            onClick = {
+                                                selectedIncidentId = incident.id
+                                                true
+                                            }
                                         )
                                     }
                                 }
