@@ -2,6 +2,8 @@ package com.tubalrr.agrivision.data.local
 
 import com.tubalrr.agrivision.AssistanceRecord
 import com.tubalrr.agrivision.CropRecord
+import com.tubalrr.agrivision.CropLifecycleEvent
+import com.tubalrr.agrivision.domain.calculator.CropLifecycleCalculator
 import com.tubalrr.agrivision.EquipmentRecord
 import com.tubalrr.agrivision.ExpenseRecord
 import com.tubalrr.agrivision.FarmTask
@@ -38,7 +40,8 @@ data class FarmSnapshot(
     val fieldIncidents: List<FieldIncident>,
     val incidentEvents: List<IncidentEvent>,
     val reportSubmission: ReportSubmission,
-    val fields: List<FieldRecord> = emptyList()
+    val fields: List<FieldRecord> = emptyList(),
+    val cropLifecycleEvents: List<CropLifecycleEvent> = emptyList()
 )
 
 class FarmRepository(
@@ -128,7 +131,37 @@ class FarmRepository(
 
     fun observeCrops(): Flow<List<CropRecord>> =
         dao.observeCrops(DEFAULT_FARM_ID).map { list ->
-            list.map { CropRecord(it.name, it.crop, it.area, it.stage) }
+            list.map {
+                CropRecord(
+                    name = it.name,
+                    crop = it.crop,
+                    area = it.area,
+                    stage = it.stage,
+                    cropId = it.cropId,
+                    fieldId = it.fieldId,
+                    plantingDate = it.plantingDate,
+                    expectedHarvest = it.expectedHarvest,
+                    currentStatus = it.currentStatus
+                )
+            }
+        }
+
+    fun observeCropLifecycleEvents(): Flow<List<CropLifecycleEvent>> =
+        dao.observeCropLifecycleEvents(DEFAULT_FARM_ID).map { list ->
+            list.map {
+                CropLifecycleEvent(
+                    eventId = it.eventId,
+                    cropId = it.cropId,
+                    fieldId = it.fieldId,
+                    stage = it.stage,
+                    date = it.date,
+                    notes = it.notes,
+                    inputName = it.inputName,
+                    quantity = it.quantity,
+                    unit = it.unit,
+                    createdAt = it.createdAt
+                )
+            }
         }
 
     fun observeProduction(): Flow<List<ProductionRecord>> =
@@ -302,15 +335,50 @@ suspend fun saveField(record: FieldRecord) {
         )
     }
 
-    suspend fun saveCrop(record: CropRecord, cropId: String = UUID.randomUUID().toString()) {
+    suspend fun saveCrop(record: CropRecord, cropId: String = record.cropId.ifBlank { UUID.randomUUID().toString() }) {
+        val normalizedStatus = CropLifecycleCalculator.normalize(record.currentStatus.ifBlank { record.stage })
         dao.upsertCrop(
             CropEntity(
                 cropId = cropId,
                 farmId = DEFAULT_FARM_ID,
+                fieldId = record.fieldId,
                 name = record.name,
                 crop = record.crop,
                 area = record.area,
-                stage = record.stage
+                stage = normalizedStatus,
+                plantingDate = record.plantingDate,
+                expectedHarvest = record.expectedHarvest,
+                currentStatus = normalizedStatus
+            )
+        )
+    }
+
+    suspend fun saveCropLifecycleEvent(event: CropLifecycleEvent) {
+        require(CropLifecycleCalculator.isValidStage(event.stage)) { "Unknown crop lifecycle stage" }
+        dao.upsertCropLifecycleEvent(
+            CropLifecycleEventEntity(
+                eventId = event.eventId.ifBlank { UUID.randomUUID().toString() },
+                farmId = DEFAULT_FARM_ID,
+                cropId = event.cropId,
+                fieldId = event.fieldId,
+                stage = CropLifecycleCalculator.normalize(event.stage),
+                date = event.date,
+                notes = event.notes,
+                inputName = event.inputName,
+                quantity = event.quantity,
+                unit = event.unit,
+                createdAt = event.createdAt
+            )
+        )
+        val crop = dao.getCrop(event.cropId) ?: return
+        val stage = CropLifecycleCalculator.normalize(event.stage)
+        dao.upsertCrop(
+            crop.copy(
+                fieldId = event.fieldId.ifBlank { crop.fieldId },
+                stage = stage,
+                currentStatus = stage,
+                plantingDate = if (stage == "Planting" && event.date.isNotBlank()) event.date else crop.plantingDate,
+                updatedAt = System.currentTimeMillis()
             )
         )
     }
@@ -494,6 +562,7 @@ suspend fun saveField(record: FieldRecord) {
         database.withTransaction {
             dao.clearFields()
             dao.clearFarmers()
+            dao.clearCropLifecycleEvents()
             dao.clearLivestock()
             dao.clearCrops()
             dao.clearFeedLogs()
@@ -512,6 +581,7 @@ suspend fun saveField(record: FieldRecord) {
             saveProfile(snapshot.profile)
             snapshot.livestock.forEach { saveLivestock(it) }
             snapshot.crops.forEach { saveCrop(it) }
+            snapshot.cropLifecycleEvents.forEach { saveCropLifecycleEvent(it) }
             snapshot.production.forEach { saveProduction(it) }
             snapshot.expenses.forEach { saveExpense(it) }
             snapshot.sales.forEach { saveSale(it) }
