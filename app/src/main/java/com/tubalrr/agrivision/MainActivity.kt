@@ -1,11 +1,7 @@
 package com.tubalrr.agrivision
 
-import android.content.Context
 import android.os.Bundle
-import android.net.Uri
 import android.app.DatePickerDialog
-import org.json.JSONArray
-import org.json.JSONObject
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1453,9 +1449,9 @@ private fun AddFarmRecordDialog(
 @Composable
 private fun ProductionFinanceScreen(
     padding: PaddingValues,
-    production: MutableList<ProductionRecord>,
-    expenses: MutableList<ExpenseRecord>,
-    sales: MutableList<SaleRecord>,
+    production: List<ProductionRecord>,
+    expenses: List<ExpenseRecord>,
+    sales: List<SaleRecord>,
     totalExpenses: Double,
     totalSales: Double,
     netIncome: Double,
