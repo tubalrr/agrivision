@@ -115,6 +115,15 @@ interface FarmDao {
     @Query("SELECT * FROM inventory WHERE farmId = :farmId ORDER BY updatedAt DESC")
     fun observeInventory(farmId: String): Flow<List<InventoryEntity>>
 
+    @Query("SELECT * FROM inventory WHERE farmId = :farmId AND lower(name) = lower(:name) LIMIT 1")
+    suspend fun findInventoryByName(farmId: String, name: String): InventoryEntity?
+
+    @Query("SELECT * FROM inventory_transactions WHERE farmId = :farmId ORDER BY date DESC, createdAt DESC")
+    fun observeInventoryTransactions(farmId: String): Flow<List<InventoryTransactionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertInventoryTransaction(record: InventoryTransactionEntity)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertInventory(record: InventoryEntity)
 
@@ -216,6 +225,9 @@ interface FarmDao {
 
     @Query("DELETE FROM sales")
     suspend fun clearSales()
+
+    @Query("DELETE FROM inventory_transactions")
+    suspend fun clearInventoryTransactions()
 
     @Query("DELETE FROM inventory")
     suspend fun clearInventory()
