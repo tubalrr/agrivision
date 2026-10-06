@@ -129,13 +129,24 @@ data class FieldIncident(
     val description: String,
     val status: String = "Draft",
     val evidenceUri: String = "",
-    val reviewNotes: String = ""
+    val reviewNotes: String = "",
+    val farmerId: String = "",
+    val farmId: String = "",
+    val fieldId: String = "",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val reviewer: String = "",
+    val assistanceRequestId: String = "",
+    val resolution: String = ""
 )
 data class IncidentEvent(
     val incidentId: String,
     val status: String,
     val note: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val fromStatus: String = "",
+    val actor: String = "",
+    val eventId: String = ""
 )
 data class FarmerProfile(
     val farmerName: String,
