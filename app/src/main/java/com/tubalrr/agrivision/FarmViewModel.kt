@@ -260,6 +260,20 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportDaReport(uri: Uri, reportType: String, format: DaReportFormat) = launch {
+        runCatching {
+            require(reportType in DaReportExporter.reportTypes) { "Unsupported DA report: " + reportType }
+            val snapshot = currentSnapshot()
+            val output = getApplication<Application>().contentResolver.openOutputStream(uri)
+                ?: error("Unable to open the selected report destination.")
+            output.use { DaReportExporter.write(snapshot, reportType, format) { bytes -> it.write(bytes) } }
+        }.onSuccess {
+            _backupStatus.value = reportType + " " + format.extension.uppercase() + " report exported."
+        }.onFailure {
+            _backupStatus.value = reportType + " export failed: " + (it.message ?: "Unknown error")
+        }
+    }
+
     fun exportCasePackage(uri: Uri) = launch {
         val snapshot = currentSnapshot()
         val json = JSONObject().apply {
