@@ -51,6 +51,28 @@ Operational records carry a `farmId`. The current prototype uses a single local 
 
 Records use stable string IDs. Dates are stored as `yyyy-MM-dd` text for predictable local filtering and reporting.
 
+## Presentation structure
+
+The Compose presentation layer is split by responsibility so the Activity only owns the Android entry point and document launchers:
+
+```
+ui/
+├── dashboard/
+├── farm/
+├── production/
+├── reports/
+├── tasks/
+├── profile/
+├── incidents/
+├── components/
+└── theme/
+navigation/
+```
+
+The flow remains:
+
+`Compose UI → FarmViewModel → FarmRepository → FarmDao → AgriDatabase`
+
 ## Dashboard calculations
 
 Sales, expenses, production count, and livestock totals are queried by Room/DAO and exposed through ViewModel state.
