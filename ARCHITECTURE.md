@@ -135,6 +135,34 @@ Expense records now keep a separate date and note, while income records persist 
 
 The next costing phase can add explicit allocation links from expenses to a crop, field, or production cycle, allowing AgriVision to calculate cost per crop/field/production cycle without replacing the financial ledger.
 
+## Incident & DA workflow
+
+Incidents are first-class workflow records, not UI-only status flags.
+
+The enforced workflow is:
+
+Incident Draft
+   ↓
+Submitted
+   ↓
+Under Review
+   ↓
+Verified
+   ↓
+Assistance
+   ↓
+Completed
+
+A report can also move from Under Review to Returned, then must be submitted again. The repository enforces valid transitions so the UI cannot skip review or close a case prematurely.
+
+Each incident stores a stable incident ID plus farmer ID, farm ID, field ID, commodity, affected area/quantity, incident date, severity, evidence reference, optional incident coordinates, reviewer, linked assistance request ID, review notes, and resolution.
+
+Status history is stored as immutable incident events. Each event records the previous status, new status, actor, note, and timestamp. This provides an auditable case timeline independent of the current incident status.
+
+Assistance remains linked through incidentId and assistanceRequestId. Requesting assistance moves a verified incident into Assistance in the same Room transaction. Completion is allowed only when the linked assistance record is marked completed and a resolution is supplied.
+
+Coordinates are explicitly entered as incident data; the form does not request GPS permission. Evidence is retained as a local file reference in the offline-first phase. Official DA transmission is still a future connected-backend concern.
+
 ## Core domain
 
 AgriVision is designed around **Farm Operations**, not a livestock-only model:
@@ -226,7 +254,7 @@ The next phase can add dedicated Feed Log UI and richer production records witho
 
 ## Database versioning
 
-The current Room schema is version 8. Migration 7 → 8 adds persisted `incomeCategory` to sales while leaving existing expense columns backward compatible.
+The current Room schema is version 9. Migration 7 → 8 adds persisted incomeCategory to sales, and migration 8 → 9 adds structured incident workflow metadata plus status-history fields.
 
 ## Government integration
 
