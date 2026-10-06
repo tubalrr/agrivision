@@ -168,18 +168,20 @@ internal fun FieldMapScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    "Field Mapping",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = AgriGreen
-                )
-                Text(
-                    farm.farmName.ifBlank { "Farm map" },
-                    color = AgriMuted,
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenDeep), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("FIELD MAPPING", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("See your farm from above.", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                    Text(farm.farmName.ifBlank { "Farm map" } + " · Satellite, fields, crops and incidents", color = Color.White.copy(alpha = .78f), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatCard("Mapped fields", mappedFieldCount.toString(), "of \${fields.size}", Icons.Outlined.Map, AgriGreenSoft, Modifier.weight(1f))
+                StatCard("Crop links", cropLayerCount.toString(), "mapped", Icons.Outlined.LocalFlorist, AgriGoldSoft, Modifier.weight(1f))
+                StatCard("Incidents", activeIncidents.toString(), "\${mappedIncidentCount} mapped", Icons.Outlined.WarningAmber, Color(0xFFFFEEE5), Modifier.weight(1f))
             }
         }
 
