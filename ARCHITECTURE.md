@@ -133,7 +133,7 @@ Income - Expenses = Net Income
 
 Expense records now keep a separate date and note, while income records persist their income category. The finance screen shows totals by category so the farm can see where money is earned and spent.
 
-The data model is intentionally ready for the next costing phase: expenses can later be allocated to a crop, field, or production cycle so AgriVision can calculate cost per crop/field/production cycle without replacing the financial ledger.
+The next costing phase can add explicit allocation links from expenses to a crop, field, or production cycle, allowing AgriVision to calculate cost per crop/field/production cycle without replacing the financial ledger.
 
 ## Core domain
 
