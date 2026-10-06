@@ -263,10 +263,10 @@ private fun DashboardScreen(
     expenses: List<ExpenseRecord>,
     inventory: List<InventoryItem>,
     tasks: List<FarmTask>,
-    fieldIncidents: MutableList<FieldIncident>,
-    incidentEvents: MutableList<IncidentEvent>,
-    assistance: MutableList<AssistanceRecord>,
-    farmPrefs: android.content.SharedPreferences,
+    fieldIncidents: List<FieldIncident>,
+    incidentEvents: List<IncidentEvent>,
+    assistance: List<AssistanceRecord>,
+    farmViewModel: FarmViewModel,
     totalAnimals: Int,
     totalExpenses: Double,
     totalSales: Double,
@@ -306,10 +306,7 @@ private fun DashboardScreen(
         AddFieldIncidentDialog(
             onDismiss = { showIncidentDialog = false },
             onSave = { incident ->
-                fieldIncidents.add(incident)
-                incidentEvents.add(IncidentEvent(incident.id, "Draft", "Report created"))
-                saveFieldIncidents(farmPrefs, fieldIncidents)
-                saveIncidentEvents(farmPrefs, incidentEvents)
+                farmViewModel.addFieldIncident(incident)
                 showIncidentDialog = false
             }
         )
@@ -328,21 +325,7 @@ private fun DashboardScreen(
             incident = incident,
             onDismiss = { reviewIncident = null },
             onSave = { updated ->
-                val index = fieldIncidents.indexOfFirst { it.id == updated.id }
-                if (index >= 0) {
-                    fieldIncidents[index] = updated
-                    if (updated.status != incident.status || updated.reviewNotes != incident.reviewNotes) {
-                        incidentEvents.add(
-                            IncidentEvent(
-                                incidentId = updated.id,
-                                status = updated.status,
-                                note = updated.reviewNotes.ifBlank { "Reviewer updated case status" }
-                            )
-                        )
-                        saveIncidentEvents(farmPrefs, incidentEvents)
-                    }
-                    saveFieldIncidents(farmPrefs, fieldIncidents)
-                }
+                farmViewModel.reviewFieldIncident(incident, updated)
                 reviewIncident = null
             }
         )
@@ -540,49 +523,16 @@ private fun DashboardScreen(
                         it.incidentId == incident.id && it.status == "Completed"
                     },
                     onStatusChange = { next ->
-                        val index = fieldIncidents.indexOfFirst { it.id == incident.id }
-                        if (index >= 0) {
-                            fieldIncidents[index] = incident.copy(status = next)
-                            incidentEvents.add(
-                                IncidentEvent(
-                                    incidentId = incident.id,
-                                    status = next,
-                                    note = when (next) {
-                                        "Submitted" -> "Farmer submitted field report"
-                                        "Resolved" -> "Case closed after closure gate"
-                                        else -> "Case status updated"
-                                    }
-                                )
-                            )
-                            saveFieldIncidents(farmPrefs, fieldIncidents)
-                            saveIncidentEvents(farmPrefs, incidentEvents)
-                        }
+                        farmViewModel.updateFieldIncident(
+                            incident.copy(status = next),
+                            previousStatus = incident.status
+                        )
                     },
                     onReview = { reviewIncident = incident },
                     onTimeline = { timelineIncident = incident },
                     onCreateAssistance = {
                         if (!assistance.any { it.incidentId == incident.id }) {
-                            assistance.add(
-                                AssistanceRecord(
-                                    program = "Field Incident Assistance",
-                                    assistanceType = incident.type,
-                                    dateReceived = "",
-                                    quantity = incident.affectedArea,
-                                    status = "Applied",
-                                    source = "Linked to " + incident.id,
-                                    incidentId = incident.id,
-                                    requestId = "DAR-" + System.currentTimeMillis()
-                                )
-                            )
-                            saveAssistance(farmPrefs, assistance)
-                            incidentEvents.add(
-                                IncidentEvent(
-                                    incidentId = incident.id,
-                                    status = "Assistance Requested",
-                                    note = "Assistance request linked to verified incident"
-                                )
-                            )
-                            saveIncidentEvents(farmPrefs, incidentEvents)
+                            farmViewModel.requestAssistance(incident)
                         }
                     }
                 )
@@ -2197,9 +2147,9 @@ private fun ProfileScreen(
     onProfileSaved: (FarmerProfile) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
-    assistance: MutableList<AssistanceRecord>,
-    farmPrefs: android.content.SharedPreferences,
-    onAddAssistance: (AssistanceRecord) -> Unit
+    assistance: List<AssistanceRecord>,
+    onAddAssistance: (AssistanceRecord) -> Unit,
+    onUpdateAssistance: (AssistanceRecord) -> Unit
 ) {
     var showEdit by remember { mutableStateOf(false) }
 
@@ -2333,8 +2283,8 @@ private fun ProfileScreen(
         item {
             AssistanceSection(
                 assistance = assistance,
-                farmPrefs = farmPrefs,
-                onAdd = onAddAssistance
+                onAdd = onAddAssistance,
+                onUpdate = onUpdateAssistance
             )
         }
 
@@ -2349,9 +2299,9 @@ private fun ProfileScreen(
 
 @Composable
 private fun AssistanceSection(
-    assistance: MutableList<AssistanceRecord>,
-    farmPrefs: android.content.SharedPreferences,
-    onAdd: (AssistanceRecord) -> Unit
+    assistance: List<AssistanceRecord>,
+    onAdd: (AssistanceRecord) -> Unit,
+    onUpdate: (AssistanceRecord) -> Unit
 ) {
     var showAdd by remember { mutableStateOf(false) }
     var manageRecord by remember { mutableStateOf<AssistanceRecord?>(null) }
@@ -2376,10 +2326,7 @@ private fun AssistanceSection(
                     it.requestId == record.requestId && record.requestId.isNotBlank()
                             || it == record
                 }
-                if (index >= 0) {
-                    assistance[index] = updated
-                    saveAssistance(farmPrefs, assistance)
-                }
+                onUpdate(updated)
                 manageRecord = null
             }
         )
@@ -2957,419 +2904,6 @@ private fun InfoCard(title: String, body: String) {
     }
 }
 
-
-// ---------- Local farm storage ----------
-
-private fun exportDaCasePackage(
-    context: Context,
-    uri: Uri,
-    prefs: android.content.SharedPreferences
-) {
-    val packageJson = JSONObject().apply {
-        put("packageVersion", 1)
-        put("app", "AgriVision")
-        put("packageType", "DA Case Package")
-        put("generatedAt", System.currentTimeMillis())
-
-        put("farmerProfile", JSONObject().apply {
-            put("farmerName", prefs.getString("farmerName", ""))
-            put("farmerId", prefs.getString("farmerId", ""))
-            put("contact", prefs.getString("contact", ""))
-            put("province", prefs.getString("province", ""))
-            put("municipality", prefs.getString("municipality", ""))
-            put("barangay", prefs.getString("barangay", ""))
-            put("farmName", prefs.getString("farmName", ""))
-            put("farmSize", prefs.getString("farmSize", ""))
-            put("landTenure", prefs.getString("landTenure", ""))
-            put("commodities", prefs.getString("commodities", ""))
-            put("registryStatus", prefs.getString("registryStatus", "For Review"))
-            put("reviewNotes", prefs.getString("reviewNotes", ""))
-        })
-
-        put("fieldIncidents", JSONArray(prefs.getString("fieldIncidents", "[]")))
-        put("incidentEvents", JSONArray(prefs.getString("incidentEvents", "[]")))
-        put("assistance", JSONArray(prefs.getString("assistance", "[]")))
-
-        put("operationalRecords", JSONObject().apply {
-            put("livestock", JSONArray(prefs.getString("livestock", "[]")))
-            put("crops", JSONArray(prefs.getString("crops", "[]")))
-            put("production", JSONArray(prefs.getString("production", "[]")))
-        })
-    }
-
-    context.contentResolver.openOutputStream(uri)?.use { output ->
-        output.write(packageJson.toString(2).toByteArray(Charsets.UTF_8))
-    }
-}
-
-private fun exportFarmBackup(context: Context, uri: Uri, prefs: android.content.SharedPreferences) {
-    val backup = JSONObject().apply {
-        put("version", 1)
-        put("app", "AgriVision")
-        put("livestock", JSONArray(prefs.getString("livestock", "[]")))
-        put("crops", JSONArray(prefs.getString("crops", "[]")))
-        put("inventory", JSONArray(prefs.getString("inventory", "[]")))
-        put("equipment", JSONArray(prefs.getString("equipment", "[]")))
-        put("production", JSONArray(prefs.getString("production", "[]")))
-        put("expenses", JSONArray(prefs.getString("expenses", "[]")))
-        put("sales", JSONArray(prefs.getString("sales", "[]")))
-        put("tasks", JSONArray(prefs.getString("tasks", "[]")))
-        put("assistance", JSONArray(prefs.getString("assistance", "[]")))
-        put("fieldIncidents", JSONArray(prefs.getString("fieldIncidents", "[]")))
-        put("incidentEvents", JSONArray(prefs.getString("incidentEvents", "[]")))
-        put("reportSubmission", JSONObject().apply {
-            put("status", prefs.getString("reportStatus", "Draft"))
-            put("submittedDate", prefs.getString("reportSubmittedDate", ""))
-            put("referenceNo", prefs.getString("reportReferenceNo", ""))
-        })
-        put("farmerProfile", JSONObject().apply {
-            put("farmerName", prefs.getString("farmerName", ""))
-            put("farmerId", prefs.getString("farmerId", ""))
-            put("contact", prefs.getString("contact", ""))
-            put("province", prefs.getString("province", ""))
-            put("municipality", prefs.getString("municipality", ""))
-            put("barangay", prefs.getString("barangay", ""))
-            put("farmName", prefs.getString("farmName", ""))
-            put("farmSize", prefs.getString("farmSize", ""))
-            put("landTenure", prefs.getString("landTenure", ""))
-            put("commodities", prefs.getString("commodities", ""))
-            put("registryStatus", prefs.getString("registryStatus", "For Review"))
-            put("reviewNotes", prefs.getString("reviewNotes", ""))
-        })
-    }
-    context.contentResolver.openOutputStream(uri)?.use { output ->
-        output.write(backup.toString(2).toByteArray(Charsets.UTF_8))
-    }
-}
-
-private fun importFarmBackup(context: Context, uri: Uri, prefs: android.content.SharedPreferences) {
-    val json = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-        ?: return
-    val backup = JSONObject(json)
-    val edit = prefs.edit()
-    val keys = listOf("livestock", "crops", "inventory", "equipment", "production", "expenses", "sales", "tasks", "assistance", "fieldIncidents", "incidentEvents")
-    keys.forEach { key ->
-        if (backup.has(key)) edit.putString(key, backup.getJSONArray(key).toString())
-    }
-    if (backup.has("reportSubmission")) {
-        val r = backup.getJSONObject("reportSubmission")
-        edit.putString("reportStatus", r.optString("status", "Draft"))
-        edit.putString("reportSubmittedDate", r.optString("submittedDate"))
-        edit.putString("reportReferenceNo", r.optString("referenceNo"))
-    }
-    if (backup.has("farmerProfile")) {
-        val p = backup.getJSONObject("farmerProfile")
-        edit.putString("farmerName", p.optString("farmerName"))
-        edit.putString("farmerId", p.optString("farmerId"))
-        edit.putString("contact", p.optString("contact"))
-        edit.putString("province", p.optString("province"))
-        edit.putString("municipality", p.optString("municipality"))
-        edit.putString("barangay", p.optString("barangay"))
-        edit.putString("farmName", p.optString("farmName"))
-        edit.putString("farmSize", p.optString("farmSize"))
-        edit.putString("landTenure", p.optString("landTenure"))
-        edit.putString("commodities", p.optString("commodities"))
-        edit.putString("registryStatus", p.optString("registryStatus", "For Review"))
-        edit.putString("reviewNotes", p.optString("reviewNotes"))
-    }
-    edit.apply()
-}
-
-private fun loadIncidentEvents(prefs: android.content.SharedPreferences): List<IncidentEvent> {
-    val raw = prefs.getString("incidentEvents", "[]") ?: "[]"
-    val a = JSONArray(raw)
-    return List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        IncidentEvent(
-            incidentId = o.optString("incidentId"),
-            status = o.optString("status"),
-            note = o.optString("note"),
-            timestamp = o.optLong("timestamp", System.currentTimeMillis())
-        )
-    }
-}
-
-private fun saveIncidentEvents(
-    prefs: android.content.SharedPreferences,
-    list: List<IncidentEvent>
-) {
-    val a = JSONArray()
-    list.forEach { event ->
-        a.put(JSONObject().apply {
-            put("incidentId", event.incidentId)
-            put("status", event.status)
-            put("note", event.note)
-            put("timestamp", event.timestamp)
-        })
-    }
-    prefs.edit().putString("incidentEvents", a.toString()).apply()
-}
-
-private fun loadFieldIncidents(prefs: android.content.SharedPreferences): List<FieldIncident> {
-    val raw = prefs.getString("fieldIncidents", "[]") ?: "[]"
-    val a = JSONArray(raw)
-    return List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        FieldIncident(
-            id = o.optString("id"),
-            type = o.optString("type", "Other"),
-            commodity = o.optString("commodity"),
-            affectedArea = o.optString("affectedArea"),
-            date = o.optString("date"),
-            severity = o.optString("severity", "Moderate"),
-            description = o.optString("description"),
-            status = o.optString("status", "Draft"),
-            evidenceUri = o.optString("evidenceUri"),
-            reviewNotes = o.optString("reviewNotes")
-        )
-    }
-}
-
-private fun saveFieldIncidents(prefs: android.content.SharedPreferences, list: List<FieldIncident>) {
-    val a = JSONArray()
-    list.forEach { incident ->
-        a.put(JSONObject().apply {
-            put("id", incident.id)
-            put("type", incident.type)
-            put("commodity", incident.commodity)
-            put("affectedArea", incident.affectedArea)
-            put("date", incident.date)
-            put("severity", incident.severity)
-            put("description", incident.description)
-            put("status", incident.status)
-            put("evidenceUri", incident.evidenceUri)
-            put("reviewNotes", incident.reviewNotes)
-        })
-    }
-    prefs.edit().putString("fieldIncidents", a.toString()).apply()
-}
-
-private fun loadAssistance(prefs: android.content.SharedPreferences): List<AssistanceRecord> {
-    val raw = prefs.getString("assistance", "[]") ?: "[]"
-    val a = JSONArray(raw)
-    return List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        AssistanceRecord(
-            o.optString("program"),
-            o.optString("assistanceType"),
-            o.optString("dateReceived"),
-            o.optString("quantity"),
-            o.optString("status"),
-            o.optString("source"),
-            o.optString("incidentId"),
-            o.optString("requestId"),
-            o.optString("approvedDate"),
-            o.optString("distributedDate"),
-            o.optString("completedDate"),
-            o.optString("distributionDetails"),
-            o.optString("outcome"),
-            o.optString("reviewNotes")
-        )
-    }
-}
-
-private fun saveAssistance(prefs: android.content.SharedPreferences, list: List<AssistanceRecord>) {
-    val a = JSONArray()
-    list.forEach {
-        a.put(JSONObject().apply {
-            put("program", it.program)
-            put("assistanceType", it.assistanceType)
-            put("dateReceived", it.dateReceived)
-            put("quantity", it.quantity)
-            put("status", it.status)
-            put("source", it.source)
-            put("incidentId", it.incidentId)
-            put("requestId", it.requestId)
-            put("approvedDate", it.approvedDate)
-            put("distributedDate", it.distributedDate)
-            put("completedDate", it.completedDate)
-            put("distributionDetails", it.distributionDetails)
-            put("outcome", it.outcome)
-            put("reviewNotes", it.reviewNotes)
-        })
-    }
-    prefs.edit().putString("assistance", a.toString()).apply()
-}
-
-private fun loadReportSubmission(prefs: android.content.SharedPreferences): ReportSubmission {
-    return ReportSubmission(
-        prefs.getString("reportStatus", "Draft") ?: "Draft",
-        prefs.getString("reportSubmittedDate", "") ?: "",
-        prefs.getString("reportReferenceNo", "") ?: ""
-    )
-}
-
-private fun saveReportSubmission(prefs: android.content.SharedPreferences, submission: ReportSubmission) {
-    prefs.edit()
-        .putString("reportStatus", submission.status)
-        .putString("reportSubmittedDate", submission.submittedDate)
-        .putString("reportReferenceNo", submission.referenceNo)
-        .apply()
-}
-
-private fun loadFarmerProfile(prefs: android.content.SharedPreferences): FarmerProfile {
-    return FarmerProfile(
-        prefs.getString("farmerName", "") ?: "",
-        prefs.getString("farmerId", "") ?: "",
-        prefs.getString("contact", "") ?: "",
-        prefs.getString("province", "") ?: "",
-        prefs.getString("municipality", "") ?: "",
-        prefs.getString("barangay", "") ?: "",
-        prefs.getString("farmName", "") ?: "",
-        prefs.getString("farmSize", "") ?: "",
-        prefs.getString("landTenure", "") ?: "",
-        prefs.getString("commodities", "") ?: "",
-        prefs.getString("registryStatus", "For Review") ?: "For Review",
-        prefs.getString("reviewNotes", "") ?: ""
-    )
-}
-
-private fun saveFarmerProfile(prefs: android.content.SharedPreferences, profile: FarmerProfile) {
-    prefs.edit()
-        .putString("farmerName", profile.farmerName)
-        .putString("farmerId", profile.farmerId)
-        .putString("contact", profile.contact)
-        .putString("province", profile.province)
-        .putString("municipality", profile.municipality)
-        .putString("barangay", profile.barangay)
-        .putString("farmName", profile.farmName)
-        .putString("farmSize", profile.farmSize)
-        .putString("landTenure", profile.landTenure)
-        .putString("commodities", profile.commodities)
-        .putString("registryStatus", profile.registryStatus)
-        .putString("reviewNotes", profile.reviewNotes)
-        .apply()
-}
-
-private fun loadLivestock(prefs: android.content.SharedPreferences): List<Livestock> {
-    val raw = prefs.getString("livestock", null) ?: return listOf(
-        Livestock("Layer Batch 01", "Chickens", 279, "Healthy"),
-        Livestock("Native Chickens", "Chickens", 24, "Monitor")
-    )
-    val a = JSONArray(raw)
-    return List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        Livestock(o.getString("name"), o.getString("kind"), o.getInt("count"), o.getString("status"))
-    }
-}
-
-private fun loadCrops(prefs: android.content.SharedPreferences): List<CropRecord> {
-    val raw = prefs.getString("crops", null) ?: return listOf(
-        CropRecord("North Plot", "Rice", "1.0 ha", "Growing"),
-        CropRecord("Garden", "Vegetables", "0.15 ha", "Active")
-    )
-    val a = JSONArray(raw)
-    return List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        CropRecord(o.getString("name"), o.getString("crop"), o.getString("area"), o.getString("stage"))
-    }
-}
-
-private fun loadInventory(prefs: android.content.SharedPreferences): List<InventoryItem> {
-    val raw = prefs.getString("inventory", null) ?: return listOf(
-        InventoryItem("Layer Feed", "6 sacks", "Good"),
-        InventoryItem("Medicine", "3 packs", "Good"),
-        InventoryItem("Fertilizer", "2 bags", "Low")
-    )
-    val a = JSONArray(raw)
-    return List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        InventoryItem(o.getString("name"), o.getString("quantity"), o.getString("status"))
-    }
-}
-
-private fun loadEquipment(prefs: android.content.SharedPreferences): List<EquipmentRecord> {
-    val raw = prefs.getString("equipment", null) ?: return listOf(
-        EquipmentRecord("Water Pump", "Ready", "Last checked recently"),
-        EquipmentRecord("Knapsack Sprayer", "Ready", "Good condition"),
-        EquipmentRecord("Farm Tools", "Needs check", "Inspect before next use")
-    )
-    val a = JSONArray(raw)
-    return List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        EquipmentRecord(o.getString("name"), o.getString("status"), o.getString("note"))
-    }
-}
-
-private fun saveLivestock(prefs: android.content.SharedPreferences, list: List<Livestock>) {
-    val a = JSONArray()
-    list.forEach { a.put(JSONObject().apply {
-        put("name", it.name); put("kind", it.kind); put("count", it.count); put("status", it.status)
-    }) }
-    prefs.edit().putString("livestock", a.toString()).apply()
-}
-
-private fun saveCrops(prefs: android.content.SharedPreferences, list: List<CropRecord>) {
-    val a = JSONArray()
-    list.forEach { a.put(JSONObject().apply {
-        put("name", it.name); put("crop", it.crop); put("area", it.area); put("stage", it.stage)
-    }) }
-    prefs.edit().putString("crops", a.toString()).apply()
-}
-
-private fun saveInventory(prefs: android.content.SharedPreferences, list: List<InventoryItem>) {
-    val a = JSONArray()
-    list.forEach { a.put(JSONObject().apply {
-        put("name", it.name); put("quantity", it.quantity); put("status", it.status)
-    }) }
-    prefs.edit().putString("inventory", a.toString()).apply()
-}
-
-private fun saveEquipment(prefs: android.content.SharedPreferences, list: List<EquipmentRecord>) {
-    val a = JSONArray()
-    list.forEach { a.put(JSONObject().apply {
-        put("name", it.name); put("status", it.status); put("note", it.note)
-    }) }
-    prefs.edit().putString("equipment", a.toString()).apply()
-}
-
-private fun loadProduction(prefs: android.content.SharedPreferences): List<ProductionRecord> {
-    val raw = prefs.getString("production", null) ?: return listOf(ProductionRecord("Eggs", "186 pcs", "Today"), ProductionRecord("Vegetables", "12 kg", "This week"))
-    val a = JSONArray(raw); return List(a.length()) { i -> val o = a.getJSONObject(i); ProductionRecord(o.getString("product"), o.getString("quantity"), o.getString("period")) }
-}
-private fun loadExpenses(prefs: android.content.SharedPreferences): List<ExpenseRecord> {
-    val raw = prefs.getString("expenses", null) ?: return listOf(ExpenseRecord("Feeds", 1730.0, "Layer feed"), ExpenseRecord("Farm supplies", 620.0, "General supplies"), ExpenseRecord("Medicine", 350.0, "Animal care"))
-    val a = JSONArray(raw); return List(a.length()) { i -> val o = a.getJSONObject(i); ExpenseRecord(o.getString("category"), o.getDouble("amount"), o.getString("note")) }
-}
-private fun loadSales(prefs: android.content.SharedPreferences): List<SaleRecord> {
-    val a = JSONArray(prefs.getString("sales", "[]")); return List(a.length()) { i -> val o = a.getJSONObject(i); SaleRecord(o.getString("product"), o.getDouble("amount"), o.getString("date")) }
-}
-private fun saveProduction(prefs: android.content.SharedPreferences, list: List<ProductionRecord>) {
-    val a=JSONArray(); list.forEach { a.put(JSONObject().apply { put("product",it.product); put("quantity",it.quantity); put("period",it.period) }) }; prefs.edit().putString("production",a.toString()).apply()
-}
-private fun saveExpenses(prefs: android.content.SharedPreferences, list: List<ExpenseRecord>) {
-    val a=JSONArray(); list.forEach { a.put(JSONObject().apply { put("category",it.category); put("amount",it.amount); put("note",it.note) }) }; prefs.edit().putString("expenses",a.toString()).apply()
-}
-private fun saveSales(prefs: android.content.SharedPreferences, list: List<SaleRecord>) {
-    val a=JSONArray(); list.forEach { a.put(JSONObject().apply { put("product",it.product); put("amount",it.amount); put("date",it.date) }) }; prefs.edit().putString("sales",a.toString()).apply()
-}
-
-private fun loadTasks(prefs: android.content.SharedPreferences): List<FarmTask> {
-    val raw = prefs.getString("tasks", null) ?: return listOf(
-        FarmTask("Feed layer chickens", "Livestock", "Today", false),
-        FarmTask("Check water supply", "Farm", "Today", false),
-        FarmTask("Inspect growing rice", "Crops", "Tomorrow", false),
-        FarmTask("Record farm expenses", "Finance", "Today", false)
-    )
-    val a = JSONArray(raw)
-    return List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        FarmTask(o.getString("title"), o.getString("category"), o.getString("date"), o.getBoolean("done"))
-    }
-}
-
-private fun saveTasks(prefs: android.content.SharedPreferences, list: List<FarmTask>) {
-    val a = JSONArray()
-    list.forEach { task ->
-        a.put(JSONObject().apply {
-            put("title", task.title)
-            put("category", task.category)
-            put("date", task.date)
-            put("done", task.done)
-        })
-    }
-    prefs.edit().putString("tasks", a.toString()).apply()
-}
 
 private fun money(value: Double): String {
     return String.format(java.util.Locale.US, "%,.0f", value)
