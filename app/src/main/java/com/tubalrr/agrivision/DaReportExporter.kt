@@ -119,43 +119,158 @@ object DaReportExporter {
 
     private fun pdf(s: FarmSnapshot, type: String, d: Data): ByteArray {
         val doc = PdfDocument()
-        val title = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 18f; typeface = android.graphics.Typeface.DEFAULT_BOLD }
-        val meta = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f }
-        val head = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 7.5f; typeface = android.graphics.Typeface.DEFAULT_BOLD }
-        val body = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 7f }
-        var pageNo = 1
-        var page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNo).create())
-        var canvas = page.canvas
-        var y = 42f
-        fun nextPage() {
-            doc.finishPage(page)
-            pageNo++
-            page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNo).create())
-            canvas = page.canvas
-            y = 42f
+        val pageWidth = 595f
+        val pageHeight = 842f
+        val margin = 32f
+        val contentWidth = pageWidth - (margin * 2)
+        val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 18f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
-        canvas.drawText("AgriVision - DA-Ready Report", 32f, y, title)
-        y += 22f
-        canvas.drawText(type, 32f, y, Paint(meta).apply { textSize = 13f; typeface = android.graphics.Typeface.DEFAULT_BOLD })
-        y += 16f
-        canvas.drawText("Farmer: " + s.profile.farmerName.ifBlank { "Not registered" }, 32f, y, meta)
-        y += 12f
-        canvas.drawText("Farm: " + (s.farm?.farmName ?: s.profile.farmName).ifBlank { "Not registered" }, 32f, y, meta)
-        y += 12f
-        canvas.drawText("Generated: " + now(), 32f, y, meta)
-        y += 22f
-        val width = 531f / d.columns.size.coerceAtLeast(1)
-        fun row(values: List<String>, p: Paint) {
-            if (y > 810f) nextPage()
-            values.forEachIndexed { i, v ->
-                canvas.drawText(short(v), 32f + i * width, y, p)
+        val reportPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 13f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        val metaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f }
+        val headPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 7.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 7f }
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 7f }
+
+        var pageNo = 0
+        var page: PdfDocument.Page? = null
+        var canvas: android.graphics.Canvas? = null
+        var y = 0f
+
+        fun finishPage() {
+            page?.let { doc.finishPage(it) }
+            page = null
+            canvas = null
+        }
+
+        fun wrap(text: String, paint: Paint, maxWidth: Float): List<String> {
+            val clean = text.replace('\n', ' ').replace('\r', ' ').trim()
+            if (clean.isEmpty()) return listOf("")
+            val words = clean.split(Regex("\\s+"))
+            val lines = mutableListOf<String>()
+            var current = ""
+            for (word in words) {
+                val candidate = if (current.isEmpty()) word else "$current $word"
+                if (paint.measureText(candidate) <= maxWidth || current.isEmpty()) {
+                    current = candidate
+                } else {
+                    lines += current
+                    current = word
+                }
             }
-            y += 14f
+            if (current.isNotEmpty()) lines += current
+            return lines
         }
-        row(d.columns, head)
-        y += 4f
-        d.rows.forEach { row(it, body) }
-        doc.finishPage(page)
+
+        fun startPage() {
+            finishPage()
+            pageNo++
+            page = doc.startPage(
+                PdfDocument.PageInfo.Builder(
+                    pageWidth.toInt(),
+                    pageHeight.toInt(),
+                    pageNo
+                ).create()
+            )
+            canvas = page!!.canvas
+            y = margin
+            canvas!!.drawText("AgriVision", margin, y, headerPaint)
+            y += 18f
+            canvas!!.drawText("DA-READY AGRICULTURAL RECORD", margin, y, metaPaint)
+            y += 18f
+            canvas!!.drawText(type, margin, y, reportPaint)
+            y += 16f
+            canvas!!.drawText(
+                "Farmer: " + s.profile.farmerName.ifBlank { "Not registered" },
+                margin, y, metaPaint
+            )
+            y += 12f
+            canvas!!.drawText(
+                "Farm: " + (s.farm?.farmName ?: s.profile.farmName).ifBlank { "Not registered" },
+                margin, y, metaPaint
+            )
+            y += 12f
+            canvas!!.drawText("Generated: " + now(), margin, y, metaPaint)
+            y += 16f
+            canvas!!.drawLine(margin, y, pageWidth - margin, y, metaPaint)
+            y += 12f
+        }
+
+        fun footer() {
+            val c = canvas ?: return
+            val footerY = pageHeight - 18f
+            c.drawLine(margin, footerY - 8f, pageWidth - margin, footerY - 8f, footerPaint)
+            c.drawText("AgriVision • DA-ready record • Page $pageNo", margin, footerY, footerPaint)
+        }
+
+        fun columnWidths(): FloatArray {
+            if (d.columns.isEmpty()) return floatArrayOf()
+            val weights = d.columns.map { column ->
+                when {
+                    column.contains("Description", true) || column.contains("Notes", true) -> 2.4f
+                    column.contains("Name", true) || column.contains("Commodity", true) ||
+                        column.contains("Program", true) || column.contains("Location", true) -> 1.6f
+                    column.length > 14 -> 1.25f
+                    else -> 1f
+                }
+            }
+            val total = weights.sum()
+            return weights.map { contentWidth * (it / total) }.toFloatArray()
+        }
+
+        fun drawTableHeader(widths: FloatArray) {
+            val c = canvas ?: return
+            var x = margin
+            d.columns.forEachIndexed { i, column ->
+                val header = wrap(column, headPaint, (widths[i] - 4f).coerceAtLeast(12f)).firstOrNull().orEmpty()
+                c.drawText(header, x + 2f, y, headPaint)
+                x += widths[i]
+            }
+            y += 12f
+            c.drawLine(margin, y, pageWidth - margin, y, headPaint)
+            y += 10f
+        }
+
+        fun drawRow(values: List<String>, widths: FloatArray, paint: Paint) {
+            val lineHeight = 9f
+            val wrapped = values.mapIndexed { i, value ->
+                wrap(value, paint, (widths.getOrElse(i) { 0f } - 4f).coerceAtLeast(12f))
+            }
+            val rowHeight = (wrapped.maxOfOrNull { it.size } ?: 1) * lineHeight + 5f
+            if (y + rowHeight > pageHeight - 34f) {
+                footer()
+                startPage()
+                drawTableHeader(widths)
+            }
+            var x = margin
+            wrapped.forEachIndexed { i, lines ->
+                lines.forEachIndexed { lineIndex, line ->
+                    canvas!!.drawText(line, x + 2f, y + (lineIndex + 1) * lineHeight, paint)
+                }
+                x += widths.getOrElse(i) { 0f }
+            }
+            y += rowHeight
+        }
+
+        val widths = columnWidths()
+        startPage()
+        if (d.columns.isNotEmpty()) {
+            drawTableHeader(widths)
+            d.rows.forEach { row -> drawRow(row, widths, bodyPaint) }
+        } else {
+            canvas!!.drawText("No records found for this report.", margin, y, bodyPaint)
+        }
+
+        footer()
+        finishPage()
+
         val out = ByteArrayOutputStream()
         doc.writeTo(out)
         doc.close()
