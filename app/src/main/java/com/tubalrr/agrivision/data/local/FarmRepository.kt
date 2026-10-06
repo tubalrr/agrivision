@@ -3,6 +3,7 @@ package com.tubalrr.agrivision.data.local
 import com.tubalrr.agrivision.AssistanceRecord
 import com.tubalrr.agrivision.CropRecord
 import com.tubalrr.agrivision.CropLifecycleEvent
+import com.tubalrr.agrivision.LivestockLifecycleEvent
 import com.tubalrr.agrivision.domain.calculator.CropLifecycleCalculator
 import com.tubalrr.agrivision.EquipmentRecord
 import com.tubalrr.agrivision.ExpenseRecord
@@ -41,7 +42,8 @@ data class FarmSnapshot(
     val incidentEvents: List<IncidentEvent>,
     val reportSubmission: ReportSubmission,
     val fields: List<FieldRecord> = emptyList(),
-    val cropLifecycleEvents: List<CropLifecycleEvent> = emptyList()
+    val cropLifecycleEvents: List<CropLifecycleEvent> = emptyList(),
+    val livestockLifecycleEvents: List<LivestockLifecycleEvent> = emptyList()
 )
 
 class FarmRepository(
@@ -126,7 +128,35 @@ class FarmRepository(
 
     fun observeLivestock(): Flow<List<Livestock>> =
         dao.observeLivestock(DEFAULT_FARM_ID).map { list ->
-            list.map { Livestock(it.name, it.kind, it.count, it.status) }
+            list.map {
+                Livestock(
+                    name = it.name,
+                    kind = it.kind,
+                    count = it.currentPopulation,
+                    status = it.status,
+                    groupId = it.groupId,
+                    initialPopulation = it.initialPopulation,
+                    currentPopulation = it.currentPopulation
+                )
+            }
+        }
+
+    fun observeLivestockLifecycleEvents(): Flow<List<LivestockLifecycleEvent>> =
+        dao.observeLivestockLifecycleEvents(DEFAULT_FARM_ID).map { list ->
+            list.map {
+                LivestockLifecycleEvent(
+                    eventId = it.eventId,
+                    livestockId = it.livestockId,
+                    stage = it.stage,
+                    date = it.date,
+                    notes = it.notes,
+                    inputName = it.inputName,
+                    quantity = it.quantity,
+                    unit = it.unit,
+                    amount = it.amount,
+                    createdAt = it.createdAt
+                )
+            }
         }
 
     fun observeCrops(): Flow<List<CropRecord>> =
@@ -322,17 +352,57 @@ suspend fun saveField(record: FieldRecord) {
         )
     }
 
-    suspend fun saveLivestock(record: Livestock, livestockId: String = UUID.randomUUID().toString()) {
+    suspend fun saveLivestock(record: Livestock, livestockId: String = record.groupId.ifBlank { UUID.randomUUID().toString() }) {
         dao.upsertLivestock(
             LivestockEntity(
                 livestockId = livestockId,
                 farmId = DEFAULT_FARM_ID,
                 name = record.name,
                 kind = record.kind,
-                count = record.count,
-                status = record.status
+                count = record.currentPopulation,
+                status = record.status,
+                groupId = livestockId,
+                initialPopulation = record.initialPopulation.coerceAtLeast(0),
+                currentPopulation = record.currentPopulation.coerceAtLeast(0)
             )
         )
+    }
+
+    suspend fun saveLivestockLifecycleEvent(event: LivestockLifecycleEvent) {
+        val livestock = dao.getLivestock(event.livestockId) ?: return
+        dao.upsertLivestockLifecycleEvent(
+            LivestockLifecycleEventEntity(
+                eventId = event.eventId.ifBlank { UUID.randomUUID().toString() },
+                farmId = DEFAULT_FARM_ID,
+                livestockId = event.livestockId,
+                stage = event.stage,
+                date = event.date,
+                notes = event.notes,
+                inputName = event.inputName,
+                quantity = event.quantity,
+                unit = event.unit,
+                amount = event.amount,
+                createdAt = event.createdAt
+            )
+        )
+
+        val updatedPopulation = when {
+            event.stage.equals("Mortality", ignoreCase = true) ->
+                (livestock.currentPopulation - event.quantity.toInt().coerceAtLeast(0)).coerceAtLeast(0)
+            event.stage.equals("Population", ignoreCase = true) ->
+                event.quantity.toInt().coerceAtLeast(0)
+            else -> livestock.currentPopulation
+        }
+
+        if (updatedPopulation != livestock.currentPopulation) {
+            dao.upsertLivestock(
+                livestock.copy(
+                    count = updatedPopulation,
+                    currentPopulation = updatedPopulation,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
     }
 
     suspend fun saveCrop(record: CropRecord, cropId: String = record.cropId.ifBlank { UUID.randomUUID().toString() }) {
@@ -563,6 +633,7 @@ suspend fun saveField(record: FieldRecord) {
             dao.clearFields()
             dao.clearFarmers()
             dao.clearCropLifecycleEvents()
+            dao.clearLivestockLifecycleEvents()
             dao.clearLivestock()
             dao.clearCrops()
             dao.clearFeedLogs()
@@ -580,6 +651,7 @@ suspend fun saveField(record: FieldRecord) {
 
             saveProfile(snapshot.profile)
             snapshot.livestock.forEach { saveLivestock(it) }
+            snapshot.livestockLifecycleEvents.forEach { saveLivestockLifecycleEvent(it) }
             snapshot.crops.forEach { saveCrop(it) }
             snapshot.cropLifecycleEvents.forEach { saveCropLifecycleEvent(it) }
             snapshot.production.forEach { saveProduction(it) }
