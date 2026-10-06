@@ -221,7 +221,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun exportCasePackage(uri: Uri) = launch {
         val snapshot = currentSnapshot()
         val json = JSONObject().apply {
-            put("packageVersion", 6)
+            put("packageVersion", 7)
             put("app", "AgriVision")
             put("packageType", "DA Case Package")
             put("generatedAt", System.currentTimeMillis())
@@ -286,7 +286,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
     JSONObject().apply {
-        put("version", 6)
+        put("version", 7)
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
@@ -433,10 +433,16 @@ private fun ProductionRecord.toJson() = JSONObject().apply {
     put("productionType", productionType)
 }
 private fun ExpenseRecord.toJson() = JSONObject().apply {
-    put("category", category); put("amount", amount); put("note", note)
+    put("category", category)
+    put("amount", amount)
+    put("note", note)
+    put("date", date)
 }
 private fun SaleRecord.toJson() = JSONObject().apply {
-    put("product", product); put("amount", amount); put("date", date)
+    put("product", product)
+    put("amount", amount)
+    put("date", date)
+    put("incomeCategory", incomeCategory)
 }
 private fun InventoryItem.toJson() = JSONObject().apply {
     put("name", name)
@@ -604,9 +610,19 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
         )
     }
     val expenses = mutableListOf<ExpenseRecord>()
-    parseList(expensesArray) { o, _ -> expenses += ExpenseRecord(o.optString("category"), o.optDouble("amount"), o.optString("note")) }
+    parseList(expensesArray) { o, _ -> expenses += ExpenseRecord(
+            category = o.optString("category"),
+            amount = o.optDouble("amount", 0.0),
+            note = o.optString("note"),
+            date = o.optString("date")
+        ) }
     val sales = mutableListOf<SaleRecord>()
-    parseList(salesArray) { o, _ -> sales += SaleRecord(o.optString("product"), o.optDouble("amount"), o.optString("date")) }
+    parseList(salesArray) { o, _ -> sales += SaleRecord(
+            product = o.optString("product"),
+            amount = o.optDouble("amount", 0.0),
+            date = o.optString("date"),
+            incomeCategory = o.optString("incomeCategory", "Other Income")
+        ) }
     val inventory = mutableListOf<InventoryItem>()
     parseList(inventoryArray) { o, _ ->
         val legacyQuantity = o.optString("quantity")
