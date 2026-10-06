@@ -402,7 +402,7 @@ internal fun FieldMapScreen(
                         Text("Map coverage", fontWeight = FontWeight.Bold, color = AgriGreen)
                         Text(
                             "Farm boundary " +
-                                    if (farm.boundaryPoints.size >= 3) "mapped" else "not mapped" +
+                                    (if (farm.boundaryPoints.size >= 3) "mapped" else "not mapped") +
                                     " · " + mappedFieldCount + " field(s) mapped · " +
                                     cropLayerCount + " crop link(s) · " +
                                     mappedIncidentCount + " incident(s) mapped · " +
