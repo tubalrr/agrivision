@@ -285,3 +285,10 @@ The current Room schema is version 10. Migration 7 → 8 adds persisted incomeCa
 The DA-oriented workflow is intentionally separated from official transmission.
 
 No claim of official DA API integration is made. A connected, authenticated, authorized backend can be added later without replacing the offline-first local domain model.
+
+
+## DA-ready reports (Priority 12)
+
+AgriVision reports are generated from the Room-backed `FarmSnapshot`, not directly from UI state. The report layer supports 11 report types: Farmer Profile, Farm Registry, Crop Production, Livestock Inventory, Farm Inputs, Expenses, Sales, Incidents, Assistance, Harvest, and Field Summary.
+
+Each report can be exported as PDF, CSV, or JSON. PDF uses Android `PdfDocument`; CSV is escaped for spreadsheet import; JSON is versioned with report metadata. Harvest is derived from production records marked `Harvest`, while Farm Inputs combines inventory with recorded crop/livestock lifecycle inputs. Android's document picker is used for user-selected destinations.
