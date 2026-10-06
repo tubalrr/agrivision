@@ -13,6 +13,12 @@ interface FarmDao {
     @Query("SELECT * FROM farms ORDER BY updatedAt DESC")
     fun observeFarms(): Flow<List<FarmEntity>>
 
+    @Query("SELECT * FROM farmers ORDER BY updatedAt DESC LIMIT 1")
+    fun observeFarmer(): Flow<FarmerEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertFarmer(farmer: FarmerEntity)
+
     @Query("SELECT * FROM farms WHERE farmId = :farmId LIMIT 1")
     fun observeFarm(farmId: String): Flow<FarmEntity?>
 
@@ -39,6 +45,15 @@ interface FarmDao {
 
     @Delete
     suspend fun deleteCrop(record: CropEntity)
+
+    @Query("SELECT * FROM fields WHERE farmId = :farmId ORDER BY updatedAt DESC, fieldId ASC")
+    fun observeFields(farmId: String): Flow<List<FieldEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertField(record: FieldEntity)
+
+    @Delete
+    suspend fun deleteField(record: FieldEntity)
 
     @Query("SELECT * FROM feed_logs WHERE farmId = :farmId ORDER BY date DESC, createdAt DESC")
     fun observeFeedLogs(farmId: String): Flow<List<FeedLogEntity>>
@@ -153,6 +168,12 @@ interface FarmDao {
 
     @Query("SELECT COALESCE(SUM(count), 0) FROM livestock WHERE farmId = :farmId")
     fun observeTotalLivestock(farmId: String): Flow<Int>
+
+    @Query("DELETE FROM fields")
+    suspend fun clearFields()
+
+    @Query("DELETE FROM farmers")
+    suspend fun clearFarmers()
 
     @Query("DELETE FROM livestock")
     suspend fun clearLivestock()
