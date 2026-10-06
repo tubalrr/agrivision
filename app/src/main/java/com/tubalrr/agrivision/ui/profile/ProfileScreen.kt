@@ -71,7 +71,7 @@ internal fun ProfileScreen(
         }
 
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenSoft), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("DA Farmer Registry", color = AgriGreen, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("Registry status: " + if (profile.farmerName.isNotBlank() && profile.farmerId.isNotBlank()) "Registered" else "Incomplete", color = AgriText, fontWeight = FontWeight.SemiBold)
@@ -83,7 +83,8 @@ internal fun ProfileScreen(
             Card(
                 Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(26.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriGreen)
+                colors = CardDefaults.cardColors(containerColor = AgriGreen),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text("Farmer Profile", color = Color.White.copy(alpha = .75f), style = MaterialTheme.typography.labelLarge)
@@ -101,7 +102,7 @@ internal fun ProfileScreen(
                     Spacer(Modifier.height(8.dp))
                     Button(
                         onClick = { showEdit = true },
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White,
                             contentColor = AgriGreen
@@ -116,8 +117,9 @@ internal fun ProfileScreen(
         item {
             Card(
                 Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Registry Identity", color = AgriGreen, fontWeight = FontWeight.Bold)
@@ -177,8 +179,9 @@ internal fun ProfileScreen(
         item {
             Card(
                 Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriCard)
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriCard),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Backup & Restore", fontWeight = FontWeight.Bold)
@@ -187,8 +190,8 @@ internal fun ProfileScreen(
                         color = AgriMuted
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = onExportBackup, shape = RoundedCornerShape(14.dp)) { Text("Export AgriVision Backup") }
-                        OutlinedButton(onClick = onImportBackup, shape = RoundedCornerShape(14.dp)) { Text("Import AgriVision Backup") }
+                        Button(onClick = onExportBackup, shape = RoundedCornerShape(12.dp)) { Text("Export AgriVision Backup") }
+                        OutlinedButton(onClick = onImportBackup, shape = RoundedCornerShape(12.dp)) { Text("Import AgriVision Backup") }
                     }
                     if (backupStatus.isNotBlank()) {
                         Text(backupStatus, color = AgriGreen, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
