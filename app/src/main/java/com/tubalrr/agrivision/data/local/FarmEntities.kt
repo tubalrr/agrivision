@@ -237,7 +237,35 @@ data class InventoryEntity(
     val quantity: Double,
     val unit: String,
     val status: String,
+    val category: String = "Other",
+    val purchasePrice: Double = 0.0,
+    val supplier: String = "",
+    val dateAcquired: String = "",
+    val expiryDate: String = "",
     val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "inventory_transactions",
+    primaryKeys = ["transactionId"],
+    indices = [
+        Index(value = ["farmId"]),
+        Index(value = ["inventoryId"]),
+        Index(value = ["inventoryId", "date"])
+    ]
+)
+data class InventoryTransactionEntity(
+    val transactionId: String,
+    val farmId: String,
+    val inventoryId: String,
+    val type: String,
+    val quantity: Double,
+    val unit: String,
+    val date: String,
+    val sourceType: String,
+    val sourceId: String,
+    val notes: String,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(
