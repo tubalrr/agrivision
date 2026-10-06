@@ -12,6 +12,7 @@ import com.tubalrr.agrivision.domain.model.FarmRecord
 import com.tubalrr.agrivision.domain.model.FarmerRecord
 import com.tubalrr.agrivision.domain.model.FieldRecord
 import com.tubalrr.agrivision.domain.model.MapPoint
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -22,6 +23,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class FarmViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        const val BACKUP_FORMAT_VERSION = 1
+        const val ROOM_SCHEMA_VERSION = 10
+    }
+
+    private val _backupStatus = MutableStateFlow("")
+    val backupStatus: StateFlow<String> = _backupStatus
+
 
     private val database = AgriDatabase.getInstance(application)
     private val repository = FarmRepository(database)
@@ -236,10 +246,17 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun exportBackup(uri: Uri) = launch {
-        val snapshot = currentSnapshot()
-        val json = snapshotToJson(snapshot)
-        getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
-            it.write(json.toString(2).toByteArray(Charsets.UTF_8))
+        runCatching {
+            val snapshot = currentSnapshot()
+            val json = snapshotToJson(snapshot)
+            require(json.optString("app") == "AgriVision") { "Invalid backup payload." }
+            val output = getApplication<Application>().contentResolver.openOutputStream(uri)
+                ?: error("Unable to open the selected backup destination.")
+            output.use { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
+        }.onSuccess {
+            _backupStatus.value = "Backup exported successfully."
+        }.onFailure {
+            _backupStatus.value = "Backup export failed: " + (it.message ?: "Unknown error")
         }
     }
 
@@ -274,12 +291,36 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun importBackup(uri: Uri) = launch {
-        val input = getApplication<Application>().contentResolver.openInputStream(uri)
-            ?: return@launch
-        val text = input.bufferedReader().use { it.readText() }
-        val json = JSONObject(text)
-        val snapshot = jsonToSnapshot(json)
-        repository.replaceAll(snapshot)
+        runCatching {
+            val input = getApplication<Application>().contentResolver.openInputStream(uri)
+                ?: error("Unable to open the selected backup file.")
+            val text = input.bufferedReader().use { it.readText() }
+            require(text.isNotBlank()) { "Backup file is empty." }
+            val json = JSONObject(text)
+            validateBackup(json)
+            val snapshot = jsonToSnapshot(json)
+            repository.replaceAll(snapshot)
+        }.onSuccess {
+            _backupStatus.value = "Backup imported successfully. Room data restored."
+        }.onFailure {
+            _backupStatus.value = "Backup import failed: " + (it.message ?: "Invalid backup file.")
+        }
+    }
+
+    private fun validateBackup(json: JSONObject) {
+        require(json.optString("app") == "AgriVision") { "This is not an AgriVision backup." }
+        val backupVersion = json.optInt("backupVersion", 0)
+        val legacyVersion = json.optInt("version", 0)
+        val effectiveBackupVersion = if (backupVersion == 0 && legacyVersion > 0) 1 else backupVersion
+        require(effectiveBackupVersion == BACKUP_FORMAT_VERSION) {
+            "Unsupported backup format version: " + effectiveBackupVersion
+        }
+        val schemaVersion = json.optInt("schemaVersion", legacyVersion)
+        require(schemaVersion in 1..ROOM_SCHEMA_VERSION) {
+            "Unsupported Room schema version: " + schemaVersion
+        }
+        require(json.optJSONObject("farmerProfile") != null) { "Backup is missing farmerProfile." }
+        require(json.optJSONObject("farm") != null) { "Backup is missing farm data." }
     }
 
     private suspend fun currentSnapshot(): FarmSnapshot {
@@ -312,7 +353,9 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
     JSONObject().apply {
-        put("version", 10)
+        put("backupVersion", BACKUP_FORMAT_VERSION)
+        put("schemaVersion", ROOM_SCHEMA_VERSION)
+        put("version", ROOM_SCHEMA_VERSION)
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("farm", (snapshot.farm ?: snapshot.profile.toFarmRecord()).toJson())
