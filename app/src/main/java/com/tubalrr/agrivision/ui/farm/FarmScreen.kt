@@ -24,6 +24,7 @@ internal fun FarmScreen(
     livestockLifecycleEvents: List<LivestockLifecycleEvent>,
     crops: List<CropRecord>,
     inventory: List<InventoryItem>,
+    inventoryTransactions: List<InventoryTransaction>,
     equipment: List<EquipmentRecord>,
     fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
     cropLifecycleEvents: List<CropLifecycleEvent>,
