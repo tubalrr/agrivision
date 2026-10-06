@@ -29,6 +29,17 @@ import kotlinx.coroutines.flow.map
 import java.util.UUID
 import kotlin.math.roundToInt
 
+data class FeedLogRecord(
+    val feedLogId: String = "",
+    val livestockId: String = "",
+    val date: String = "",
+    val feedName: String = "",
+    val quantityKg: Double = 0.0,
+    val unit: String = "kg",
+    val notes: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
 data class FarmSnapshot(
     val profile: FarmerProfile,
     val livestock: List<Livestock>,
@@ -47,6 +58,7 @@ data class FarmSnapshot(
     val cropLifecycleEvents: List<CropLifecycleEvent> = emptyList(),
     val livestockLifecycleEvents: List<LivestockLifecycleEvent> = emptyList(),
     val inventoryTransactions: List<InventoryTransaction> = emptyList(),
+    val feedLogs: List<FeedLogRecord> = emptyList(),
     val farm: FarmRecord? = null
 )
 
@@ -259,6 +271,38 @@ class FarmRepository(
                 )
             }
         }
+
+    fun observeFeedLogs(): Flow<List<FeedLogRecord>> =
+        dao.observeFeedLogs(DEFAULT_FARM_ID).map { list ->
+            list.map {
+                FeedLogRecord(
+                    feedLogId = it.feedLogId,
+                    livestockId = it.livestockId.orEmpty(),
+                    date = it.date,
+                    feedName = it.feedName,
+                    quantityKg = it.quantityKg,
+                    unit = it.unit,
+                    notes = it.notes,
+                    createdAt = it.createdAt
+                )
+            }
+        }
+
+    suspend fun saveFeedLog(record: FeedLogRecord) {
+        dao.upsertFeedLog(
+            FeedLogEntity(
+                feedLogId = record.feedLogId.ifBlank { UUID.randomUUID().toString() },
+                farmId = DEFAULT_FARM_ID,
+                livestockId = record.livestockId.ifBlank { null },
+                date = record.date,
+                feedName = record.feedName.trim(),
+                quantityKg = record.quantityKg.coerceAtLeast(0.0),
+                unit = record.unit.ifBlank { "kg" },
+                notes = record.notes.trim(),
+                createdAt = record.createdAt
+            )
+        )
+    }
 
     fun observeInventoryTransactions(): Flow<List<InventoryTransaction>> =
         dao.observeInventoryTransactions(DEFAULT_FARM_ID).map { list ->
@@ -1034,6 +1078,7 @@ suspend fun saveField(record: FieldRecord) {
             snapshot.livestock.forEach { saveLivestock(it) }
             snapshot.livestockLifecycleEvents.forEach { saveLivestockLifecycleEvent(it) }
             snapshot.crops.forEach { saveCrop(it) }
+            snapshot.feedLogs.forEach { saveFeedLog(it) }
             snapshot.cropLifecycleEvents.forEach { saveCropLifecycleEvent(it) }
             snapshot.production.forEach { saveProduction(it) }
             snapshot.expenses.forEach { saveExpense(it) }
