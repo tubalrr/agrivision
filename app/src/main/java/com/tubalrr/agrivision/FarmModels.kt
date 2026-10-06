@@ -2,7 +2,30 @@ package com.tubalrr.agrivision
 
 data class FarmAsset(val name: String, val type: String, val detail: String)
 data class Livestock(val name: String, val kind: String, val count: Int, val status: String)
-data class CropRecord(val name: String, val crop: String, val area: String, val stage: String)
+data class CropRecord(
+    val name: String,
+    val crop: String,
+    val area: String,
+    val stage: String,
+    val cropId: String = "",
+    val fieldId: String = "",
+    val plantingDate: String = "",
+    val expectedHarvest: String = "",
+    val currentStatus: String = stage
+)
+
+data class CropLifecycleEvent(
+    val eventId: String = "",
+    val cropId: String,
+    val fieldId: String,
+    val stage: String,
+    val date: String,
+    val notes: String = "",
+    val inputName: String = "",
+    val quantity: String = "",
+    val unit: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
 data class ProductionRecord(val product: String, val quantity: String, val period: String)
 data class ExpenseRecord(val category: String, val amount: Double, val note: String)
 data class InventoryItem(val name: String, val quantity: String, val status: String)
