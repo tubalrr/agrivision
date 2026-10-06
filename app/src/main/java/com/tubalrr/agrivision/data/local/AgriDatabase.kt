@@ -287,7 +287,6 @@ abstract class AgriDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE production_records ADD COLUMN sourceId TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE production_records ADD COLUMN fieldId TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE production_records ADD COLUMN areaHectares REAL NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE production_records ADD COLUMN productionType TEXT NOT NULL DEFAULT 'Harvest'")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_sourceId ON production_records(sourceId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_fieldId ON production_records(fieldId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_farmId_sourceType_date ON production_records(farmId,sourceType,date)")
