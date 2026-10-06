@@ -13,6 +13,9 @@ import com.tubalrr.agrivision.Livestock
 import com.tubalrr.agrivision.ProductionRecord
 import com.tubalrr.agrivision.ReportSubmission
 import com.tubalrr.agrivision.SaleRecord
+import com.tubalrr.agrivision.domain.model.FarmRecord
+import com.tubalrr.agrivision.domain.model.FarmerRecord
+import com.tubalrr.agrivision.domain.model.FieldRecord
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -33,7 +36,8 @@ data class FarmSnapshot(
     val assistance: List<AssistanceRecord>,
     val fieldIncidents: List<FieldIncident>,
     val incidentEvents: List<IncidentEvent>,
-    val reportSubmission: ReportSubmission
+    val reportSubmission: ReportSubmission,
+    val fields: List<FieldRecord> = emptyList()
 )
 
 class FarmRepository(
@@ -45,6 +49,50 @@ class FarmRepository(
         const val DEFAULT_FARM_ID = "default-farm"
         const val DEFAULT_SUBMISSION_ID = "default"
     }
+
+    fun observeFarmer(): Flow<FarmerRecord> =
+        dao.observeFarmer().map { farmer ->
+            if (farmer == null) FarmerRecord("", "")
+            else FarmerRecord(farmer.farmerId, farmer.fullName, farmer.contact)
+        }
+
+    fun observeFarm(): Flow<FarmRecord> =
+        dao.observeFarm(DEFAULT_FARM_ID).map { farm ->
+            if (farm == null) FarmRecord(DEFAULT_FARM_ID, "", "")
+            else FarmRecord(
+                farmId = farm.farmId,
+                farmerId = farm.farmerId,
+                farmName = farm.farmName,
+                province = farm.province,
+                municipality = farm.municipality,
+                barangay = farm.barangay,
+                totalArea = farm.farmSize,
+                landTenure = farm.landTenure,
+                commodities = farm.commodities,
+                registryStatus = farm.registryStatus,
+                reviewNotes = farm.reviewNotes
+            )
+        }
+
+    fun observeFields(): Flow<List<FieldRecord>> =
+        dao.observeFields(DEFAULT_FARM_ID).map { list ->
+            list.map {
+                FieldRecord(
+                    fieldId = it.fieldId,
+                    farmId = it.farmId,
+                    name = it.name,
+                    areaHectares = it.areaHectares,
+                    location = it.location,
+                    latitude = it.latitude,
+                    longitude = it.longitude,
+                    landTenure = it.landTenure,
+                    crop = it.crop,
+                    plantingDate = it.plantingDate,
+                    expectedHarvest = it.expectedHarvest,
+                    currentStatus = it.currentStatus
+                )
+            }
+        }
 
     fun observeProfile(): Flow<FarmerProfile> =
         dao.observeFarm(DEFAULT_FARM_ID).map { farm ->
@@ -172,6 +220,13 @@ class FarmRepository(
     fun observeTotalLivestock(): Flow<Int> = dao.observeTotalLivestock(DEFAULT_FARM_ID)
 
     suspend fun saveProfile(profile: FarmerProfile) {
+        dao.upsertFarmer(
+            FarmerEntity(
+                farmerId = profile.farmerId,
+                fullName = profile.farmerName,
+                contact = profile.contact
+            )
+        )
         dao.upsertFarm(
             FarmEntity(
                 farmId = DEFAULT_FARM_ID,
@@ -187,6 +242,44 @@ class FarmRepository(
                 contact = profile.contact,
                 registryStatus = profile.registryStatus,
                 reviewNotes = profile.reviewNotes
+            )
+        )
+    }
+
+suspend fun saveField(record: FieldRecord) {
+        dao.upsertField(
+            FieldEntity(
+                fieldId = record.fieldId,
+                farmId = record.farmId.ifBlank { DEFAULT_FARM_ID },
+                name = record.name,
+                areaHectares = record.areaHectares,
+                location = record.location,
+                latitude = record.latitude,
+                longitude = record.longitude,
+                landTenure = record.landTenure,
+                crop = record.crop,
+                plantingDate = record.plantingDate,
+                expectedHarvest = record.expectedHarvest,
+                currentStatus = record.currentStatus
+            )
+        )
+    }
+
+    suspend fun deleteField(record: FieldRecord) {
+        dao.deleteField(
+            FieldEntity(
+                fieldId = record.fieldId,
+                farmId = record.farmId.ifBlank { DEFAULT_FARM_ID },
+                name = record.name,
+                areaHectares = record.areaHectares,
+                location = record.location,
+                latitude = record.latitude,
+                longitude = record.longitude,
+                landTenure = record.landTenure,
+                crop = record.crop,
+                plantingDate = record.plantingDate,
+                expectedHarvest = record.expectedHarvest,
+                currentStatus = record.currentStatus
             )
         )
     }
@@ -394,6 +487,8 @@ class FarmRepository(
 
     suspend fun replaceAll(snapshot: FarmSnapshot) {
         database.withTransaction {
+            dao.clearFields()
+            dao.clearFarmers()
             dao.clearLivestock()
             dao.clearCrops()
             dao.clearFeedLogs()
