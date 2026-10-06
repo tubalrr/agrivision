@@ -29,6 +29,7 @@ internal fun AgriVisionApp(
     onExportBackup: () -> Unit = {},
     onImportBackup: () -> Unit = {},
     onExportCasePackage: () -> Unit = {},
+    onExportDaReport: (String, DaReportFormat) -> Unit = { _, _ -> },
     farmViewModel: FarmViewModel = viewModel()
 ) {
     var selected by remember { mutableStateOf(0) }
@@ -139,6 +140,7 @@ internal fun AgriVisionApp(
                     fieldIncidents = fieldIncidents,
                     incidentEvents = incidentEvents,
                     onExportCasePackage = onExportCasePackage,
+                    onExportDaReport = onExportDaReport,
                     reportSubmission = reportSubmission,
                     onProduction = farmViewModel::addProduction,
                     onExpense = farmViewModel::addExpense,
