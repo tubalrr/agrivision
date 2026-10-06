@@ -281,5 +281,19 @@ abstract class AgriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE production_records ADD COLUMN sourceType TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE production_records ADD COLUMN sourceId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE production_records ADD COLUMN fieldId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE production_records ADD COLUMN areaHectares REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE production_records ADD COLUMN productionType TEXT NOT NULL DEFAULT 'Harvest'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_sourceId ON production_records(sourceId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_fieldId ON production_records(fieldId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_production_records_farmId_sourceType_date ON production_records(farmId,sourceType,date)")
+            }
+        }
+
+
     }
 }
