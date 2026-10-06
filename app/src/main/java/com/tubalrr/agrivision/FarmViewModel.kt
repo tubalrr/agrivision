@@ -199,7 +199,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun exportCasePackage(uri: Uri) = launch {
         val snapshot = currentSnapshot()
         val json = JSONObject().apply {
-            put("packageVersion", 2)
+            put("packageVersion", 3)
             put("app", "AgriVision")
             put("packageType", "DA Case Package")
             put("generatedAt", System.currentTimeMillis())
