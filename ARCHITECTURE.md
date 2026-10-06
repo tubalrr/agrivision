@@ -50,6 +50,16 @@ Sales
 
 A separate livestock lifecycle event table records the operational history for each group, including stage, date, notes, feed/medicine/product reference, quantity, unit, and amount. Population events can set the current population while mortality events reduce it, keeping the group count synchronized with recorded events.
 
+## Inputs & inventory
+
+Inventory is a structured stock system rather than a display-only list.
+
+Each inventory item keeps category, remaining stock, unit, purchase price, supplier, date acquired, and expiry date. Inventory transactions record purchases and usage with a source reference.
+
+Farm activities can automatically deduct inputs when the lifecycle event selects an inventory item and records a quantity. Crop activities that consume inventory include land preparation, planting, fertilization, and pest/disease monitoring. Livestock activities that consume inventory include feed and health records.
+
+The deduction and activity record are written in the same Room transaction. Exact item name and normalized unit matching prevents silent deduction of the wrong stock. Insufficient or mismatched stock is recorded as an activity note instead of making the inventory quantity negative.
+
 ## Crop lifecycle
 
 Crop records are field-linked and no longer model a crop as only a name, area, and stage.
