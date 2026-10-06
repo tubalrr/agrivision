@@ -156,54 +156,52 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addFieldIncident(value: FieldIncident) = launch {
-        repository.saveFieldIncident(value)
-        repository.saveIncidentEvent(
-            IncidentEvent(value.id, value.status, "Report created")
-        )
+        repository.createIncident(value)
     }
 
     fun updateFieldIncident(value: FieldIncident, previousStatus: String) = launch {
-        repository.saveFieldIncident(value)
-        if (value.status != previousStatus) {
-            repository.saveIncidentEvent(
-                IncidentEvent(
-                    incidentId = value.id,
-                    status = value.status,
-                    note = when (value.status) {
-                        "Submitted" -> "Farmer submitted field report"
-                        "Resolved" -> "Case closed after closure gate"
-                        else -> "Case status updated"
-                    }
-                )
-            )
-        }
+        if (value.status == previousStatus) return@launch
+        repository.transitionIncident(
+            incidentId = value.id,
+            nextStatus = value.status,
+            actor = value.reviewer.ifBlank { value.farmerId },
+            note = when (value.status) {
+                "Submitted" -> "Farmer submitted field report"
+                else -> "Incident workflow updated"
+            }
+        )
     }
 
     fun reviewFieldIncident(previous: FieldIncident, updated: FieldIncident) = launch {
-        repository.saveFieldIncident(updated)
-        if (updated.status != previous.status || updated.reviewNotes != previous.reviewNotes) {
+        if (updated.status != previous.status) {
+            repository.transitionIncident(
+                incidentId = updated.id,
+                nextStatus = updated.status,
+                actor = updated.reviewer,
+                note = updated.reviewNotes.ifBlank { "Reviewer updated case status" }
+            )
+        } else if (updated.reviewNotes != previous.reviewNotes || updated.reviewer != previous.reviewer) {
+            repository.saveFieldIncident(updated)
             repository.saveIncidentEvent(
                 IncidentEvent(
                     incidentId = updated.id,
+                    fromStatus = updated.status,
                     status = updated.status,
-                    note = updated.reviewNotes.ifBlank { "Reviewer updated case status" }
+                    note = updated.reviewNotes.ifBlank { "Reviewer notes updated" },
+                    actor = updated.reviewer
                 )
             )
         }
     }
 
     fun requestAssistance(incident: FieldIncident) = launch {
-        val alreadyLinked = assistance.value.any { it.incidentId == incident.id }
-        if (!alreadyLinked) {
+        if (assistance.value.none { it.incidentId == incident.id }) {
             repository.createAssistanceForIncident(incident)
-            repository.saveIncidentEvent(
-                IncidentEvent(
-                    incidentId = incident.id,
-                    status = "Assistance Requested",
-                    note = "Assistance request linked to verified incident"
-                )
-            )
         }
+    }
+
+    fun completeFieldIncident(incident: FieldIncident, resolution: String, reviewer: String) = launch {
+        repository.completeIncident(incident.id, resolution, reviewer)
     }
 
     fun saveReportSubmission(value: ReportSubmission) = launch {
@@ -493,13 +491,33 @@ private fun AssistanceRecord.toJson() = JSONObject().apply {
     put("reviewNotes", reviewNotes)
 }
 private fun FieldIncident.toJson() = JSONObject().apply {
-    put("id", id); put("type", type); put("commodity", commodity)
-    put("affectedArea", affectedArea); put("date", date); put("severity", severity)
-    put("description", description); put("status", status)
-    put("evidenceUri", evidenceUri); put("reviewNotes", reviewNotes)
+    put("id", id)
+    put("type", type)
+    put("commodity", commodity)
+    put("affectedArea", affectedArea)
+    put("date", date)
+    put("severity", severity)
+    put("description", description)
+    put("status", status)
+    put("evidenceUri", evidenceUri)
+    put("reviewNotes", reviewNotes)
+    put("farmerId", farmerId)
+    put("farmId", farmId)
+    put("fieldId", fieldId)
+    if (latitude == null) put("latitude", JSONObject.NULL) else put("latitude", latitude)
+    if (longitude == null) put("longitude", JSONObject.NULL) else put("longitude", longitude)
+    put("reviewer", reviewer)
+    put("assistanceRequestId", assistanceRequestId)
+    put("resolution", resolution)
 }
 private fun IncidentEvent.toJson() = JSONObject().apply {
-    put("incidentId", incidentId); put("status", status); put("note", note); put("timestamp", timestamp)
+    put("incidentId", incidentId)
+    put("status", status)
+    put("note", note)
+    put("timestamp", timestamp)
+    put("fromStatus", fromStatus)
+    put("actor", actor)
+    put("eventId", eventId)
 }
 
 private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
@@ -695,19 +713,39 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
     val incidents = mutableListOf<FieldIncident>()
     parseList(array("fieldIncidents")) { o, _ ->
         incidents += FieldIncident(
-            o.optString("id"), o.optString("type", "Other"), o.optString("commodity"),
-            o.optString("affectedArea"), o.optString("date"), o.optString("severity", "Moderate"),
-            o.optString("description"), o.optString("status", "Draft"), o.optString("evidenceUri"),
-            o.optString("reviewNotes")
+            id = o.optString("id"),
+            type = o.optString("type", "Other"),
+            commodity = o.optString("commodity"),
+            affectedArea = o.optString("affectedArea"),
+            date = o.optString("date"),
+            severity = o.optString("severity", "Moderate"),
+            description = o.optString("description"),
+            status = o.optString("status", "Draft"),
+            evidenceUri = o.optString("evidenceUri"),
+            reviewNotes = o.optString("reviewNotes"),
+            farmerId = o.optString("farmerId"),
+            farmId = o.optString("farmId"),
+            fieldId = o.optString("fieldId"),
+            latitude = if (o.isNull("latitude")) null else o.optDouble("latitude"),
+            longitude = if (o.isNull("longitude")) null else o.optDouble("longitude"),
+            reviewer = o.optString("reviewer"),
+            assistanceRequestId = o.optString("assistanceRequestId"),
+            resolution = o.optString("resolution")
         )
     }
     val events = mutableListOf<IncidentEvent>()
     parseList(array("incidentEvents")) { o, _ ->
         events += IncidentEvent(
-            o.optString("incidentId"), o.optString("status"), o.optString("note"),
-            o.optLong("timestamp")
+            incidentId = o.optString("incidentId"),
+            status = o.optString("status"),
+            note = o.optString("note"),
+            timestamp = o.optLong("timestamp"),
+            fromStatus = o.optString("fromStatus"),
+            actor = o.optString("actor"),
+            eventId = o.optString("eventId")
         )
     }
+
     val report = op("reportSubmission")
     return FarmSnapshot(
         profile, livestock, crops, production, expenses, sales, inventory, equipment,
