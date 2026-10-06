@@ -20,6 +20,7 @@ import com.tubalrr.agrivision.SaleRecord
 import com.tubalrr.agrivision.domain.model.FarmRecord
 import com.tubalrr.agrivision.domain.model.FarmerRecord
 import com.tubalrr.agrivision.domain.model.FieldRecord
+import com.tubalrr.agrivision.domain.model.MapPoint
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -45,7 +46,8 @@ data class FarmSnapshot(
     val fields: List<FieldRecord> = emptyList(),
     val cropLifecycleEvents: List<CropLifecycleEvent> = emptyList(),
     val livestockLifecycleEvents: List<LivestockLifecycleEvent> = emptyList(),
-    val inventoryTransactions: List<InventoryTransaction> = emptyList()
+    val inventoryTransactions: List<InventoryTransaction> = emptyList(),
+    val farm: FarmRecord? = null
 )
 
 class FarmRepository(
@@ -82,7 +84,8 @@ class FarmRepository(
                 landTenure = farm.landTenure,
                 commodities = farm.commodities,
                 registryStatus = farm.registryStatus,
-                reviewNotes = farm.reviewNotes
+                reviewNotes = farm.reviewNotes,
+                boundaryPoints = decodeMapPoints(farm.boundaryPointsJson)
             )
         }
 
@@ -101,7 +104,8 @@ class FarmRepository(
                     crop = it.crop,
                     plantingDate = it.plantingDate,
                     expectedHarvest = it.expectedHarvest,
-                    currentStatus = it.currentStatus
+                    currentStatus = it.currentStatus,
+                    boundaryPoints = decodeMapPoints(it.boundaryPointsJson)
                 )
             }
         }
@@ -327,7 +331,8 @@ class FarmRepository(
                     longitude = it.longitude,
                     reviewer = it.reviewer,
                     assistanceRequestId = it.assistanceRequestId,
-                    resolution = it.resolution
+                    resolution = it.resolution,
+                    affectedAreaBoundary = decodeMapPoints(it.affectedAreaBoundaryJson)
                 )
             }
         }
@@ -339,7 +344,10 @@ class FarmRepository(
                     incidentId = it.incidentId,
                     status = it.status,
                     note = it.note,
-                    timestamp = it.timestamp
+                    timestamp = it.timestamp,
+                    fromStatus = it.fromStatus,
+                    actor = it.actor,
+                    eventId = it.eventId
                 )
             }
         }
@@ -355,7 +363,11 @@ class FarmRepository(
     fun observeProductionCount(): Flow<Int> = dao.observeProductionCount(DEFAULT_FARM_ID)
     fun observeTotalLivestock(): Flow<Int> = dao.observeTotalLivestock(DEFAULT_FARM_ID)
 
-    suspend fun saveProfile(profile: FarmerProfile) {
+    suspend fun saveProfile(profile: FarmerProfile, farmBoundary: List<MapPoint>? = null) {
+        val existingFarm = dao.observeFarm(DEFAULT_FARM_ID).first()
+        val boundaryJson = farmBoundary?.let(::encodeMapPoints)
+            ?: existingFarm?.boundaryPointsJson
+            ?: "[]"
         dao.upsertFarmer(
             FarmerEntity(
                 farmerId = profile.farmerId,
@@ -377,7 +389,8 @@ class FarmRepository(
                 commodities = profile.commodities,
                 contact = profile.contact,
                 registryStatus = profile.registryStatus,
-                reviewNotes = profile.reviewNotes
+                reviewNotes = profile.reviewNotes,
+                boundaryPointsJson = boundaryJson
             )
         )
     }
@@ -396,7 +409,19 @@ suspend fun saveField(record: FieldRecord) {
                 crop = record.crop,
                 plantingDate = record.plantingDate,
                 expectedHarvest = record.expectedHarvest,
-                currentStatus = record.currentStatus
+                currentStatus = record.currentStatus,
+                boundaryPointsJson = encodeMapPoints(record.boundaryPoints)
+            )
+        )
+    }
+
+    suspend fun saveFarmBoundary(points: List<MapPoint>) {
+        val farm = dao.observeFarm(DEFAULT_FARM_ID).first()
+            ?: error("Farm registry is required before mapping the farm boundary.")
+        dao.upsertFarm(
+            farm.copy(
+                boundaryPointsJson = encodeMapPoints(points),
+                updatedAt = System.currentTimeMillis()
             )
         )
     }
@@ -415,7 +440,8 @@ suspend fun saveField(record: FieldRecord) {
                 crop = record.crop,
                 plantingDate = record.plantingDate,
                 expectedHarvest = record.expectedHarvest,
-                currentStatus = record.currentStatus
+                currentStatus = record.currentStatus,
+                boundaryPointsJson = encodeMapPoints(record.boundaryPoints)
             )
         )
     }
@@ -818,6 +844,7 @@ suspend fun saveField(record: FieldRecord) {
                 reviewer = record.reviewer,
                 assistanceRequestId = record.assistanceRequestId,
                 resolution = record.resolution,
+                affectedAreaBoundaryJson = encodeMapPoints(record.affectedAreaBoundary),
                 updatedAt = now
             )
         )
@@ -1002,7 +1029,7 @@ suspend fun saveField(record: FieldRecord) {
             dao.clearReportSubmissions()
             dao.clearFarms()
 
-            saveProfile(snapshot.profile)
+            saveProfile(snapshot.profile, snapshot.farm?.boundaryPoints)
             snapshot.livestock.forEach { saveLivestock(it) }
             snapshot.livestockLifecycleEvents.forEach { saveLivestockLifecycleEvent(it) }
             snapshot.crops.forEach { saveCrop(it) }
@@ -1035,6 +1062,33 @@ suspend fun saveField(record: FieldRecord) {
             snapshot.incidentEvents.forEach { saveIncidentEvent(it) }
             saveReportSubmission(snapshot.reportSubmission)
         }
+    }
+
+    private fun encodeMapPoints(points: List<MapPoint>): String =
+        org.json.JSONArray().apply {
+            points.forEach { point ->
+                put(
+                    org.json.JSONObject().apply {
+                        put("latitude", point.latitude)
+                        put("longitude", point.longitude)
+                    }
+                )
+            }
+        }.toString()
+
+    private fun decodeMapPoints(raw: String): List<MapPoint> {
+        if (raw.isBlank()) return emptyList()
+        return runCatching {
+            val array = org.json.JSONArray(raw)
+            buildList {
+                for (i in 0 until array.length()) {
+                    val point = array.optJSONObject(i) ?: continue
+                    val lat = point.optDouble("latitude", Double.NaN)
+                    val lon = point.optDouble("longitude", Double.NaN)
+                    if (lat.isFinite() && lon.isFinite()) add(MapPoint(lat, lon))
+                }
+            }
+        }.getOrDefault(emptyList())
     }
 
     private fun parseQuantity(raw: String): Pair<Double, String> {
