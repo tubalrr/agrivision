@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.UUID
 
 class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -233,6 +232,29 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { block() }
     }
 }
+
+private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
+    JSONObject().apply {
+        put("version", 2)
+        put("app", "AgriVision")
+        put("farmerProfile", snapshot.profile.toJson())
+        put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
+        put("crops", JSONArray(snapshot.crops.map { it.toJson() }))
+        put("production", JSONArray(snapshot.production.map { it.toJson() }))
+        put("expenses", JSONArray(snapshot.expenses.map { it.toJson() }))
+        put("sales", JSONArray(snapshot.sales.map { it.toJson() }))
+        put("inventory", JSONArray(snapshot.inventory.map { it.toJson() }))
+        put("equipment", JSONArray(snapshot.equipment.map { it.toJson() }))
+        put("tasks", JSONArray(snapshot.tasks.map { it.toJson() }))
+        put("assistance", JSONArray(snapshot.assistance.map { it.toJson() }))
+        put("fieldIncidents", JSONArray(snapshot.fieldIncidents.map { it.toJson() }))
+        put("incidentEvents", JSONArray(snapshot.incidentEvents.map { it.toJson() }))
+        put("reportSubmission", JSONObject().apply {
+            put("status", snapshot.reportSubmission.status)
+            put("submittedDate", snapshot.reportSubmission.submittedDate)
+            put("referenceNo", snapshot.reportSubmission.referenceNo)
+        })
+    }
 
 private fun FarmerProfile.toJson() = JSONObject().apply {
     put("farmerName", farmerName)
