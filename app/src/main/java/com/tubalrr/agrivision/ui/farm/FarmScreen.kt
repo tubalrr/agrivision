@@ -85,6 +85,7 @@ internal fun FarmScreen(
                     LivestockLifecycleSection(
                         livestock = livestock,
                         lifecycleEvents = livestockLifecycleEvents,
+                        inventory = inventory,
                         onAddLivestock = onAddLivestock,
                         onAddLifecycleEvent = onAddLivestockLifecycleEvent
                     )
@@ -97,6 +98,7 @@ internal fun FarmScreen(
                         crops = crops,
                         fields = fields,
                         lifecycleEvents = cropLifecycleEvents,
+                        inventory = inventory,
                         onAddCrop = onAddCrop,
                         onAddLifecycleEvent = onAddCropLifecycleEvent
                     )
@@ -105,19 +107,12 @@ internal fun FarmScreen(
 
             "Inventory" -> {
                 item {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SectionTitle("Farm Inventory")
-                        TextButton(onClick = { showAddDialog = true }) { Text("+ Add") }
-                    }
+                    InventorySection(
+                        inventory = inventory,
+                        transactions = inventoryTransactions,
+                        onAdd = onAddInventory
+                    )
                 }
-                items(inventory) { item ->
-                    FarmRecordCard(item.name, item.quantity, item.status, Icons.Outlined.Inventory2)
-                }
-                item { AddHint("Feeds, medicine, fertilizer, seeds, tools and supplies.") }
             }
 
             "Equipment" -> {
