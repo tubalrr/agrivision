@@ -114,6 +114,8 @@ internal fun AgriVisionApp(
                 2 -> ProductionFinanceScreen(
                     padding = padding,
                     production = production,
+                    crops = crops,
+                    livestock = livestock,
                     expenses = expenses,
                     sales = sales,
                     totalExpenses = totalExpenses,
