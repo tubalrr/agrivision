@@ -264,8 +264,9 @@ internal fun FieldMapScreen(
 
                             if (showCrops) {
                                 fields.forEach { field ->
-                                    if (field.boundaryPoints.size >= 3 && field.crop.isNotBlank()) {
-                                        val crop = crops.firstOrNull { it.fieldId == field.fieldId }
+                                    val crop = crops.firstOrNull { it.fieldId == field.fieldId }
+                                    val cropName = crop?.crop?.ifBlank { null } ?: field.crop
+                                    if (field.boundaryPoints.size >= 3 && cropName.isNotBlank()) {
                                         Polygon(
                                             points = field.boundaryPoints.toLatLng(),
                                             fillColor = cropStageFillColor(
