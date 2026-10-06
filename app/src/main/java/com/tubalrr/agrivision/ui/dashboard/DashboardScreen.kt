@@ -35,6 +35,9 @@ internal fun DashboardScreen(
     fieldIncidents: List<FieldIncident>,
     incidentEvents: List<IncidentEvent>,
     assistance: List<AssistanceRecord>,
+    farmer: com.tubalrr.agrivision.domain.model.FarmerRecord,
+    farm: com.tubalrr.agrivision.domain.model.FarmRecord,
+    fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
     farmViewModel: FarmViewModel,
     totalAnimals: Int,
     totalExpenses: Double,
@@ -48,7 +51,7 @@ internal fun DashboardScreen(
     val submittedIncidents = fieldIncidents.count { it.status == "Submitted" }
     val reviewIncidents = fieldIncidents.count { it.status == "Under Review" }
     val verifiedIncidents = fieldIncidents.count { it.status == "Verified" }
-    val activeIncidents = fieldIncidents.filter { it.status != "Resolved" }
+    val activeIncidents = fieldIncidents.filter { it.status != "Completed" }
     val urgentCases = activeIncidents.count {
         it.severity == "Critical" || it.severity == "High"
     }
@@ -56,13 +59,13 @@ internal fun DashboardScreen(
         it.evidenceUri.isBlank() && it.status != "Draft"
     }
     val assistancePending = activeIncidents.count { incident ->
-        incident.status == "Verified" &&
+        incident.status == "Assistance" &&
                 assistance.none {
                     it.incidentId == incident.id && it.status == "Completed"
                 }
     }
     val closureReady = fieldIncidents.count { incident ->
-        incident.status == "Verified" &&
+        incident.status == "Assistance" &&
                 assistance.any {
                     it.incidentId == incident.id && it.status == "Completed"
                 }
@@ -70,9 +73,15 @@ internal fun DashboardScreen(
     var showIncidentDialog by remember { mutableStateOf(false) }
     var reviewIncident by remember { mutableStateOf<FieldIncident?>(null) }
     var timelineIncident by remember { mutableStateOf<FieldIncident?>(null) }
+    var resolutionIncident by remember { mutableStateOf<FieldIncident?>(null) }
 
     if (showIncidentDialog) {
         AddFieldIncidentDialog(
+            farmerId = farmer.farmerId,
+            farmerName = farmer.fullName,
+            farmId = farm.farmId,
+            farmName = farm.farmName,
+            fields = fields,
             onDismiss = { showIncidentDialog = false },
             onSave = { incident ->
                 farmViewModel.addFieldIncident(incident)
@@ -96,6 +105,17 @@ internal fun DashboardScreen(
             onSave = { updated ->
                 farmViewModel.reviewFieldIncident(incident, updated)
                 reviewIncident = null
+            }
+        )
+    }
+ 
+    resolutionIncident?.let { incident ->
+        IncidentResolutionDialog(
+            incident = incident,
+            onDismiss = { resolutionIncident = null },
+            onSave = { resolution, reviewer ->
+                farmViewModel.completeFieldIncident(incident, resolution, reviewer)
+                resolutionIncident = null
             }
         )
     }
@@ -300,10 +320,11 @@ internal fun DashboardScreen(
                     onReview = { reviewIncident = incident },
                     onTimeline = { timelineIncident = incident },
                     onCreateAssistance = {
-                        if (!assistance.any { it.incidentId == incident.id }) {
+                        if (incident.status == "Assistance" && !assistance.any { it.incidentId == incident.id }) {
                             farmViewModel.requestAssistance(incident)
                         }
-                    }
+                    },
+                    onResolve = { resolutionIncident = incident }
                 )
             }
         }
@@ -417,7 +438,7 @@ internal fun CaseTriageCard(
     onReviewCase: (FieldIncident) -> Unit
 ) {
     val triageCases = cases
-        .filter { it.status != "Resolved" && (it.severity == "Critical" || it.severity == "High" || it.status == "Submitted" || it.status == "Under Review") }
+        .filter { it.status != "Completed" && (it.severity == "Critical" || it.severity == "High" || it.status == "Submitted" || it.status == "Under Review") }
         .take(3)
 
     Card(
