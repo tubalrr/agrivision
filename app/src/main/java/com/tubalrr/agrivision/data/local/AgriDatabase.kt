@@ -220,5 +220,35 @@ abstract class AgriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE livestock ADD COLUMN groupId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE livestock ADD COLUMN initialPopulation INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE livestock ADD COLUMN currentPopulation INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_livestock_groupId ON livestock(groupId)")
+                db.execSQL("UPDATE livestock SET groupId = livestockId WHERE groupId = ''")
+                db.execSQL("UPDATE livestock SET initialPopulation = count, currentPopulation = count WHERE initialPopulation = 0 AND currentPopulation = 0")
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS livestock_lifecycle_events (
+                        eventId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        livestockId TEXT NOT NULL,
+                        stage TEXT NOT NULL,
+                        date TEXT NOT NULL,
+                        notes TEXT NOT NULL,
+                        inputName TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        unit TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        PRIMARY KEY(eventId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_livestock_lifecycle_events_farmId ON livestock_lifecycle_events(farmId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_livestock_lifecycle_events_livestockId ON livestock_lifecycle_events(livestockId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_livestock_lifecycle_events_livestockId_date ON livestock_lifecycle_events(livestockId,date)")
+            }
+        }
+
     }
 }
