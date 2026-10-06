@@ -198,7 +198,19 @@ class FarmRepository(
 
     fun observeProduction(): Flow<List<ProductionRecord>> =
         dao.observeProduction(DEFAULT_FARM_ID).map { list ->
-            list.map { ProductionRecord(it.commodity, formatQuantity(it.quantity, it.unit), it.date) }
+            list.map {
+                ProductionRecord(
+                    product = it.commodity,
+                    quantity = formatQuantity(it.quantity, it.unit),
+                    period = it.date,
+                    productionId = it.productionId,
+                    sourceType = it.sourceType,
+                    sourceId = it.sourceId,
+                    fieldId = it.fieldId,
+                    areaHectares = it.areaHectares,
+                    productionType = it.productionType
+                )
+            }
         }
 
     fun observeExpenses(): Flow<List<ExpenseRecord>> =
@@ -653,18 +665,30 @@ suspend fun saveField(record: FieldRecord) {
         )
     }
 
-    suspend fun saveProduction(record: ProductionRecord, productionId: String = UUID.randomUUID().toString()) {
+    suspend fun saveProduction(record: ProductionRecord, productionId: String = record.productionId.ifBlank { UUID.randomUUID().toString() }) {
         val parsed = parseQuantity(record.quantity)
+        require(record.sourceType == "Crop" || record.sourceType == "Livestock") {
+            "Production must be linked to a crop or livestock source."
+        }
+        require(record.sourceId.isNotBlank()) { "Production source is required." }
+        require(parsed.first > 0.0) { "Production quantity must be greater than zero." }
+
         dao.upsertProduction(
             ProductionEntity(
                 productionId = productionId,
                 farmId = DEFAULT_FARM_ID,
                 date = record.period,
-                productionType = "Farm Production",
+                productionType = record.productionType.ifBlank { "Harvest" },
                 commodity = record.product,
                 quantity = parsed.first,
-                unit = parsed.second
-            )
+                unit = parsed.second.ifBlank { "unit" },
+                source = record.sourceType + ":" + record.sourceId,
+                notes = "",
+                sourceType = record.sourceType,
+                sourceId = record.sourceId,
+                fieldId = record.fieldId,
+                areaHectares = record.areaHectares.coerceAtLeast(0.0),
+                            )
         )
     }
 
