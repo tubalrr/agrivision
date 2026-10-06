@@ -1,5 +1,9 @@
 package com.tubalrr.agrivision
 
+import com.tubalrr.agrivision.domain.model.FarmRecord
+import com.tubalrr.agrivision.domain.model.FarmerRecord
+import com.tubalrr.agrivision.domain.model.FieldRecord
+
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,12 +32,17 @@ import androidx.compose.material.icons.outlined.*
 internal fun ProfileScreen(
     padding: PaddingValues,
     profile: FarmerProfile,
+    farmer: FarmerRecord,
+    farm: FarmRecord,
+    fields: List<FieldRecord>,
     onProfileSaved: (FarmerProfile) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     assistance: List<AssistanceRecord>,
     onAddAssistance: (AssistanceRecord) -> Unit,
-    onUpdateAssistance: (AssistanceRecord) -> Unit
+    onUpdateAssistance: (AssistanceRecord) -> Unit,
+    onAddField: (FieldRecord) -> Unit,
+    onUpdateField: (FieldRecord) -> Unit
 ) {
     var showEdit by remember { mutableStateOf(false) }
 
@@ -102,6 +111,30 @@ internal fun ProfileScreen(
         }
 
         item { SectionTitle("Farm Registry") }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Registry Identity", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text("Farmer ID: " + farmer.farmerId.ifBlank { "Not assigned" }, style = MaterialTheme.typography.bodySmall)
+                    Text("Farm ID: " + farm.farmId, style = MaterialTheme.typography.bodySmall)
+                    Text("Registered fields: " + fields.size, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        item {
+            FieldRegistrySection(
+                farm = farm,
+                fields = fields,
+                onAdd = onAddField,
+                onUpdate = onUpdateField
+            )
+        }
 
         item {
             RegistryInfoCard("Farm Name", profile.farmName.ifBlank { "Not registered" })
