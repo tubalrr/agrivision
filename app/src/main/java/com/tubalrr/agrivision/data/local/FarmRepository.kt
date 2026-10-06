@@ -15,6 +15,7 @@ import com.tubalrr.agrivision.ReportSubmission
 import com.tubalrr.agrivision.SaleRecord
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -295,14 +296,13 @@ class FarmRepository(
         )
     }
 
-    suspend fun updateTaskAt(index: Int, task: FarmTask) {
-        val current = dao.observeTasks(DEFAULT_FARM_ID)
-        current.map { list -> list.getOrNull(index) }.collect { entity ->
-            if (entity != null) {
-                dao.upsertTask(entity.copy(done = task.done, updatedAt = System.currentTimeMillis()))
-            }
-            return@collect
-        }
+    suspend fun updateTask(task: FarmTask) {
+        val entity = dao.observeTasks(DEFAULT_FARM_ID).first().firstOrNull {
+            it.title == task.title &&
+                    it.category == task.category &&
+                    it.date == task.date
+        } ?: return
+        dao.upsertTask(entity.copy(done = task.done, updatedAt = System.currentTimeMillis()))
     }
 
     suspend fun saveAssistance(record: AssistanceRecord) {
