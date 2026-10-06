@@ -31,16 +31,39 @@ Built with:
 
 🚧 Android foundation
 
-## Google Satellite Field Map
+## Field Mapping System
 
-The dashboard uses Google Maps Compose in satellite mode. To enable map tiles on your device:
+The Map tab is a functional operational layer, not a decorative map. It uses Google Maps Compose in satellite mode and reads/writes the local Room registry.
 
-1. Enable **Maps SDK for Android** in your Google Maps Platform project.
-2. Create an API key and restrict it to this Android app (package name + SHA-1).
-3. In the local project root, add this to `local.properties`:
+The map can show:
+
+- Farm boundary polygon
+- Individual field boundaries and field coordinates
+- Crop linked to each field and the crop's current lifecycle stage
+- Incident markers, severity and workflow status
+- Incident affected-area polygons
+- GPS coordinates captured from map points and stored with the field/incident
+- Map editing with long-press points, undo, clear and save
+
+The relationship is:
+
+```
+Map
+ ├── Farm
+ ├── Fields
+ ├── Crops
+ └── Incidents
+```
+
+Map geometry is stored locally for the offline-first workflow and included in backup/case-package JSON. The app does not request device location permission for this feature.
+
+### Local Google Maps setup
+
+The API key is kept out of source control. Add this to the project root `local.properties`:
 
 ```properties
 MAPS_API_KEY=YOUR_API_KEY
 ```
 
-The key is read locally and is not stored in the repository. Long-press the actual field on the satellite map to pin its location; the selected coordinates are saved locally on the phone.
+Then enable **Maps SDK for Android** for the Google Maps Platform project used by the key. The Android manifest receives the value through the `com.google.android.geo.API_KEY` metadata placeholder. 
+
