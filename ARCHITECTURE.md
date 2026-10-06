@@ -26,6 +26,34 @@ Farmer stores person/beneficiary identity, Farm stores the agricultural holding,
 
 Coordinates are stored as explicit registry data. The field form does not request GPS permission; coordinates can be entered manually. This keeps the registry offline-first while making field records ready for a future map layer.
 
+## Crop lifecycle
+
+Crop records are field-linked and no longer model a crop as only a name, area, and stage.
+
+The lifecycle is represented as:
+
+```
+Field
+  ↓
+Land Preparation
+  ↓
+Planting
+  ↓
+Growing
+  ↓
+Fertilization
+  ↓
+Pest/Disease Monitoring
+  ↓
+Harvest
+  ↓
+Production
+  ↓
+Sales
+```
+
+A crop keeps its linked `fieldId`, crop identity, planting/expected-harvest dates, current lifecycle status, and operational area. A separate lifecycle-event table records each stage update with date, notes, input/activity, quantity, and unit. This provides an auditable crop history and gives future production, sales, incident, and map workflows a stable crop/field relationship.
+
 ## Core domain
 
 AgriVision is designed around **Farm Operations**, not a livestock-only model:
