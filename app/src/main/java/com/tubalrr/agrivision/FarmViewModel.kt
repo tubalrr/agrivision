@@ -71,6 +71,11 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     val inventory: StateFlow<List<InventoryItem>> = repository.observeInventory().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
+
+    val inventoryTransactions: StateFlow<List<InventoryTransaction>> =
+        repository.observeInventoryTransactions().stateIn(
+            viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
+        )
     val equipment: StateFlow<List<EquipmentRecord>> = repository.observeEquipment().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
@@ -129,7 +134,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun addCropLifecycleEvent(value: CropLifecycleEvent) = launch {
         repository.saveCropLifecycleEvent(value)
     }
-    fun addInventory(value: InventoryItem) = launch { repository.saveInventory(value) }
+    fun addInventory(value: InventoryItem) = launch { repository.saveInventoryWithPurchase(value) }
     fun addEquipment(value: EquipmentRecord) = launch { repository.saveEquipment(value) }
 
     fun addProduction(value: ProductionRecord) = launch { repository.saveProduction(value) }
@@ -216,7 +221,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun exportCasePackage(uri: Uri) = launch {
         val snapshot = currentSnapshot()
         val json = JSONObject().apply {
-            put("packageVersion", 5)
+            put("packageVersion", 6)
             put("app", "AgriVision")
             put("packageType", "DA Case Package")
             put("generatedAt", System.currentTimeMillis())
@@ -260,6 +265,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             expenses = repository.observeExpenses().first(),
             sales = repository.observeSales().first(),
             inventory = repository.observeInventory().first(),
+            inventoryTransactions = repository.observeInventoryTransactions().first(),
             equipment = repository.observeEquipment().first(),
             tasks = repository.observeTasks().first(),
             assistance = repository.observeAssistance().first(),
@@ -290,6 +296,7 @@ private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
         put("expenses", JSONArray(snapshot.expenses.map { it.toJson() }))
         put("sales", JSONArray(snapshot.sales.map { it.toJson() }))
         put("inventory", JSONArray(snapshot.inventory.map { it.toJson() }))
+        put("inventoryTransactions", JSONArray(snapshot.inventoryTransactions.map { it.toJson() }))
         put("equipment", JSONArray(snapshot.equipment.map { it.toJson() }))
         put("tasks", JSONArray(snapshot.tasks.map { it.toJson() }))
         put("assistance", JSONArray(snapshot.assistance.map { it.toJson() }))
@@ -423,7 +430,30 @@ private fun SaleRecord.toJson() = JSONObject().apply {
     put("product", product); put("amount", amount); put("date", date)
 }
 private fun InventoryItem.toJson() = JSONObject().apply {
-    put("name", name); put("quantity", quantity); put("status", status)
+    put("name", name)
+    put("quantity", quantity)
+    put("status", status)
+    put("inventoryId", inventoryId)
+    put("category", category)
+    put("stock", stock)
+    put("unit", unit)
+    put("purchasePrice", purchasePrice)
+    put("supplier", supplier)
+    put("dateAcquired", dateAcquired)
+    put("expiryDate", expiryDate)
+}
+
+private fun InventoryTransaction.toJson() = JSONObject().apply {
+    put("transactionId", transactionId)
+    put("inventoryId", inventoryId)
+    put("type", type)
+    put("quantity", quantity)
+    put("unit", unit)
+    put("date", date)
+    put("sourceType", sourceType)
+    put("sourceId", sourceId)
+    put("notes", notes)
+    put("createdAt", createdAt)
 }
 private fun EquipmentRecord.toJson() = JSONObject().apply {
     put("name", name); put("status", status); put("note", note)
@@ -557,7 +587,41 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
     val sales = mutableListOf<SaleRecord>()
     parseList(salesArray) { o, _ -> sales += SaleRecord(o.optString("product"), o.optDouble("amount"), o.optString("date")) }
     val inventory = mutableListOf<InventoryItem>()
-    parseList(inventoryArray) { o, _ -> inventory += InventoryItem(o.optString("name"), o.optString("quantity"), o.optString("status")) }
+    parseList(inventoryArray) { o, _ ->
+        val legacyQuantity = o.optString("quantity")
+        val parts = legacyQuantity.trim().split(" ", limit = 2)
+        val legacyStock = o.optDouble("stock", parts.firstOrNull()?.toDoubleOrNull() ?: 0.0)
+        val legacyUnit = o.optString("unit").ifBlank { parts.getOrNull(1).orEmpty() }
+        inventory += InventoryItem(
+            name = o.optString("name"),
+            quantity = legacyQuantity,
+            status = o.optString("status"),
+            inventoryId = o.optString("inventoryId"),
+            category = o.optString("category", "Other"),
+            stock = legacyStock,
+            unit = legacyUnit,
+            purchasePrice = o.optDouble("purchasePrice", 0.0),
+            supplier = o.optString("supplier"),
+            dateAcquired = o.optString("dateAcquired"),
+            expiryDate = o.optString("expiryDate")
+        )
+    }
+
+    val inventoryTransactions = mutableListOf<InventoryTransaction>()
+    parseList(array("inventoryTransactions")) { o, _ ->
+        inventoryTransactions += InventoryTransaction(
+            transactionId = o.optString("transactionId"),
+            inventoryId = o.optString("inventoryId"),
+            type = o.optString("type"),
+            quantity = o.optDouble("quantity", 0.0),
+            unit = o.optString("unit"),
+            date = o.optString("date"),
+            sourceType = o.optString("sourceType"),
+            sourceId = o.optString("sourceId"),
+            notes = o.optString("notes"),
+            createdAt = o.optLong("createdAt", System.currentTimeMillis())
+        )
+    }
     val equipment = mutableListOf<EquipmentRecord>()
     parseList(equipmentArray) { o, _ -> equipment += EquipmentRecord(o.optString("name"), o.optString("status"), o.optString("note")) }
     val tasks = mutableListOf<FarmTask>()
@@ -618,6 +682,7 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
         ),
         fields,
         cropLifecycleEvents,
-        livestockLifecycleEvents
+        livestockLifecycleEvents,
+        inventoryTransactions
     )
 }
