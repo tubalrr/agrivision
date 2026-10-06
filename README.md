@@ -42,7 +42,7 @@ The map can show:
 - Crop linked to each field and the crop's current lifecycle stage
 - Incident markers, severity and workflow status
 - Incident affected-area polygons
-- GPS coordinates captured from map points and stored with the field/incident
+- Latitude/longitude captured from map points and stored with the field/incident
 - Map editing with long-press points, undo, clear and save
 
 The relationship is:
