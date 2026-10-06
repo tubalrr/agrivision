@@ -48,11 +48,12 @@ internal fun StatusBadge(status: String) {
 internal fun FarmRecordCard(title: String, value: String, detail: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
     Card(
         Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = AgriCard)
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(AgriGreenSoft), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(50.dp).clip(RoundedCornerShape(16.dp)).background(AgriGreenSoft), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(14.dp))
@@ -89,13 +90,22 @@ internal fun StatCard(
     background: Color,
     modifier: Modifier = Modifier
 ) {
-    Card(modifier, shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = background)) {
-        Column(Modifier.padding(16.dp)) {
-            Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(25.dp))
-            Spacer(Modifier.height(10.dp))
-            Text(title, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(detail, color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+    Card(
+        modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = background),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Box(
+                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = .62f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(20.dp))
+            }
+            Text(title, color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = AgriText)
+            Text(detail, color = AgriGreen, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -147,16 +157,25 @@ internal fun AddHint(text: String) {
 
 @Composable
 internal fun ScreenHeader(title: String, subtitle: String) {
-    Column {
-        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(3.dp))
-        Text(subtitle, color = AgriMuted)
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = AgriText
+        )
+        Text(subtitle, color = AgriMuted, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 internal fun SectionTitle(title: String) {
-    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.ExtraBold,
+        color = AgriText
+    )
 }
 
 @Composable
