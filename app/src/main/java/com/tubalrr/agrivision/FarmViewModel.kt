@@ -350,6 +350,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             sales = repository.observeSales().first(),
             inventory = repository.observeInventory().first(),
             inventoryTransactions = repository.observeInventoryTransactions().first(),
+            feedLogs = repository.observeFeedLogs().first(),
             equipment = repository.observeEquipment().first(),
             tasks = repository.observeTasks().first(),
             assistance = repository.observeAssistance().first(),
