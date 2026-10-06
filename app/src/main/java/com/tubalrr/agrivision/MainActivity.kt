@@ -1253,11 +1253,14 @@ private fun DashboardKpiCard(
 @Composable
 private fun FarmScreen(
     padding: PaddingValues,
-    livestock: MutableList<Livestock>,
-    crops: MutableList<CropRecord>,
-    inventory: MutableList<InventoryItem>,
-    equipment: MutableList<EquipmentRecord>,
-    farmPrefs: android.content.SharedPreferences
+    livestock: List<Livestock>,
+    crops: List<CropRecord>,
+    inventory: List<InventoryItem>,
+    equipment: List<EquipmentRecord>,
+    onAddLivestock: (Livestock) -> Unit,
+    onAddCrop: (CropRecord) -> Unit,
+    onAddInventory: (InventoryItem) -> Unit,
+    onAddEquipment: (EquipmentRecord) -> Unit
 ) {
     var category by remember { mutableStateOf("Livestock") }
     var showAddDialog by remember { mutableStateOf(false) }
@@ -1267,23 +1270,19 @@ private fun FarmScreen(
             category = category,
             onDismiss = { showAddDialog = false },
             onAddLivestock = { record ->
-                livestock.add(record)
-                saveLivestock(farmPrefs, livestock)
+                onAddLivestock(record)
                 showAddDialog = false
             },
             onAddCrop = { record ->
-                crops.add(record)
-                saveCrops(farmPrefs, crops)
+                onAddCrop(record)
                 showAddDialog = false
             },
             onAddInventory = { record ->
-                inventory.add(record)
-                saveInventory(farmPrefs, inventory)
+                onAddInventory(record)
                 showAddDialog = false
             },
             onAddEquipment = { record ->
-                equipment.add(record)
-                saveEquipment(farmPrefs, equipment)
+                onAddEquipment(record)
                 showAddDialog = false
             }
         )
@@ -1512,13 +1511,15 @@ private fun ProductionFinanceScreen(
     netIncome: Double,
     totalAnimals: Int,
     openTasks: Int,
-    farmPrefs: android.content.SharedPreferences,
     farmerProfile: FarmerProfile,
     assistance: List<AssistanceRecord>,
     fieldIncidents: List<FieldIncident>,
     incidentEvents: List<IncidentEvent>,
     onExportCasePackage: () -> Unit,
     reportSubmission: ReportSubmission,
+    onProduction: (ProductionRecord) -> Unit,
+    onExpense: (ExpenseRecord) -> Unit,
+    onSale: (SaleRecord) -> Unit,
     onSubmissionSaved: (ReportSubmission) -> Unit
 ) {
     var tab by remember { mutableStateOf("Production") }
@@ -1528,9 +1529,9 @@ private fun ProductionFinanceScreen(
         AddProductionFinanceDialog(
             tab = tab,
             onDismiss = { showDialog = false },
-            onProduction = { record -> production.add(record); saveProduction(farmPrefs, production); showDialog = false },
-            onExpense = { record -> expenses.add(record); saveExpenses(farmPrefs, expenses); showDialog = false },
-            onSale = { record -> sales.add(record); saveSales(farmPrefs, sales); showDialog = false }
+            onProduction = { record -> onProduction(record); showDialog = false },
+            onExpense = { record -> onExpense(record); showDialog = false },
+            onSale = { record -> onSale(record); showDialog = false }
         )
     }
 
@@ -1998,9 +1999,10 @@ private fun AddProductionFinanceDialog(
 @Composable
 private fun TasksScreen(
     padding: PaddingValues,
-    tasks: MutableList<FarmTask>,
+    tasks: List<FarmTask>,
     inventory: List<InventoryItem>,
-    farmPrefs: android.content.SharedPreferences
+    onAddTask: (FarmTask) -> Unit,
+    onToggleTask: (FarmTask) -> Unit
 ) {
     val todayKey = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time) }
     var selectedDate by remember { mutableStateOf(todayKey) }
@@ -2013,7 +2015,7 @@ private fun TasksScreen(
     if (showDialog) {
         AddTaskDialog(
             onDismiss = { showDialog = false },
-            onAdd = { record -> tasks.add(record); saveTasks(farmPrefs, tasks); showDialog = false }
+            onAdd = { record -> onAddTask(record); showDialog = false }
         )
     }
 
@@ -2109,7 +2111,7 @@ private fun TasksScreen(
                         Text(task.title, fontWeight = FontWeight.Bold)
                         Text(task.category + " · " + if (task.done) "Completed" else "Upcoming", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                     }
-                    TextButton(onClick = { tasks[index] = task.copy(done = !task.done); saveTasks(farmPrefs, tasks) }) {
+                    TextButton(onClick = { onToggleTask(task.copy(done = !task.done)) }) {
                         Text(if (task.done) "Undo" else "Done")
                     }
                 }
