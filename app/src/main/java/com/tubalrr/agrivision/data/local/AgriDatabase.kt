@@ -148,5 +148,45 @@ abstract class AgriDatabase : RoomDatabase() {
                 )
             }
         }
+        
+        private val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS farmers (
+                        farmerId TEXT NOT NULL,
+                        fullName TEXT NOT NULL,
+                        contact TEXT NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(farmerId)
+                    )"""
+                )
+                db.execSQL(
+                    "INSERT OR IGNORE INTO farmers(farmerId, fullName, contact, updatedAt) " +
+                            "SELECT farmerId, farmerName, contact, updatedAt FROM farms"
+                )
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS fields (
+                        fieldId TEXT NOT NULL,
+                        farmId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        areaHectares REAL NOT NULL,
+                        location TEXT NOT NULL,
+                        latitude REAL,
+                        longitude REAL,
+                        landTenure TEXT NOT NULL,
+                        crop TEXT NOT NULL,
+                        plantingDate TEXT NOT NULL,
+                        expectedHarvest TEXT NOT NULL,
+                        currentStatus TEXT NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(fieldId)
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_fields_farmId ON fields(farmId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_fields_farmId_currentStatus ON fields(farmId,currentStatus)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_fields_farmId_crop ON fields(farmId,crop)")
+            }
+        }
+
     }
 }
