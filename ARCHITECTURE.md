@@ -50,6 +50,21 @@ Sales
 
 A separate livestock lifecycle event table records the operational history for each group, including stage, date, notes, feed/medicine/product reference, quantity, unit, and amount. Population events can set the current population while mortality events reduce it, keeping the group count synchronized with recorded events.
 
+## Production source links
+
+Production records must reference an actual farm source instead of storing only a generic product and quantity.
+
+Supported production sources are:
+
+```
+Crop → Field → Harvest → Production
+Livestock Group → Production
+```
+
+Each production record stores `sourceType`, `sourceId`, and (for crop production) `fieldId` plus the recorded area. This allows a report such as “Rice · Field A · 2.5 ha · 4,200 kg · 2026-10-05” to remain traceable to the registered crop cycle and field.
+
+New production entries require a valid crop or livestock source. Legacy records may remain unlinked for backward compatibility and are displayed as legacy/unlinked records until they are re-entered with a source.
+
 ## Inputs & inventory
 
 Inventory is a structured stock system rather than a display-only list.
