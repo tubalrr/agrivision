@@ -42,6 +42,7 @@ internal fun ProductionFinanceScreen(
     incidentEvents: List<IncidentEvent>,
     onExportCasePackage: () -> Unit,
     onExportDaReport: (String, DaReportFormat) -> Unit,
+    exportStatus: String,
     reportSubmission: ReportSubmission,
     onProduction: (ProductionRecord) -> Unit,
     onExpense: (ExpenseRecord) -> Unit,
@@ -184,6 +185,14 @@ internal fun ProductionFinanceScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                             }
+                        }
+                        if (exportStatus.isNotBlank()) {
+                            Text(
+                                exportStatus,
+                                color = if (exportStatus.contains("failed", ignoreCase = true)) MaterialTheme.colorScheme.error else AgriGreen,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                         Button(
                             onClick = { onExportDaReport(selectedDaReport, selectedDaFormat) },
