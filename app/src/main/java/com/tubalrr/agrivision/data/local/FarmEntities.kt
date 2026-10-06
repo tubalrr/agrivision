@@ -192,6 +192,11 @@ data class ProductionEntity(
     val unit: String,
     val source: String = "",
     val notes: String = "",
+    val sourceType: String = "",
+    val sourceId: String = "",
+    val fieldId: String = "",
+    val areaHectares: Double = 0.0,
+    val productionType: String = "Harvest",
     val createdAt: Long = System.currentTimeMillis()
 )
 
