@@ -370,10 +370,17 @@ internal fun FieldMapScreen(
                             Modifier.align(Alignment.TopEnd).padding(12.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            FilledTonalButton(onClick = fitAll, enabled = allMappedPoints.isNotEmpty()) {
+                            FilledTonalButton(
+                                onClick = fitAll,
+                                enabled = allMappedPoints.isNotEmpty(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
                                 Text("Fit all")
                             }
-                            FilledTonalButton(onClick = { editing = !editing }) {
+                            FilledTonalButton(
+                                onClick = { editing = !editing },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
                                 Text(if (editing) "Stop edit" else "Edit map")
                             }
                         }
@@ -522,7 +529,7 @@ private fun MapEditorCard(
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = AgriCard)
     ) {
-        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Map editor", fontWeight = FontWeight.Bold, color = AgriGreen)
             Text(requirements, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
 
@@ -573,13 +580,13 @@ private fun MapEditorCard(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                OutlinedButton(onClick = onUndo, enabled = draftPoints.isNotEmpty(), modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = onUndo, enabled = draftPoints.isNotEmpty(), modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
                     Text("Undo")
                 }
-                OutlinedButton(onClick = onClear, enabled = draftPoints.isNotEmpty(), modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = onClear, enabled = draftPoints.isNotEmpty(), modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
                     Text("Clear")
                 }
-                Button(onClick = onSave, enabled = saveEnabled, modifier = Modifier.weight(1f)) {
+                Button(onClick = onSave, enabled = saveEnabled, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
                     Text("Save map")
                 }
             }
