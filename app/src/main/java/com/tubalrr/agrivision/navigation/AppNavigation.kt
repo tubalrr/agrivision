@@ -97,7 +97,15 @@ internal fun AgriVisionApp(
                     netIncome = netIncome,
                     openTasks = openTasks
                 )
-                1 -> FarmScreen(
+                1 -> FieldMapScreen(
+                    padding = padding,
+                    farm = farm,
+                    fields = fields,
+                    crops = crops,
+                    incidents = fieldIncidents,
+                    farmViewModel = farmViewModel
+                )
+                2 -> FarmScreen(
                     padding = padding,
                     livestock = livestock,
                     livestockLifecycleEvents = livestockLifecycleEvents,
@@ -114,7 +122,7 @@ internal fun AgriVisionApp(
                     onAddEquipment = farmViewModel::addEquipment,
                     onAddCropLifecycleEvent = farmViewModel::addCropLifecycleEvent
                 )
-                2 -> ProductionFinanceScreen(
+                3 -> ProductionFinanceScreen(
                     padding = padding,
                     production = production,
                     crops = crops,
@@ -137,7 +145,7 @@ internal fun AgriVisionApp(
                     onSale = farmViewModel::addSale,
                     onSubmissionSaved = farmViewModel::saveReportSubmission
                 )
-                3 -> TasksScreen(
+                4 -> TasksScreen(
                     padding = padding,
                     tasks = tasks,
                     inventory = inventory,
@@ -168,6 +176,7 @@ internal fun AgriVisionApp(
 internal fun AgriBottomBar(selected: Int, onSelected: (Int) -> Unit) {
     val items = listOf(
         "Dashboard" to Icons.Outlined.Dashboard,
+        "Map" to Icons.Outlined.Map,
         "Farm" to Icons.Outlined.Yard,
         "Reports" to Icons.Outlined.Assessment,
         "Tasks" to Icons.Outlined.Checklist,
