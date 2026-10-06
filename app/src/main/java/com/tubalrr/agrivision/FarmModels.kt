@@ -49,7 +49,32 @@ data class CropLifecycleEvent(
 )
 data class ProductionRecord(val product: String, val quantity: String, val period: String)
 data class ExpenseRecord(val category: String, val amount: Double, val note: String)
-data class InventoryItem(val name: String, val quantity: String, val status: String)
+data class InventoryItem(
+    val name: String,
+    val quantity: String,
+    val status: String,
+    val inventoryId: String = "",
+    val category: String = "Other",
+    val stock: Double = 0.0,
+    val unit: String = "",
+    val purchasePrice: Double = 0.0,
+    val supplier: String = "",
+    val dateAcquired: String = "",
+    val expiryDate: String = ""
+)
+
+data class InventoryTransaction(
+    val transactionId: String = "",
+    val inventoryId: String,
+    val type: String,
+    val quantity: Double,
+    val unit: String,
+    val date: String,
+    val sourceType: String = "",
+    val sourceId: String = "",
+    val notes: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
 data class EquipmentRecord(val name: String, val status: String, val note: String)
 data class FarmTask(val title: String, val category: String, val date: String, val done: Boolean)
 data class SaleRecord(val product: String, val amount: Double, val date: String)
