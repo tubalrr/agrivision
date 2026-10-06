@@ -353,9 +353,9 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
     JSONObject().apply {
-        put("backupVersion", BACKUP_FORMAT_VERSION)
-        put("schemaVersion", ROOM_SCHEMA_VERSION)
-        put("version", ROOM_SCHEMA_VERSION)
+        put("backupVersion", FarmViewModel.BACKUP_FORMAT_VERSION)
+        put("schemaVersion", FarmViewModel.ROOM_SCHEMA_VERSION)
+        put("version", FarmViewModel.ROOM_SCHEMA_VERSION)
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("farm", (snapshot.farm ?: snapshot.profile.toFarmRecord()).toJson())
