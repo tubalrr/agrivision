@@ -111,7 +111,12 @@ object LegacyPreferencesMigrator {
         val a = JSONArray(raw)
         return List(a.length()) { i ->
             val o = a.getJSONObject(i)
-            ExpenseRecord(o.optString("category"), o.optDouble("amount", 0.0), o.optString("note"))
+            ExpenseRecord(
+                category = o.optString("category"),
+                amount = o.optDouble("amount", 0.0),
+                note = o.optString("note"),
+                date = o.optString("date")
+            )
         }
     }
 
@@ -119,7 +124,12 @@ object LegacyPreferencesMigrator {
         val a = JSONArray(raw)
         return List(a.length()) { i ->
             val o = a.getJSONObject(i)
-            SaleRecord(o.optString("product"), o.optDouble("amount", 0.0), o.optString("date"))
+            SaleRecord(
+                product = o.optString("product"),
+                amount = o.optDouble("amount", 0.0),
+                date = o.optString("date"),
+                incomeCategory = o.optString("incomeCategory", "Other Income")
+            )
         }
     }
 
