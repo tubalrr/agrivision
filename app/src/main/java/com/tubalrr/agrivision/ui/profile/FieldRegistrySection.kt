@@ -53,7 +53,7 @@ internal fun FieldRegistrySection(
                 Column(Modifier.weight(1f)) {
                     Text("Field Registry", fontWeight = FontWeight.Bold, color = AgriGreen)
                     Text(
-                        "Field-level records prepared for future map, monitoring and DA validation workflows.",
+                        "Field-level records feed the live map, crop monitoring and DA validation workflow.",
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -112,6 +112,11 @@ internal fun FieldRegistrySection(
                             Text(
                                 coordinateLabel(field),
                                 color = if (field.latitude != null && field.longitude != null) AgriGreen else AgriMuted,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            Text(
+                                if (field.boundaryPoints.size >= 3) "Boundary: mapped" else "Boundary: not mapped",
+                                color = if (field.boundaryPoints.size >= 3) AgriGreen else AgriMuted,
                                 style = MaterialTheme.typography.labelSmall
                             )
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
