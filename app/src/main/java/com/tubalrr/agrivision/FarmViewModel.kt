@@ -492,6 +492,7 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
     val livestock = mutableListOf<Livestock>()
     parseList(livestockArray) { o, _ ->
         val count = o.optInt("count")
+        val legacyGroupId = o.optString("groupId").ifBlank { "LIV-" + o.optString("name") }
         livestock += Livestock(
             name = o.optString("name"),
             kind = o.optString("kind"),
