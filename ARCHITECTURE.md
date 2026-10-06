@@ -22,7 +22,7 @@ Farmer
     └── Field 3
 ```
 
-Farmer stores person/beneficiary identity, Farm stores the agricultural holding, and Field stores the spatial production unit. Each field has a stable field ID, area in hectares, local location text, optional latitude/longitude, land tenure, crop, planting date, expected harvest, and current status.
+Farmer stores person/beneficiary identity, Farm stores the agricultural holding, and Field stores the spatial production unit. Each field has a stable field ID, area in hectares, local location text, optional latitude/longitude, land tenure, crop, planting date, expected harvest, current status, and optional polygon geometry.
 
 Coordinates are stored as explicit registry data. The field form does not request GPS permission; coordinates can be entered manually. This keeps the registry offline-first while making field records ready for a future map layer.
 
@@ -161,7 +161,31 @@ Status history is stored as immutable incident events. Each event records the pr
 
 Assistance remains linked through incidentId and assistanceRequestId. Requesting assistance moves a verified incident into Assistance in the same Room transaction. Completion is allowed only when the linked assistance record is marked completed and a resolution is supplied.
 
-Coordinates are explicitly entered as incident data; the form does not request GPS permission. Evidence is retained as a local file reference in the offline-first phase. Official DA transmission is still a future connected-backend concern.
+Coordinates are explicitly entered as incident data; the form does not request GPS permission. Incident affected-area geometry can also be stored as a polygon. Evidence is retained as a local file reference in the offline-first phase. Official DA transmission is still a future connected-backend concern.
+
+## Field Mapping System
+
+The Map tab is a real operational layer backed by the same Room registry used by the rest of the app. It uses satellite imagery as the basemap and renders farm/field/incident geometry from persisted records.
+
+The layers are:
+
+```
+Map
+ ├── Farm boundary
+ ├── Fields
+ │    ├── field polygon
+ │    └── field coordinate
+ ├── Crops
+ │    └── field-linked crop + current stage
+ └── Incidents
+      ├── incident coordinate
+      ├── affected-area polygon
+      └── severity/status
+```
+
+Mapping actions are performed in the Map editor. A long press adds a coordinate point to the current draft. Farm and incident areas require at least three points for a polygon; a field can be saved with one point for location-only mapping or three or more points for a boundary. Saving a field/incident polygon also stores its centroid as the record's latitude/longitude so both the area and its representative GPS coordinate remain available.
+
+Geometry is serialized into Room text columns for the offline-first schema and is included in backup/case-package JSON. The map intentionally does not request device location permission and never depends on live GPS for rendering existing records.
 
 ## Core domain
 
@@ -254,7 +278,7 @@ The next phase can add dedicated Feed Log UI and richer production records witho
 
 ## Database versioning
 
-The current Room schema is version 9. Migration 7 → 8 adds persisted incomeCategory to sales, and migration 8 → 9 adds structured incident workflow metadata plus status-history fields.
+The current Room schema is version 10. Migration 7 → 8 adds persisted incomeCategory to sales, migration 8 → 9 adds structured incident workflow metadata plus status-history fields, and migration 9 → 10 adds farm/field/incident map geometry.
 
 ## Government integration
 
