@@ -158,6 +158,9 @@ interface FarmDao {
     @Query("SELECT * FROM assistance WHERE farmId = :farmId ORDER BY updatedAt DESC")
     fun observeAssistance(farmId: String): Flow<List<AssistanceEntity>>
 
+    @Query("SELECT * FROM assistance WHERE farmId = :farmId AND incidentId = :incidentId ORDER BY updatedAt DESC")
+    suspend fun getAssistanceForIncident(farmId: String, incidentId: String): List<AssistanceEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAssistance(record: AssistanceEntity)
 
@@ -166,6 +169,9 @@ interface FarmDao {
 
     @Query("SELECT * FROM field_incidents WHERE farmId = :farmId ORDER BY createdAt DESC")
     fun observeFieldIncidents(farmId: String): Flow<List<FieldIncidentEntity>>
+
+    @Query("SELECT * FROM field_incidents WHERE incidentId = :incidentId LIMIT 1")
+    suspend fun getFieldIncident(incidentId: String): FieldIncidentEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertFieldIncident(record: FieldIncidentEntity)
