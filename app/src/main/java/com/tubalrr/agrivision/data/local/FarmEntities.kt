@@ -13,6 +13,17 @@ data class AppMetaEntity(
 )
 
 @Entity(
+    tableName = "farmers",
+    primaryKeys = ["farmerId"]
+)
+data class FarmerEntity(
+    val farmerId: String,
+    val fullName: String,
+    val contact: String = "",
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
     tableName = "farms",
     primaryKeys = ["farmId"],
     indices = [Index(value = ["farmerId"])]
@@ -61,6 +72,31 @@ data class CropEntity(
     val crop: String,
     val area: String,
     val stage: String,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "fields",
+    primaryKeys = ["fieldId"],
+    indices = [
+        Index(value = ["farmId"]),
+        Index(value = ["farmId", "currentStatus"]),
+        Index(value = ["farmId", "crop"])
+    ]
+)
+data class FieldEntity(
+    val fieldId: String,
+    val farmId: String,
+    val name: String,
+    val areaHectares: Double,
+    val location: String,
+    val latitude: Double?,
+    val longitude: Double?,
+    val landTenure: String,
+    val crop: String,
+    val plantingDate: String,
+    val expectedHarvest: String,
+    val currentStatus: String,
     val updatedAt: Long = System.currentTimeMillis()
 )
 
