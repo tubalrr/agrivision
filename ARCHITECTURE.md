@@ -292,3 +292,8 @@ No claim of official DA API integration is made. A connected, authenticated, aut
 AgriVision reports are generated from the Room-backed `FarmSnapshot`, not directly from UI state. The report layer supports 11 report types: Farmer Profile, Farm Registry, Crop Production, Livestock Inventory, Farm Inputs, Expenses, Sales, Incidents, Assistance, Harvest, and Field Summary.
 
 Each report can be exported as PDF, CSV, or JSON. PDF uses Android `PdfDocument`; CSV is escaped for spreadsheet import; JSON is versioned with report metadata. Harvest is derived from production records marked `Harvest`, while Farm Inputs combines inventory with recorded crop/livestock lifecycle inputs. Android's document picker is used for user-selected destinations.
+
+
+## UI v2 — Premium Farmer UI
+
+The core navigation screens use a shared visual system: warm agricultural cream background, deep farm green, sage/gold accents, 24–28dp card radii, consistent spacing, elevated record cards, stronger screen hierarchy, and reusable headers/stat cards. Dashboard, Farm, Field Mapping, and Reports receive the first v2 pass while existing Room/data workflows remain unchanged. The same shared components automatically carry the visual language into Tasks and Profile.
