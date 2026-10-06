@@ -141,6 +141,7 @@ internal fun AgriVisionApp(
                     incidentEvents = incidentEvents,
                     onExportCasePackage = onExportCasePackage,
                     onExportDaReport = onExportDaReport,
+                    exportStatus = farmViewModel.backupStatus.collectAsStateWithLifecycle().value,
                     reportSubmission = reportSubmission,
                     onProduction = farmViewModel::addProduction,
                     onExpense = farmViewModel::addExpense,
