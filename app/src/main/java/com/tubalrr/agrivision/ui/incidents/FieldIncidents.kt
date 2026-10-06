@@ -99,6 +99,15 @@ internal fun FieldIncidentCard(
                 )
             }
 
+            if (incident.affectedAreaBoundary.size >= 3) {
+                Text(
+                    "Affected area: mapped polygon (${incident.affectedAreaBoundary.size} points)",
+                    color = AgriGreen,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
             if (incident.reviewer.isNotBlank()) {
                 Text(
                     "Reviewer: " + incident.reviewer,
