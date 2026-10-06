@@ -83,6 +83,9 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     val inventory: StateFlow<List<InventoryItem>> = repository.observeInventory().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
+    val feedLogs: StateFlow<List<FeedLogRecord>> = repository.observeFeedLogs().stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
+    )
 
     val inventoryTransactions: StateFlow<List<InventoryTransaction>> =
         repository.observeInventoryTransactions().stateIn(
