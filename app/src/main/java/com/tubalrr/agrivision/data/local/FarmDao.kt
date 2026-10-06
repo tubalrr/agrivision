@@ -31,11 +31,20 @@ interface FarmDao {
     @Query("SELECT * FROM livestock WHERE farmId = :farmId ORDER BY updatedAt DESC")
     fun observeLivestock(farmId: String): Flow<List<LivestockEntity>>
 
+    @Query("SELECT * FROM livestock WHERE livestockId = :livestockId LIMIT 1")
+    suspend fun getLivestock(livestockId: String): LivestockEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertLivestock(record: LivestockEntity)
 
     @Delete
     suspend fun deleteLivestock(record: LivestockEntity)
+
+    @Query("SELECT * FROM livestock_lifecycle_events WHERE farmId = :farmId ORDER BY date DESC, createdAt DESC")
+    fun observeLivestockLifecycleEvents(farmId: String): Flow<List<LivestockLifecycleEventEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertLivestockLifecycleEvent(event: LivestockLifecycleEventEntity)
 
     @Query("SELECT * FROM crops WHERE farmId = :farmId ORDER BY updatedAt DESC")
     fun observeCrops(farmId: String): Flow<List<CropEntity>>
@@ -186,6 +195,9 @@ interface FarmDao {
 
     @Query("DELETE FROM farmers")
     suspend fun clearFarmers()
+
+    @Query("DELETE FROM livestock_lifecycle_events")
+    suspend fun clearLivestockLifecycleEvents()
 
     @Query("DELETE FROM livestock")
     suspend fun clearLivestock()
