@@ -8,6 +8,9 @@ import com.tubalrr.agrivision.data.local.AgriDatabase
 import com.tubalrr.agrivision.data.local.FarmRepository
 import com.tubalrr.agrivision.data.local.FarmSnapshot
 import com.tubalrr.agrivision.data.local.LegacyPreferencesMigrator
+import com.tubalrr.agrivision.domain.model.FarmRecord
+import com.tubalrr.agrivision.domain.model.FarmerRecord
+import com.tubalrr.agrivision.domain.model.FieldRecord
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,6 +29,19 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         FarmerProfile("", "", "", "", "", "", "", "", "", "")
+    )
+
+    val farmer: StateFlow<FarmerRecord> = repository.observeFarmer().stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), FarmerRecord("", "")
+    )
+
+    val farm: StateFlow<FarmRecord> = repository.observeFarm().stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000),
+        FarmRecord(FarmRepository.DEFAULT_FARM_ID, "", "")
+    )
+
+    val fields: StateFlow<List<FieldRecord>> = repository.observeFields().stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
 
     val livestock: StateFlow<List<Livestock>> = repository.observeLivestock().stateIn(
@@ -89,6 +105,10 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveProfile(value: FarmerProfile) = launch { repository.saveProfile(value) }
+
+    fun addField(value: FieldRecord) = launch { repository.saveField(value) }
+    fun updateField(value: FieldRecord) = launch { repository.saveField(value) }
+    fun deleteField(value: FieldRecord) = launch { repository.deleteField(value) }
 
     fun addLivestock(value: Livestock) = launch { repository.saveLivestock(value) }
     fun addCrop(value: CropRecord) = launch { repository.saveCrop(value) }
@@ -184,6 +204,9 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             put("packageType", "DA Case Package")
             put("generatedAt", System.currentTimeMillis())
             put("farmerProfile", snapshot.profile.toJson())
+        put("farmer", snapshot.profile.toFarmerRecord().toJson())
+        put("farm", snapshot.profile.toFarmRecord().toJson())
+        put("fields", JSONArray(snapshot.fields.map { it.toJson() }))
             put("fieldIncidents", JSONArray(snapshot.fieldIncidents.map { it.toJson() }))
             put("incidentEvents", JSONArray(snapshot.incidentEvents.map { it.toJson() }))
             put("assistance", JSONArray(snapshot.assistance.map { it.toJson() }))
@@ -224,7 +247,8 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             assistance = repository.observeAssistance().first(),
             fieldIncidents = repository.observeFieldIncidents().first(),
             incidentEvents = repository.observeIncidentEvents().first(),
-            reportSubmission = reportSubmission.value
+            reportSubmission = reportSubmission.value,
+            fields = repository.observeFields().first()
         )
     }
 
@@ -235,7 +259,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
     JSONObject().apply {
-        put("version", 2)
+        put("version", 3)
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
@@ -255,6 +279,56 @@ private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
             put("referenceNo", snapshot.reportSubmission.referenceNo)
         })
     }
+
+private fun FarmerProfile.toFarmerRecord() = FarmerRecord(farmerId, farmerName, contact)
+private fun FarmerProfile.toFarmRecord() = FarmRecord(
+    farmId = FarmRepository.DEFAULT_FARM_ID,
+    farmerId = farmerId,
+    farmName = farmName,
+    province = province,
+    municipality = municipality,
+    barangay = barangay,
+    totalArea = farmSize,
+    landTenure = landTenure,
+    commodities = commodities,
+    registryStatus = registryStatus,
+    reviewNotes = reviewNotes
+)
+
+private fun FarmerRecord.toJson() = JSONObject().apply {
+    put("farmerId", farmerId)
+    put("fullName", fullName)
+    put("contact", contact)
+}
+
+private fun FarmRecord.toJson() = JSONObject().apply {
+    put("farmId", farmId)
+    put("farmerId", farmerId)
+    put("farmName", farmName)
+    put("province", province)
+    put("municipality", municipality)
+    put("barangay", barangay)
+    put("totalArea", totalArea)
+    put("landTenure", landTenure)
+    put("commodities", commodities)
+    put("registryStatus", registryStatus)
+    put("reviewNotes", reviewNotes)
+}
+
+private fun FieldRecord.toJson() = JSONObject().apply {
+    put("fieldId", fieldId)
+    put("farmId", farmId)
+    put("name", name)
+    put("areaHectares", areaHectares)
+    put("location", location)
+    if (latitude == null) put("latitude", JSONObject.NULL) else put("latitude", latitude)
+    if (longitude == null) put("longitude", JSONObject.NULL) else put("longitude", longitude)
+    put("landTenure", landTenure)
+    put("crop", crop)
+    put("plantingDate", plantingDate)
+    put("expectedHarvest", expectedHarvest)
+    put("currentStatus", currentStatus)
+}
 
 private fun FarmerProfile.toJson() = JSONObject().apply {
     put("farmerName", farmerName)
@@ -380,6 +454,24 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             o.optString("distributionDetails"), o.optString("outcome"), o.optString("reviewNotes")
         )
     }
+    val fields = mutableListOf<FieldRecord>()
+    parseList(array("fields")) { o, _ ->
+        fields += FieldRecord(
+            fieldId = o.optString("fieldId"),
+            farmId = o.optString("farmId", FarmRepository.DEFAULT_FARM_ID),
+            name = o.optString("name"),
+            areaHectares = o.optDouble("areaHectares", 0.0),
+            location = o.optString("location"),
+            latitude = if (o.isNull("latitude")) null else o.optDouble("latitude"),
+            longitude = if (o.isNull("longitude")) null else o.optDouble("longitude"),
+            landTenure = o.optString("landTenure"),
+            crop = o.optString("crop"),
+            plantingDate = o.optString("plantingDate"),
+            expectedHarvest = o.optString("expectedHarvest"),
+            currentStatus = o.optString("currentStatus", "Planned")
+        )
+    }
+
     val incidents = mutableListOf<FieldIncident>()
     parseList(array("fieldIncidents")) { o, _ ->
         incidents += FieldIncident(
@@ -404,6 +496,7 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             report.optString("status", "Draft"),
             report.optString("submittedDate"),
             report.optString("referenceNo")
-        )
+        ),
+        fields
     )
 }
