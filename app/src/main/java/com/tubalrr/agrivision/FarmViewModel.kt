@@ -47,6 +47,11 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     val livestock: StateFlow<List<Livestock>> = repository.observeLivestock().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
+
+    val livestockLifecycleEvents: StateFlow<List<LivestockLifecycleEvent>> =
+        repository.observeLivestockLifecycleEvents().stateIn(
+            viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
+        )
     val crops: StateFlow<List<CropRecord>> = repository.observeCrops().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
@@ -115,6 +120,10 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteField(value: FieldRecord) = launch { repository.deleteField(value) }
 
     fun addLivestock(value: Livestock) = launch { repository.saveLivestock(value) }
+
+    fun addLivestockLifecycleEvent(value: LivestockLifecycleEvent) = launch {
+        repository.saveLivestockLifecycleEvent(value)
+    }
     fun addCrop(value: CropRecord) = launch { repository.saveCrop(value) }
 
     fun addCropLifecycleEvent(value: CropLifecycleEvent) = launch {
@@ -220,6 +229,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             put("assistance", JSONArray(snapshot.assistance.map { it.toJson() }))
             put("operationalRecords", JSONObject().apply {
                 put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
+                put("livestockLifecycleEvents", JSONArray(snapshot.livestockLifecycleEvents.map { it.toJson() }))
                 put("crops", JSONArray(snapshot.crops.map { it.toJson() }))
                 put("production", JSONArray(snapshot.production.map { it.toJson() }))
                 put("expenses", JSONArray(snapshot.expenses.map { it.toJson() }))
@@ -257,7 +267,8 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             incidentEvents = repository.observeIncidentEvents().first(),
             reportSubmission = reportSubmission.value,
             fields = repository.observeFields().first(),
-            cropLifecycleEvents = repository.observeCropLifecycleEvents().first()
+            cropLifecycleEvents = repository.observeCropLifecycleEvents().first(),
+            livestockLifecycleEvents = repository.observeLivestockLifecycleEvents().first()
         )
     }
 
@@ -268,10 +279,11 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
 private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
     JSONObject().apply {
-        put("version", 4)
+        put("version", 5)
         put("app", "AgriVision")
         put("farmerProfile", snapshot.profile.toJson())
         put("livestock", JSONArray(snapshot.livestock.map { it.toJson() }))
+        put("livestockLifecycleEvents", JSONArray(snapshot.livestockLifecycleEvents.map { it.toJson() }))
         put("crops", JSONArray(snapshot.crops.map { it.toJson() }))
         put("cropLifecycleEvents", JSONArray(snapshot.cropLifecycleEvents.map { it.toJson() }))
         put("production", JSONArray(snapshot.production.map { it.toJson() }))
@@ -356,7 +368,26 @@ private fun FarmerProfile.toJson() = JSONObject().apply {
 }
 
 private fun Livestock.toJson() = JSONObject().apply {
-    put("name", name); put("kind", kind); put("count", count); put("status", status)
+    put("name", name)
+    put("kind", kind)
+    put("count", count)
+    put("status", status)
+    put("groupId", groupId)
+    put("initialPopulation", initialPopulation)
+    put("currentPopulation", currentPopulation)
+}
+
+private fun LivestockLifecycleEvent.toJson() = JSONObject().apply {
+    put("eventId", eventId)
+    put("livestockId", livestockId)
+    put("stage", stage)
+    put("date", date)
+    put("notes", notes)
+    put("inputName", inputName)
+    put("quantity", quantity)
+    put("unit", unit)
+    put("amount", amount)
+    put("createdAt", createdAt)
 }
 private fun CropRecord.toJson() = JSONObject().apply {
     put("name", name)
@@ -459,7 +490,34 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
     }
 
     val livestock = mutableListOf<Livestock>()
-    parseList(livestockArray) { o, _ -> livestock += Livestock(o.optString("name"), o.optString("kind"), o.optInt("count"), o.optString("status")) }
+    parseList(livestockArray) { o, _ ->
+        val count = o.optInt("count")
+        livestock += Livestock(
+            name = o.optString("name"),
+            kind = o.optString("kind"),
+            count = o.optInt("currentPopulation", count),
+            status = o.optString("status"),
+            groupId = o.optString("groupId"),
+            initialPopulation = o.optInt("initialPopulation", count),
+            currentPopulation = o.optInt("currentPopulation", count)
+        )
+    }
+
+    val livestockLifecycleEvents = mutableListOf<LivestockLifecycleEvent>()
+    parseList(array("livestockLifecycleEvents")) { o, _ ->
+        livestockLifecycleEvents += LivestockLifecycleEvent(
+            eventId = o.optString("eventId"),
+            livestockId = o.optString("livestockId"),
+            stage = o.optString("stage", "Population"),
+            date = o.optString("date"),
+            notes = o.optString("notes"),
+            inputName = o.optString("inputName"),
+            quantity = o.optDouble("quantity", 0.0),
+            unit = o.optString("unit"),
+            amount = o.optDouble("amount", 0.0),
+            createdAt = o.optLong("createdAt", System.currentTimeMillis())
+        )
+    }
     val crops = mutableListOf<CropRecord>()
     parseList(cropsArray) { o, _ ->
         val legacyStage = o.optString("stage", "Land Preparation")
@@ -558,6 +616,7 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             report.optString("referenceNo")
         ),
         fields,
-        cropLifecycleEvents
+        cropLifecycleEvents,
+        livestockLifecycleEvents
     )
 }
