@@ -8,7 +8,9 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [
         AppMetaEntity::class,
+        FarmerEntity::class,
         FarmEntity::class,
+        FieldEntity::class,
         LivestockEntity::class,
         CropEntity::class,
         FeedLogEntity::class,
@@ -23,7 +25,7 @@ import androidx.room.RoomDatabase
         IncidentEventEntity::class,
         ReportSubmissionEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -41,7 +43,7 @@ abstract class AgriDatabase : RoomDatabase() {
                     AgriDatabase::class.java,
                     "agrivision.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }
