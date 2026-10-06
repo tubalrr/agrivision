@@ -866,8 +866,12 @@ suspend fun saveField(record: FieldRecord) {
         require(nextStatus in allowed) {
             "Invalid incident transition: " + current.status + " → " + nextStatus
         }
+        if (nextStatus == "Under Review" || nextStatus == "Verified" || nextStatus == "Returned") {
+            require(actor.isNotBlank()) { "Reviewer is required for this workflow step." }
+        }
         if (nextStatus == "Completed") {
             require(!resolution.isNullOrBlank()) { "Resolution is required before completion." }
+            require(actor.isNotBlank()) { "Reviewer is required for completion." }
         }
 
         database.withTransaction {
