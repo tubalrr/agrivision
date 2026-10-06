@@ -28,7 +28,7 @@ import androidx.room.RoomDatabase
         IncidentEventEntity::class,
         ReportSubmissionEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -46,7 +46,7 @@ abstract class AgriDatabase : RoomDatabase() {
                     AgriDatabase::class.java,
                     "agrivision.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -297,6 +297,23 @@ abstract class AgriDatabase : RoomDatabase() {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE sales ADD COLUMN incomeCategory TEXT NOT NULL DEFAULT 'Other Income'")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_sales_farmId_incomeCategory_date ON sales(farmId,incomeCategory,date)")
+            }
+        }
+
+        private val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE field_incidents ADD COLUMN farmerId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE field_incidents ADD COLUMN fieldId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE field_incidents ADD COLUMN latitude REAL")
+                db.execSQL("ALTER TABLE field_incidents ADD COLUMN longitude REAL")
+                db.execSQL("ALTER TABLE field_incidents ADD COLUMN reviewer TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE field_incidents ADD COLUMN assistanceRequestId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE field_incidents ADD COLUMN resolution TEXT NOT NULL DEFAULT ''")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_field_incidents_fieldId ON field_incidents(fieldId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_field_incidents_farmerId ON field_incidents(farmerId)")
+                db.execSQL("ALTER TABLE incident_events ADD COLUMN fromStatus TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE incident_events ADD COLUMN actor TEXT NOT NULL DEFAULT ''")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_incident_events_incidentId_timestamp ON incident_events(incidentId,timestamp)")
             }
         }
 
