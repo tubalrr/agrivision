@@ -11,6 +11,7 @@ import androidx.room.RoomDatabase
         FarmerEntity::class,
         FarmEntity::class,
         FieldEntity::class,
+        CropLifecycleEventEntity::class,
         LivestockEntity::class,
         CropEntity::class,
         FeedLogEntity::class,
@@ -25,7 +26,7 @@ import androidx.room.RoomDatabase
         IncidentEventEntity::class,
         ReportSubmissionEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -43,7 +44,7 @@ abstract class AgriDatabase : RoomDatabase() {
                     AgriDatabase::class.java,
                     "agrivision.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }
