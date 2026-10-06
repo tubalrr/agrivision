@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Inventory2
@@ -66,7 +67,20 @@ internal fun FarmScreen(
         contentPadding = PaddingValues(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { ScreenHeader("My Farm", "Everything on your farm, not just crops.") }
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenDeep),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("MY FARM", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("Everything on your farm.", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                    Text("Manage livestock, crops, inputs and equipment in one organized workspace.", color = Color.White.copy(alpha = .78f))
+                }
+            }
+        }
 
         item {
             Row(
