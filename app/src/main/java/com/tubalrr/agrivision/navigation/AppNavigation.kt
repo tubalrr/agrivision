@@ -40,6 +40,7 @@ internal fun AgriVisionApp(
     val cropLifecycleEvents by farmViewModel.cropLifecycleEvents.collectAsStateWithLifecycle()
     val livestockLifecycleEvents by farmViewModel.livestockLifecycleEvents.collectAsStateWithLifecycle()
     val inventoryTransactions by farmViewModel.inventoryTransactions.collectAsStateWithLifecycle()
+    val feedLogs by farmViewModel.feedLogs.collectAsStateWithLifecycle()
     val livestock by farmViewModel.livestock.collectAsStateWithLifecycle()
     val crops by farmViewModel.crops.collectAsStateWithLifecycle()
     val production by farmViewModel.production.collectAsStateWithLifecycle()
@@ -144,6 +145,8 @@ internal fun AgriVisionApp(
                     exportStatus = farmViewModel.backupStatus.collectAsStateWithLifecycle().value,
                     reportSubmission = reportSubmission,
                     onProduction = farmViewModel::addProduction,
+                    feedLogs = feedLogs,
+                    onFeedLog = farmViewModel::addFeedLog,
                     onExpense = farmViewModel::addExpense,
                     onSale = farmViewModel::addSale,
                     onSubmissionSaved = farmViewModel::saveReportSubmission
