@@ -1030,6 +1030,7 @@ suspend fun saveField(record: FieldRecord) {
             dao.clearFarms()
 
             saveProfile(snapshot.profile, snapshot.farm?.boundaryPoints)
+            snapshot.fields.forEach { saveField(it) }
             snapshot.livestock.forEach { saveLivestock(it) }
             snapshot.livestockLifecycleEvents.forEach { saveLivestockLifecycleEvent(it) }
             snapshot.crops.forEach { saveCrop(it) }
