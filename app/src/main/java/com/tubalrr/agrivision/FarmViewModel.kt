@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.tubalrr.agrivision.data.local.AgriDatabase
 import com.tubalrr.agrivision.data.local.FarmRepository
 import com.tubalrr.agrivision.data.local.FarmSnapshot
+import com.tubalrr.agrivision.data.local.FeedLogRecord
 import com.tubalrr.agrivision.data.local.LegacyPreferencesMigrator
 import com.tubalrr.agrivision.domain.model.FarmRecord
 import com.tubalrr.agrivision.domain.model.FarmerRecord
@@ -298,6 +299,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
                 put("sales", JSONArray(snapshot.sales.map { it.toJson() }))
                 put("inventory", JSONArray(snapshot.inventory.map { it.toJson() }))
                 put("inventoryTransactions", JSONArray(snapshot.inventoryTransactions.map { it.toJson() }))
+                put("feedLogs", JSONArray(snapshot.feedLogs.map { it.toJson() }))
             })
         }
         getApplication<Application>().contentResolver.openOutputStream(uri)?.use {
