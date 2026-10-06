@@ -4,7 +4,6 @@ import android.app.DatePickerDialog
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
@@ -19,12 +18,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import com.tubalrr.agrivision.domain.model.FieldRecord
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
-
 
 @Composable
 internal fun FieldIncidentCard(
@@ -34,7 +33,8 @@ internal fun FieldIncidentCard(
     onStatusChange: (String) -> Unit,
     onReview: () -> Unit,
     onTimeline: () -> Unit,
-    onCreateAssistance: () -> Unit
+    onCreateAssistance: () -> Unit,
+    onResolve: () -> Unit
 ) {
     Card(
         Modifier.fillMaxWidth(),
@@ -52,9 +52,12 @@ internal fun FieldIncidentCard(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        listOf(incident.commodity, incident.affectedArea, incident.date)
-                            .filter { it.isNotBlank() }
-                            .joinToString(" · "),
+                        listOf(
+                            incident.commodity,
+                            "Field " + incident.fieldId.ifBlank { "not linked" },
+                            incident.affectedArea,
+                            incident.date
+                        ).filter { it.isNotBlank() }.joinToString(" · "),
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -81,11 +84,43 @@ internal fun FieldIncidentCard(
                 }
             }
 
+            Text(
+                "Farmer: " + incident.farmerId.ifBlank { "not linked" } +
+                        " · Farm: " + incident.farmId.ifBlank { "not linked" },
+                color = AgriMuted,
+                style = MaterialTheme.typography.labelSmall
+            )
+
+            if (incident.latitude != null && incident.longitude != null) {
+                Text(
+                    "Coordinates: %.5f, %.5f".format(Locale.US, incident.latitude, incident.longitude),
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            if (incident.reviewer.isNotBlank()) {
+                Text(
+                    "Reviewer: " + incident.reviewer,
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
             if (incident.reviewNotes.isNotBlank()) {
                 Text(
                     "Review note: " + incident.reviewNotes,
                     color = AgriMuted,
                     style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (incident.resolution.isNotBlank()) {
+                Text(
+                    "Resolution: " + incident.resolution,
+                    color = AgriGreen,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
@@ -102,22 +137,19 @@ internal fun FieldIncidentCard(
                         }
                     }
                     "Submitted" -> {
-                        TextButton(onClick = onReview) {
-                            Text("Start Review")
-                        }
+                        TextButton(onClick = onReview) { Text("Start Review") }
                     }
                     "Under Review" -> {
-                        TextButton(onClick = onReview) {
-                            Text("Review")
-                        }
+                        TextButton(onClick = onReview) { Text("Review") }
                     }
                     "Verified" -> {
                         if (!hasAssistanceRequest) {
-                            TextButton(onClick = onCreateAssistance) {
-                                Text("Request Assistance")
-                            }
-                        } else if (assistanceCompleted) {
-                            Text("Assistance completed", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = onCreateAssistance) { Text("Request Assistance") }
+                        }
+                    }
+                    "Assistance" -> {
+                        if (assistanceCompleted) {
+                            TextButton(onClick = onResolve) { Text("Mark Completed") }
                         } else {
                             Text(
                                 "Awaiting assistance completion",
@@ -125,15 +157,9 @@ internal fun FieldIncidentCard(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
-
-                        if (!hasAssistanceRequest || assistanceCompleted) {
-                            TextButton(onClick = { onStatusChange("Resolved") }) {
-                                Text("Mark Resolved")
-                            }
-                        }
                     }
-                    "Resolved" -> {
-                        Text("Case closed", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
+                    "Completed" -> {
+                        Text("Case completed", color = AgriGreen, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -164,32 +190,47 @@ internal fun IncidentTimelineDialog(
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
                     )
+                    Text(
+                        "Farmer " + incident.farmerId.ifBlank { "—" } +
+                                " · Farm " + incident.farmId.ifBlank { "—" } +
+                                " · Field " + incident.fieldId.ifBlank { "—" },
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
                 if (events.isEmpty()) {
-                    item { Text("No events recorded yet.", color = AgriMuted) }
+                    item { Text("No status history recorded.", color = AgriMuted) }
                 } else {
                     items(events) { event ->
                         Row(verticalAlignment = Alignment.Top) {
                             Box(
                                 Modifier.size(34.dp).clip(CircleShape).background(
-                                    if (event.status == "Verified" || event.status == "Resolved") AgriGreen else AgriGreenSoft
+                                    if (event.status == "Verified" || event.status == "Assistance" || event.status == "Completed") AgriGreen else AgriGreenSoft
                                 ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    if (event.status == "Verified" || event.status == "Resolved") "✓" else "•",
-                                    color = if (event.status == "Verified" || event.status == "Resolved") Color.White else AgriGreen,
+                                    if (event.status == "Verified" || event.status == "Assistance" || event.status == "Completed") "✓" else "•",
+                                    color = if (event.status == "Verified" || event.status == "Assistance" || event.status == "Completed") Color.White else AgriGreen,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(event.status, fontWeight = FontWeight.Bold)
+                                val transition = if (event.fromStatus.isBlank()) {
+                                    event.status
+                                } else {
+                                    event.fromStatus + " → " + event.status
+                                }
+                                Text(transition, fontWeight = FontWeight.Bold)
                                 Text(
                                     formatter.format(java.util.Date(event.timestamp)),
                                     color = AgriMuted,
                                     style = MaterialTheme.typography.labelSmall
                                 )
+                                if (event.actor.isNotBlank()) {
+                                    Text("Actor: " + event.actor, color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                                }
                                 if (event.note.isNotBlank()) {
                                     Text(event.note, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                                 }
@@ -209,15 +250,20 @@ internal fun IncidentReviewDialog(
     onDismiss: () -> Unit,
     onSave: (FieldIncident) -> Unit
 ) {
-    var status by remember(incident.id) {
-        mutableStateOf(
-            when (incident.status) {
-                "Submitted" -> "Under Review"
-                else -> incident.status
-            }
-        )
+    val initialStatus = when (incident.status) {
+        "Submitted" -> "Under Review"
+        "Under Review" -> "Verified"
+        else -> incident.status
     }
+    var status by remember(incident.id) { mutableStateOf(initialStatus) }
+    var reviewer by remember(incident.id) { mutableStateOf(incident.reviewer) }
     var notes by remember(incident.id) { mutableStateOf(incident.reviewNotes) }
+
+    val options = when (incident.status) {
+        "Submitted" -> listOf("Under Review")
+        "Under Review" -> listOf("Verified", "Returned")
+        else -> emptyList()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -236,17 +282,28 @@ internal fun IncidentReviewDialog(
                     )
                 }
                 item {
-                    Text("Validation status", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf("Under Review", "Verified", "Returned").forEach { option ->
-                            FilterChip(
-                                selected = status == option,
-                                onClick = { status = option },
-                                label = { Text(option, style = MaterialTheme.typography.labelSmall) }
-                            )
+                    OutlinedTextField(
+                        value = reviewer,
+                        onValueChange = { reviewer = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Reviewer / validating officer") },
+                        singleLine = true
+                    )
+                }
+                if (options.isNotEmpty()) {
+                    item {
+                        Text("Workflow step", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            options.forEach { option ->
+                                FilterChip(
+                                    selected = status == option,
+                                    onClick = { status = option },
+                                    label = { Text(option, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
                         }
                     }
                 }
@@ -261,7 +318,7 @@ internal fun IncidentReviewDialog(
                 }
                 item {
                     Text(
-                        "Verified reports can be converted into a linked assistance request.",
+                        "Workflow is enforced in the data layer: Submitted → Under Review → Verified. Returned reports must be submitted again.",
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -270,10 +327,12 @@ internal fun IncidentReviewDialog(
         },
         confirmButton = {
             TextButton(
+                enabled = reviewer.isNotBlank() && status != incident.status,
                 onClick = {
                     onSave(
                         incident.copy(
                             status = status,
+                            reviewer = reviewer.trim(),
                             reviewNotes = notes.trim()
                         )
                     )
@@ -285,18 +344,78 @@ internal fun IncidentReviewDialog(
 }
 
 @Composable
+internal fun IncidentResolutionDialog(
+    incident: FieldIncident,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    var resolution by remember(incident.id) { mutableStateOf(incident.resolution) }
+    var reviewer by remember(incident.id) { mutableStateOf(incident.reviewer) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Complete Incident", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text(
+                    incident.id + " · Assistance completed",
+                    color = AgriGreen,
+                    fontWeight = FontWeight.Bold
+                )
+                OutlinedTextField(
+                    value = reviewer,
+                    onValueChange = { reviewer = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Reviewer / closing officer") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = resolution,
+                    onValueChange = { resolution = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Resolution / outcome") },
+                    supportingText = { Text("Example: Inputs distributed and field restored.") },
+                    minLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = reviewer.isNotBlank() && resolution.isNotBlank(),
+                onClick = { onSave(resolution.trim(), reviewer.trim()) }
+            ) { Text("Complete Case") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
 internal fun AddFieldIncidentDialog(
+    farmerId: String,
+    farmerName: String,
+    farmId: String,
+    farmName: String,
+    fields: List<FieldRecord>,
     onDismiss: () -> Unit,
     onSave: (FieldIncident) -> Unit
 ) {
     val context = LocalContext.current
     var type by remember { mutableStateOf("Pest / Disease") }
-    var commodity by remember { mutableStateOf("") }
-    var affectedArea by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
+    var fieldId by remember { mutableStateOf(fields.firstOrNull()?.fieldId.orEmpty()) }
+    var commodity by remember { mutableStateOf(fields.firstOrNull()?.crop.orEmpty()) }
+    var affectedArea by remember {
+        mutableStateOf(
+            fields.firstOrNull()?.areaHectares?.let { String.format(Locale.US, "%.2f ha", it) }.orEmpty()
+        )
+    }
+    var date by remember {
+        mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time))
+    }
     var severity by remember { mutableStateOf("Moderate") }
     var description by remember { mutableStateOf("") }
     var evidenceUri by remember { mutableStateOf("") }
+    var latitudeText by remember { mutableStateOf("") }
+    var longitudeText by remember { mutableStateOf("") }
     var showPicker by remember { mutableStateOf(false) }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -329,13 +448,63 @@ internal fun AddFieldIncidentDialog(
         title = { Text("New Field Incident", fontWeight = FontWeight.Bold) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 430.dp),
+                modifier = Modifier.heightIn(max = 500.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {
+                    Card(
+                        Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+                    ) {
+                        Column(Modifier.padding(13.dp)) {
+                            Text("Reporter / farmer", color = AgriGreen, fontWeight = FontWeight.Bold)
+                            Text(
+                                farmerName.ifBlank { "Farmer not registered" } + " · " + farmerId.ifBlank { "No farmer ID" },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                farmName.ifBlank { "Farm not registered" } + " · " + farmId.ifBlank { "No farm ID" },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+                item {
+                    Text("Field", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                    if (fields.isEmpty()) {
+                        Text(
+                            "Register a field first in Farm → Fields.",
+                            color = AgriWarning,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else {
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            fields.forEach { field ->
+                                FilterChip(
+                                    selected = fieldId == field.fieldId,
+                                    onClick = {
+                                        fieldId = field.fieldId
+                                        if (commodity.isBlank() || commodity == fields.firstOrNull()?.crop) {
+                                            commodity = field.crop
+                                        }
+                                        affectedArea = String.format(Locale.US, "%.2f ha", field.areaHectares)
+                                        latitudeText = field.latitude?.toString().orEmpty()
+                                        longitudeText = field.longitude?.toString().orEmpty()
+                                    },
+                                    label = { Text(field.name + " · " + field.fieldId) }
+                                )
+                            }
+                        }
+                    }
+                }
+                item {
                     Text("Issue type", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
                     Row(
-                        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf("Pest / Disease", "Flood", "Drought", "Crop Damage", "Animal Health", "Other").forEach { option ->
@@ -349,18 +518,18 @@ internal fun AddFieldIncidentDialog(
                 }
                 item {
                     OutlinedTextField(
-                        commodity,
-                        { commodity = it },
-                        Modifier.fillMaxWidth(),
+                        value = commodity,
+                        onValueChange = { commodity = it },
+                        modifier = Modifier.fillMaxWidth(),
                         label = { Text("Commodity / crop / animal") },
                         singleLine = true
                     )
                 }
                 item {
                     OutlinedTextField(
-                        affectedArea,
-                        { affectedArea = it },
-                        Modifier.fillMaxWidth(),
+                        value = affectedArea,
+                        onValueChange = { affectedArea = it },
+                        modifier = Modifier.fillMaxWidth(),
                         label = { Text("Affected area / quantity") },
                         singleLine = true
                     )
@@ -370,14 +539,12 @@ internal fun AddFieldIncidentDialog(
                         onClick = { showPicker = true },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Text("Date: " + date)
-                    }
+                    ) { Text("Date: " + date) }
                 }
                 item {
                     Text("Severity", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
                     Row(
-                        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf("Low", "Moderate", "High", "Critical").forEach { option ->
@@ -391,9 +558,27 @@ internal fun AddFieldIncidentDialog(
                 }
                 item {
                     OutlinedTextField(
-                        description,
-                        { description = it },
-                        Modifier.fillMaxWidth(),
+                        value = latitudeText,
+                        onValueChange = { latitudeText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Latitude (optional)") },
+                        singleLine = true
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = longitudeText,
+                        onValueChange = { longitudeText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Longitude (optional)") },
+                        singleLine = true
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        modifier = Modifier.fillMaxWidth(),
                         label = { Text("What happened?") },
                         minLines = 3
                     )
@@ -409,7 +594,7 @@ internal fun AddFieldIncidentDialog(
                 }
                 item {
                     Text(
-                        "The photo is stored as a local file reference. Official DA submission still requires a connected and authorized backend.",
+                        "Coordinates are entered explicitly; the app does not request GPS permission.",
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -418,7 +603,10 @@ internal fun AddFieldIncidentDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = commodity.isNotBlank() && description.isNotBlank(),
+                enabled = fields.isNotEmpty() &&
+                        fieldId.isNotBlank() &&
+                        commodity.isNotBlank() &&
+                        description.isNotBlank(),
                 onClick = {
                     onSave(
                         FieldIncident(
@@ -430,7 +618,12 @@ internal fun AddFieldIncidentDialog(
                             severity = severity,
                             description = description.trim(),
                             status = "Draft",
-                            evidenceUri = evidenceUri
+                            evidenceUri = evidenceUri,
+                            farmerId = farmerId,
+                            farmId = farmId,
+                            fieldId = fieldId,
+                            latitude = latitudeText.toDoubleOrNull(),
+                            longitude = longitudeText.toDoubleOrNull()
                         )
                     )
                 }
