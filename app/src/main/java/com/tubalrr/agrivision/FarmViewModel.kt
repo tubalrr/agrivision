@@ -172,6 +172,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         repository.saveCropLifecycleEvent(value)
     }
     fun addInventory(value: InventoryItem) = launch { repository.saveInventoryWithPurchase(value) }
+    fun addFeedLog(value: FeedLogRecord) = launch { repository.saveFeedLog(value) }
     fun addEquipment(value: EquipmentRecord) = launch { repository.saveEquipment(value) }
 
     fun addProduction(value: ProductionRecord) = launch { repository.saveProduction(value) }
@@ -383,6 +384,7 @@ private fun snapshotToJson(snapshot: FarmSnapshot): JSONObject =
         put("sales", JSONArray(snapshot.sales.map { it.toJson() }))
         put("inventory", JSONArray(snapshot.inventory.map { it.toJson() }))
         put("inventoryTransactions", JSONArray(snapshot.inventoryTransactions.map { it.toJson() }))
+        put("feedLogs", JSONArray(snapshot.feedLogs.map { it.toJson() }))
         put("equipment", JSONArray(snapshot.equipment.map { it.toJson() }))
         put("tasks", JSONArray(snapshot.tasks.map { it.toJson() }))
         put("assistance", JSONArray(snapshot.assistance.map { it.toJson() }))
@@ -567,6 +569,17 @@ private fun InventoryTransaction.toJson() = JSONObject().apply {
     put("notes", notes)
     put("createdAt", createdAt)
 }
+private fun FeedLogRecord.toJson() = JSONObject().apply {
+    put("feedLogId", feedLogId)
+    put("livestockId", livestockId)
+    put("date", date)
+    put("feedName", feedName)
+    put("quantityKg", quantityKg)
+    put("unit", unit)
+    put("notes", notes)
+    put("createdAt", createdAt)
+}
+
 private fun EquipmentRecord.toJson() = JSONObject().apply {
     put("name", name); put("status", status); put("note", note)
 }
@@ -808,6 +821,20 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             createdAt = o.optLong("createdAt", System.currentTimeMillis())
         )
     }
+    val feedLogs = mutableListOf<FeedLogRecord>()
+    parseList(array("feedLogs")) { o, _ ->
+        feedLogs += FeedLogRecord(
+            feedLogId = o.optString("feedLogId"),
+            livestockId = o.optString("livestockId"),
+            date = o.optString("date"),
+            feedName = o.optString("feedName"),
+            quantityKg = o.optDouble("quantityKg", 0.0),
+            unit = o.optString("unit", "kg"),
+            notes = o.optString("notes"),
+            createdAt = o.optLong("createdAt", System.currentTimeMillis())
+        )
+    }
+
     val equipment = mutableListOf<EquipmentRecord>()
     parseList(equipmentArray) { o, _ -> equipment += EquipmentRecord(o.optString("name"), o.optString("status"), o.optString("note")) }
     val tasks = mutableListOf<FarmTask>()
@@ -892,6 +919,7 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
         cropLifecycleEvents,
         livestockLifecycleEvents,
         inventoryTransactions,
+        feedLogs,
         farm = backupFarm
     )
 }
