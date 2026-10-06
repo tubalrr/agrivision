@@ -122,7 +122,7 @@ internal fun DashboardScreen(
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(16.dp, 14.dp, 16.dp, 28.dp),
+        contentPadding = PaddingValues(18.dp, 16.dp, 18.dp, 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
