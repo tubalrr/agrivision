@@ -215,12 +215,26 @@ class FarmRepository(
 
     fun observeExpenses(): Flow<List<ExpenseRecord>> =
         dao.observeExpenses(DEFAULT_FARM_ID).map { list ->
-            list.map { ExpenseRecord(it.category, it.amount, it.note) }
+            list.map {
+                ExpenseRecord(
+                    category = it.category,
+                    amount = it.amount,
+                    note = it.note,
+                    date = it.date
+                )
+            }
         }
 
     fun observeSales(): Flow<List<SaleRecord>> =
         dao.observeSales(DEFAULT_FARM_ID).map { list ->
-            list.map { SaleRecord(it.product, it.amount, it.date) }
+            list.map {
+                SaleRecord(
+                    product = it.product,
+                    amount = it.amount,
+                    date = it.date,
+                    incomeCategory = it.incomeCategory
+                )
+            }
         }
 
     fun observeInventory(): Flow<List<InventoryItem>> =
@@ -693,11 +707,15 @@ suspend fun saveField(record: FieldRecord) {
     }
 
     suspend fun saveExpense(record: ExpenseRecord, expenseId: String = UUID.randomUUID().toString()) {
+        require(record.category.isNotBlank()) { "Expense category is required." }
+        require(record.amount > 0.0) { "Expense amount must be greater than zero." }
+        val date = record.date.ifBlank { record.note }.ifBlank { "Today" }
+
         dao.upsertExpense(
             ExpenseEntity(
                 expenseId = expenseId,
                 farmId = DEFAULT_FARM_ID,
-                date = record.note,
+                date = date,
                 category = record.category,
                 amount = record.amount,
                 note = record.note
@@ -706,13 +724,17 @@ suspend fun saveField(record: FieldRecord) {
     }
 
     suspend fun saveSale(record: SaleRecord, saleId: String = UUID.randomUUID().toString()) {
+        require(record.incomeCategory.isNotBlank()) { "Income category is required." }
+        require(record.amount > 0.0) { "Income amount must be greater than zero." }
+
         dao.upsertSale(
             SaleEntity(
                 saleId = saleId,
                 farmId = DEFAULT_FARM_ID,
-                date = record.date,
+                date = record.date.ifBlank { "Today" },
                 product = record.product,
-                amount = record.amount
+                amount = record.amount,
+                incomeCategory = record.incomeCategory
             )
         )
     }
