@@ -1,5 +1,6 @@
 package com.tubalrr.agrivision
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -12,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.horizontalScroll
@@ -32,7 +34,41 @@ internal fun AgriVisionApp(
     onExportDaReport: (String, DaReportFormat) -> Unit = { _, _ -> },
     farmViewModel: FarmViewModel = viewModel()
 ) {
-    var selected by remember { mutableStateOf(0) }
+    val context = LocalContext.current
+    val view = LocalView.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("agrivision_preferences", android.content.Context.MODE_PRIVATE)
+    }
+
+    var rememberLastTab by remember {
+        mutableStateOf(preferences.getBoolean("remember_last_tab", false))
+    }
+    var hapticNavigation by remember {
+        mutableStateOf(preferences.getBoolean("haptic_navigation", true))
+    }
+    var confirmBackupImport by remember {
+        mutableStateOf(preferences.getBoolean("confirm_backup_import", true))
+    }
+    var compactNavigation by remember {
+        mutableStateOf(preferences.getBoolean("compact_navigation", false))
+    }
+    var selected by remember {
+        mutableStateOf(
+            if (preferences.getBoolean("remember_last_tab", false)) {
+                preferences.getInt("last_selected_tab", 0).coerceIn(0, 5)
+            } else 0
+        )
+    }
+    var showSettings by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selected, rememberLastTab) {
+        if (rememberLastTab) {
+            preferences.edit().putInt("last_selected_tab", selected).apply()
+        } else {
+            preferences.edit().remove("last_selected_tab").apply()
+        }
+    }
+
     // Keep the selected farm section when switching tabs or opening a dashboard shortcut.
     var farmCategory by remember { mutableStateOf("Livestock") }
 
@@ -75,9 +111,62 @@ internal fun AgriVisionApp(
     )
 
     MaterialTheme(colorScheme = scheme) {
+        if (showSettings) {
+            AppSettingsDialog(
+                rememberLastTab = rememberLastTab,
+                onRememberLastTabChange = {
+                    rememberLastTab = it
+                    preferences.edit().putBoolean("remember_last_tab", it).apply()
+                    if (it) {
+                        preferences.edit().putInt("last_selected_tab", selected).apply()
+                    } else {
+                        preferences.edit().remove("last_selected_tab").apply()
+                    }
+                },
+                hapticNavigation = hapticNavigation,
+                onHapticNavigationChange = {
+                    hapticNavigation = it
+                    preferences.edit().putBoolean("haptic_navigation", it).apply()
+                },
+                confirmBackupImport = confirmBackupImport,
+                onConfirmBackupImportChange = {
+                    confirmBackupImport = it
+                    preferences.edit().putBoolean("confirm_backup_import", it).apply()
+                },
+                compactNavigation = compactNavigation,
+                onCompactNavigationChange = {
+                    compactNavigation = it
+                    preferences.edit().putBoolean("compact_navigation", it).apply()
+                },
+                onReset = {
+                    rememberLastTab = false
+                    hapticNavigation = true
+                    confirmBackupImport = true
+                    compactNavigation = false
+                    preferences.edit()
+                        .putBoolean("remember_last_tab", false)
+                        .putBoolean("haptic_navigation", true)
+                        .putBoolean("confirm_backup_import", true)
+                        .putBoolean("compact_navigation", false)
+                        .remove("last_selected_tab")
+                        .apply()
+                },
+                onDismiss = { showSettings = false }
+            )
+        }
+
         Scaffold(
             containerColor = AgriCream,
-            bottomBar = { AgriBottomBar(selected) { selected = it } }
+            bottomBar = {
+                AgriBottomBar(
+                    selected = selected,
+                    compact = compactNavigation,
+                    onSelected = { next ->
+                        if (hapticNavigation) view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        selected = next
+                    }
+                )
+            }
         ) { padding ->
             when (selected) {
                 0 -> DashboardScreen(
@@ -178,6 +267,8 @@ internal fun AgriVisionApp(
                     onProfileSaved = farmViewModel::saveProfile,
                     onExportBackup = onExportBackup,
                     onImportBackup = onImportBackup,
+                    confirmBeforeImport = confirmBackupImport,
+                    onOpenSettings = { showSettings = true },
                     backupStatus = farmViewModel.backupStatus.collectAsStateWithLifecycle().value,
                     assistance = assistance,
                     onAddAssistance = farmViewModel::addAssistance,
@@ -191,7 +282,11 @@ internal fun AgriVisionApp(
 }
 
 @Composable
-internal fun AgriBottomBar(selected: Int, onSelected: (Int) -> Unit) {
+internal fun AgriBottomBar(
+    selected: Int,
+    compact: Boolean = false,
+    onSelected: (Int) -> Unit
+) {
     val items = listOf(
         "Dashboard" to Icons.Outlined.Dashboard,
         "Map" to Icons.Outlined.Map,
@@ -207,7 +302,7 @@ internal fun AgriBottomBar(selected: Int, onSelected: (Int) -> Unit) {
         tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .height(82.dp)
+            .height(if (compact) 70.dp else 82.dp)
             .clip(barShape)
             .border(1.dp, AgriLine, barShape),
         windowInsets = NavigationBarDefaults.windowInsets
@@ -221,7 +316,7 @@ internal fun AgriBottomBar(selected: Int, onSelected: (Int) -> Unit) {
                         item.second,
                         contentDescription = item.first,
                         tint = if (selected == index) AgriGreen else AgriMuted,
-                        modifier = Modifier.size(if (selected == index) 23.dp else 21.dp)
+                        modifier = Modifier.size(if (selected == index) 22.dp else 20.dp)
                     )
                 },
                 label = {

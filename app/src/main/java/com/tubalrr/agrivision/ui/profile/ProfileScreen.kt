@@ -39,6 +39,8 @@ internal fun ProfileScreen(
     onProfileSaved: (FarmerProfile) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
+    confirmBeforeImport: Boolean = true,
+    onOpenSettings: () -> Unit = {},
     backupStatus: String,
     assistance: List<AssistanceRecord>,
     onAddAssistance: (AssistanceRecord) -> Unit,
@@ -47,6 +49,31 @@ internal fun ProfileScreen(
     onUpdateField: (FieldRecord) -> Unit
 ) {
     var showEdit by remember { mutableStateOf(false) }
+    var showImportConfirmation by remember { mutableStateOf(false) }
+
+    if (showImportConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showImportConfirmation = false },
+            icon = { Icon(Icons.Outlined.Backup, contentDescription = null, tint = AgriGreen) },
+            title = { Text("Restore a backup?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Importing a backup can replace the farm records currently stored on this device. Continue only if you trust and intended to select that backup."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showImportConfirmation = false
+                        onImportBackup()
+                    }
+                ) { Text("Continue to file picker") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportConfirmation = false }) { Text("Cancel") }
+            }
+        )
+    }
 
     if (showEdit) {
         FarmerRegistryDialog(
@@ -111,18 +138,34 @@ internal fun ProfileScreen(
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = AgriGreenSoft,
-                    modifier = Modifier.size(58.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.size(44.dp)
+                    ) {
                         Icon(
-                            Icons.Outlined.Person,
-                            contentDescription = "Profile",
+                            Icons.Outlined.Settings,
+                            contentDescription = "App settings",
                             tint = AgriGreen,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(27.dp)
                         )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = AgriGreenSoft,
+                        modifier = Modifier.size(52.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Outlined.Person,
+                                contentDescription = "Profile",
+                                tint = AgriGreen,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -470,7 +513,7 @@ internal fun ProfileScreen(
                         Text("Export AgriVision Backup")
                     }
                     OutlinedButton(
-                        onClick = onImportBackup,
+                        onClick = { if (confirmBeforeImport) showImportConfirmation = true else onImportBackup() },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp)
                     ) {
