@@ -41,6 +41,7 @@ import androidx.compose.foundation.rememberScrollState
 internal fun FarmScreen(
     padding: PaddingValues,
     farm: com.tubalrr.agrivision.domain.model.FarmRecord,
+    onOpenMap: () -> Unit,
     category: String,
     onCategoryChange: (String) -> Unit,
     livestock: List<Livestock>,
