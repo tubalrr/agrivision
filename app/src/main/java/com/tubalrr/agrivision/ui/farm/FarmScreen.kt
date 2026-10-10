@@ -324,32 +324,3 @@ internal fun FarmCategory(
         }
     }
 }
-(
-    name: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.width(90.dp).height(86.dp),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) AgriGreenSoft else AgriCard
-        )
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(23.dp))
-            Spacer(Modifier.height(6.dp))
-            Text(
-                name,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
