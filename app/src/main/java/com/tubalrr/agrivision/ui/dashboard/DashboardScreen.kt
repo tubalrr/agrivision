@@ -130,24 +130,58 @@ internal fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Good day, Farmer", color = AgriMuted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                    Column(Modifier.weight(1f)) {
-                        Text(farm.farmName.ifBlank { "Your Farm" }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = AgriText)
-                        Text("Farm operations at a glance", color = AgriMuted)
-                    }
-                    Box(Modifier.size(46.dp).clip(CircleShape).background(AgriGreen), contentAlignment = Alignment.Center) {
-                        Text("AV", color = Color.White, fontWeight = FontWeight.ExtraBold)
-                    }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "GOOD DAY, FARMER",
+                        color = AgriGreen,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        farm.farmName.ifBlank { "Your Farm" },
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = AgriText
+                    )
+                    Text("Your farm, all in one view", color = AgriMuted)
+                }
+                Box(
+                    Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(17.dp))
+                        .background(AgriGreenSoft)
+                        .border(1.dp, AgriLine, RoundedCornerShape(17.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.Yard,
+                        contentDescription = "AgriVision",
+                        tint = AgriGreen,
+                        modifier = Modifier.size(27.dp)
+                    )
                 }
             }
         }
 
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = AgriGreenDeep), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("FARM OPERATIONS", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Card(
+                Modifier.fillMaxWidth().border(1.dp, AgriGreen.copy(alpha = .18f), RoundedCornerShape(26.dp)),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenDeep),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(Modifier.padding(21.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "FARM OPERATIONS",
+                        color = AgriGold,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                     Text(
                         if (attentionReports == 0) "Your farm is ready for the next activity."
                         else "$attentionReports active field report(s) need attention.",
@@ -155,12 +189,41 @@ internal fun DashboardScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold
                     )
-                    Text("Track crops, livestock, incidents, finances and DA-ready records from one place.", color = Color.White.copy(alpha = .78f))
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DashboardMiniStat("Fields", fields.size.toString(), Modifier.weight(1f))
-                        DashboardMiniStat("Livestock", totalAnimals.toString(), Modifier.weight(1f))
-                        DashboardMiniStat("Open tasks", openTasks.toString(), Modifier.weight(1f))
+                    Text(
+                        "Crops, livestock, incidents, finances and DA-ready records.",
+                        color = Color.White.copy(alpha = .78f)
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            "Fields" to fields.size.toString(),
+                            "Livestock" to totalAnimals.toString(),
+                            "Open tasks" to openTasks.toString()
+                        ).forEach { (label, value) ->
+                            Column(
+                                Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color.White.copy(alpha = .08f))
+                                    .padding(horizontal = 10.dp, vertical = 11.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text(
+                                    value,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Text(
+                                    label,
+                                    color = Color.White.copy(alpha = .76f),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -535,6 +598,44 @@ internal fun ActionQueueRow(
 
 @Composable
 internal fun DashboardKpiCard(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    background: Color,
+    modifier: Modifier
+) {
+    val cardShape = RoundedCornerShape(22.dp)
+    Card(
+        modifier.border(1.dp, AgriLine, cardShape),
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = background),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(Color.White.copy(alpha = .72f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(21.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(title, color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+            Text(
+                value,
+                color = AgriText,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
     title: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
