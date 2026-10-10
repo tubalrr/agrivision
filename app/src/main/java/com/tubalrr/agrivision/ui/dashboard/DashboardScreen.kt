@@ -1,5 +1,35 @@
 package com.tubalrr.agrivision
 
+import androidx.compose.ui.unit.sp
+
+import androidx.compose.ui.text.style.TextOverflow
+
+import androidx.compose.ui.res.painterResource
+
+import androidx.compose.ui.graphics.Path
+
+import androidx.compose.ui.graphics.Brush
+
+import androidx.compose.ui.geometry.Offset
+
+import androidx.compose.foundation.clickable
+
+import androidx.compose.foundation.Image
+
+import androidx.compose.foundation.Canvas
+
+import androidx.compose.animation.core.tween
+
+import androidx.compose.animation.core.rememberInfiniteTransition
+
+import androidx.compose.animation.core.infiniteRepeatable
+
+import androidx.compose.animation.core.animateFloat
+
+import androidx.compose.animation.core.RepeatMode
+
+import androidx.compose.animation.core.FastOutSlowInEasing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -131,100 +161,283 @@ internal fun DashboardScreen(
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        "GOOD DAY, FARMER",
-                        color = AgriGreen,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_agrivision_logo),
+                        contentDescription = "AgriVision logo",
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(17.dp))
+                            .border(1.dp, AgriLine, RoundedCornerShape(17.dp))
                     )
-                    Text(
-                        farm.farmName.ifBlank { "Your Farm" },
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = AgriText
-                    )
-                    Text("Your farm, all in one view", color = AgriMuted)
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            "GOOD DAY, FARMER",
+                            color = AgriGreen,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.1.sp
+                        )
+                        Text(
+                            farm.farmName.ifBlank { "Your Farm" },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = AgriText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(Calendar.getInstance().time),
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
                 Box(
-                    Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(17.dp))
-                        .background(AgriGreenSoft)
-                        .border(1.dp, AgriLine, RoundedCornerShape(17.dp)),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(if (queueCount > 0) Color(0xFFFFE6D9) else AgriGreenSoft)
+                        .padding(horizontal = 11.dp, vertical = 8.dp)
                 ) {
-                    Icon(
-                        Icons.Outlined.Yard,
-                        contentDescription = "AgriVision",
-                        tint = AgriGreen,
-                        modifier = Modifier.size(27.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Icon(
+                            if (queueCount > 0) Icons.Outlined.NotificationsActive else Icons.Outlined.CheckCircle,
+                            contentDescription = null,
+                            tint = if (queueCount > 0) AgriDanger else AgriGreen,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            if (queueCount > 0) "$queueCount alerts" else "All clear",
+                            color = if (queueCount > 0) AgriDanger else AgriGreen,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
 
         item {
+            val heroTransition = rememberInfiniteTransition(label = "farm-hero")
+            val sunScale by heroTransition.animateFloat(
+                initialValue = 0.96f,
+                targetValue = 1.04f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1700, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "hero-sun-scale"
+            )
             Card(
-                Modifier.fillMaxWidth().border(1.dp, AgriGreen.copy(alpha = .18f), RoundedCornerShape(26.dp)),
-                shape = RoundedCornerShape(26.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(298.dp)
+                    .border(1.dp, AgriGreen.copy(alpha = 0.18f), RoundedCornerShape(30.dp)),
+                shape = RoundedCornerShape(30.dp),
                 colors = CardDefaults.cardColors(containerColor = AgriGreenDeep),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
             ) {
-                Column(Modifier.padding(21.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "FARM OPERATIONS",
-                        color = AgriGold,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        if (attentionReports == 0) "Your farm is ready for the next activity."
-                        else "$attentionReports active field report(s) need attention.",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Text(
-                        "Crops, livestock, incidents, finances and DA-ready records.",
-                        color = Color.White.copy(alpha = .78f)
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color(0xFF174A32), Color(0xFF0D2F20), Color(0xFF102E22))
+                            )
+                        )
+                ) {
+                    Canvas(Modifier.matchParentSize()) {
+                        val w = size.width
+                        val h = size.height
+                        val sunCenter = Offset(w * 0.83f, h * 0.27f)
+                        drawCircle(Color(0xFFFFD66B).copy(alpha = 0.12f), w * 0.16f, sunCenter)
+                        drawCircle(Color(0xFFFFD66B), w * 0.067f * sunScale, sunCenter)
+
+                        val distantHills = Path().apply {
+                            moveTo(0f, h * 0.65f)
+                            cubicTo(w * 0.18f, h * 0.48f, w * 0.34f, h * 0.61f, w * 0.48f, h * 0.56f)
+                            cubicTo(w * 0.68f, h * 0.43f, w * 0.82f, h * 0.62f, w, h * 0.49f)
+                            lineTo(w, h)
+                            lineTo(0f, h)
+                            close()
+                        }
+                        drawPath(distantHills, Color(0xFF35684A).copy(alpha = 0.8f))
+
+                        val fieldBase = Path().apply {
+                            moveTo(0f, h * 0.76f)
+                            cubicTo(w * 0.35f, h * 0.65f, w * 0.62f, h * 0.72f, w, h * 0.61f)
+                            lineTo(w, h)
+                            lineTo(0f, h)
+                            close()
+                        }
+                        drawPath(fieldBase, Color(0xFF1B5837))
+
+                        val fieldGlow = Path().apply {
+                            moveTo(w * 0.28f, h)
+                            cubicTo(w * 0.48f, h * 0.77f, w * 0.76f, h * 0.74f, w, h * 0.70f)
+                            lineTo(w, h * 0.76f)
+                            cubicTo(w * 0.74f, h * 0.83f, w * 0.49f, h * 0.87f, w * 0.37f, h)
+                            close()
+                        }
+                        drawPath(fieldGlow, Color(0xFF2C7442))
+                        for (i in 0..4) {
+                            val t = i / 4f
+                            val line = Path().apply {
+                                moveTo(w * (0.30f - t * 0.15f), h * (0.79f + t * 0.045f))
+                                cubicTo(
+                                    w * (0.50f - t * 0.10f), h * (0.72f + t * 0.06f),
+                                    w * (0.72f + t * 0.07f), h * (0.79f + t * 0.035f),
+                                    w, h * (0.68f + t * 0.06f)
+                                )
+                            }
+                            drawPath(
+                                path = line,
+                                color = if (i % 2 == 0) Color(0xFF91C95B).copy(alpha = 0.85f) else Color(0xFFD6B85D).copy(alpha = 0.68f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(21.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(
-                            "Fields" to fields.size.toString(),
-                            "Livestock" to totalAnimals.toString(),
-                            "Open tasks" to openTasks.toString()
-                        ).forEach { (label, value) ->
-                            Column(
-                                Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color.White.copy(alpha = .08f))
-                                    .padding(horizontal = 10.dp, vertical = 11.dp),
-                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.12f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.16f), CircleShape)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
-                                Text(
-                                    value,
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                                Text(
-                                    label,
-                                    color = Color.White.copy(alpha = .76f),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Icon(Icons.Outlined.Spa, null, tint = Color(0xFFBDEB7A), modifier = Modifier.size(14.dp))
+                                    Text(
+                                        "FARM OVERVIEW",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.0.sp
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Icon(
+                                Icons.Outlined.WbSunny,
+                                contentDescription = "Sunrise",
+                                tint = Color(0xFFFFD66B),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Text(
+                            if (attentionReports == 0) "Grow with\nconfidence." else "$attentionReports field report(s) need attention.",
+                            color = Color.White,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            lineHeight = 31.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(0.82f)
+                        )
+                        Text(
+                            "Your farm activity, all in one clear view.",
+                            color = Color.White.copy(alpha = 0.82f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.fillMaxWidth(0.85f)
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                Triple("Fields", fields.size.toString(), Icons.Outlined.Map),
+                                Triple("Livestock", totalAnimals.toString(), Icons.Outlined.Pets),
+                                Triple("Open tasks", openTasks.toString(), Icons.Outlined.Checklist)
+                            ).forEach { (label, value, icon) ->
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color(0xFF082719).copy(alpha = 0.68f))
+                                        .border(1.dp, Color.White.copy(alpha = 0.13f), RoundedCornerShape(16.dp))
+                                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(icon, contentDescription = null, tint = Color(0xFFBDEB7A), modifier = Modifier.size(17.dp))
+                                    Text(
+                                        value,
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        label,
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
+                }
+            }
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionTitle("Quick Actions")
+                    Text("Jump right in", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    DashboardQuickAction(
+                        title = "Report",
+                        subtitle = "Field issue",
+                        icon = Icons.Outlined.AddCircleOutline,
+                        accent = Color(0xFFFFE8D8),
+                        iconTint = Color(0xFFB45C2D),
+                        modifier = Modifier.weight(1f),
+                        onClick = { showIncidentDialog = true }
+                    )
+                    DashboardQuickAction(
+                        title = "Tasks",
+                        subtitle = "$openTasks open",
+                        icon = Icons.Outlined.Checklist,
+                        accent = Color(0xFFDFF1E3),
+                        iconTint = AgriGreen,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenTasks
+                    )
+                    DashboardQuickAction(
+                        title = "Stock",
+                        subtitle = if (lowStock == 0) "All stocked" else "$lowStock low",
+                        icon = Icons.Outlined.Inventory2,
+                        accent = Color(0xFFFFF0C7),
+                        iconTint = Color(0xFF96701B),
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenInventory
+                    )
                 }
             }
         }
@@ -631,6 +844,57 @@ internal fun DashboardKpiCard(
                 color = AgriText,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun DashboardQuickAction(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    iconTint: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .height(126.dp)
+            .clickable(onClick = onClick)
+            .border(1.dp, AgriLine, RoundedCornerShape(21.dp)),
+        shape = RoundedCornerShape(21.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(39.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(accent),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(21.dp))
+            }
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = AgriText,
+                maxLines = 1
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = AgriMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
