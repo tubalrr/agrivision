@@ -635,24 +635,3 @@ internal fun DashboardKpiCard(
         }
     }
 }
-
-    title: String,
-    value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    background: Color,
-    modifier: Modifier
-) {
-    Card(
-        modifier,
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = background),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(23.dp))
-            Spacer(Modifier.height(9.dp))
-            Text(title, color = AgriMuted, style = MaterialTheme.typography.labelMedium)
-            Text(value, color = AgriText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        }
-    }
-}
