@@ -439,7 +439,7 @@ private fun FarmTaskCard(task: FarmTask, onToggle: () -> Unit) {
         "inventory", "stock" -> Icons.Outlined.Inventory2
         "maintenance", "repair" -> Icons.Outlined.Build
         "cleaning" -> Icons.Outlined.CleaningServices
-        else -> Icons.Outlined.ClipboardList
+        else -> Icons.Outlined.Assignment
     }
     Card(
         modifier = Modifier.fillMaxWidth().border(
