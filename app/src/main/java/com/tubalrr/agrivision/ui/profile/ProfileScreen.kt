@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -217,6 +218,575 @@ internal fun ProfileScreen(
                 "Privacy",
                 "Farmer information stays on this device unless you intentionally export or share a backup."
             )
+        }
+    }
+}
+
+@Composable
+internal fun ProfileScreen(
+    padding: PaddingValues,
+    profile: FarmerProfile,
+    farmer: FarmerRecord,
+    farm: FarmRecord,
+    fields: List<FieldRecord>,
+    onProfileSaved: (FarmerProfile) -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit,
+    backupStatus: String,
+    assistance: List<AssistanceRecord>,
+    onAddAssistance: (AssistanceRecord) -> Unit,
+    onUpdateAssistance: (AssistanceRecord) -> Unit,
+    onAddField: (FieldRecord) -> Unit,
+    onUpdateField: (FieldRecord) -> Unit
+) {
+    var showEdit by remember { mutableStateOf(false) }
+
+    if (showEdit) {
+        FarmerRegistryDialog(
+            profile = profile,
+            onDismiss = { showEdit = false },
+            onSave = {
+                onProfileSaved(it)
+                showEdit = false
+            }
+        )
+    }
+
+    val registrationReady = profile.farmerName.isNotBlank() && profile.farmerId.isNotBlank()
+    val details = listOf(
+        profile.farmerName.isNotBlank(),
+        profile.farmerId.isNotBlank(),
+        profile.contact.isNotBlank(),
+        profile.farmName.isNotBlank(),
+        profile.province.isNotBlank(),
+        profile.municipality.isNotBlank(),
+        profile.barangay.isNotBlank(),
+        profile.farmSize.isNotBlank(),
+        profile.landTenure.isNotBlank(),
+        profile.commodities.isNotBlank()
+    )
+    val completion = details.count { it } * 100 / details.size
+    val initials = profile.farmerName.trim()
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+        .take(2)
+        .map { it.first().uppercaseChar() }
+        .joinToString("")
+        .ifBlank { "F" }
+
+    LazyColumn(
+        Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "PROFILE CENTER",
+                        color = AgriGreen,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Farmer & Farm",
+                        color = AgriText,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        "Your farmer identity, field registry, and farm records in one place.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = AgriGreenSoft,
+                    modifier = Modifier.size(58.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.Person,
+                            contentDescription = "Profile",
+                            tint = AgriGreen,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreen),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.linearGradient(
+                                listOf(AgriGreen, Color(0xFF245841))
+                            ),
+                            shape = RoundedCornerShape(28.dp)
+                        )
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(15.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(70.dp),
+                            shape = CircleShape,
+                            color = AgriGold
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    initials,
+                                    color = AgriGreen,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(
+                                "FARMER PROFILE",
+                                color = Color.White.copy(alpha = .72f),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                profile.farmerName.ifBlank { "Farmer not registered" },
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                if (profile.farmerId.isBlank()) "No farmer reference ID yet"
+                                else "Farmer ID · " + profile.farmerId,
+                                color = Color.White.copy(alpha = .82f),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(50.dp),
+                        color = Color.White.copy(alpha = .13f)
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            Icon(
+                                if (registrationReady) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
+                                contentDescription = null,
+                                tint = AgriGold,
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Text(
+                                if (registrationReady) "Farmer identity added" else "Complete your farmer identity",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = { showEdit = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(15.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = AgriGreen
+                        )
+                    ) {
+                        Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (profile.farmerName.isBlank()) "Register Farmer" else "Edit Farmer & Farm Details",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ProfileQuickMetric(
+                    title = "Fields",
+                    value = fields.size.toString(),
+                    icon = Icons.Outlined.Map,
+                    modifier = Modifier.weight(1f)
+                )
+                ProfileQuickMetric(
+                    title = "Assistance",
+                    value = assistance.size.toString(),
+                    icon = Icons.Outlined.VerifiedUser,
+                    modifier = Modifier.weight(1f)
+                )
+                ProfileQuickMetric(
+                    title = "Complete",
+                    value = "$completion%",
+                    icon = Icons.Outlined.CheckCircle,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriCard),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(
+                    Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Registry completeness", fontWeight = FontWeight.Bold, color = AgriText)
+                            Text(
+                                if (completion == 100) "All core profile details are filled in."
+                                else "Add the missing details to make your farm record more useful.",
+                                color = AgriMuted,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Text("$completion%", color = AgriGreen, fontWeight = FontWeight.ExtraBold)
+                    }
+                    LinearProgressIndicator(
+                        progress = { completion / 100f },
+                        modifier = Modifier.fillMaxWidth().height(7.dp),
+                        color = AgriGreen,
+                        trackColor = AgriLine
+                    )
+                }
+            }
+        }
+
+        item {
+            ProfileSectionHeading(
+                title = "Farm details",
+                subtitle = "Key details connected to your farmer registry."
+            )
+        }
+
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ProfileInfoTile(
+                    title = "Farm name",
+                    value = profile.farmName.ifBlank { "Not registered" },
+                    icon = Icons.Outlined.Home,
+                    modifier = Modifier.weight(1f)
+                )
+                ProfileInfoTile(
+                    title = "Farm size",
+                    value = profile.farmSize.ifBlank { "Not set" },
+                    icon = Icons.Outlined.Map,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            ProfileInfoTile(
+                title = "Farm location",
+                value = listOf(profile.barangay, profile.municipality, profile.province)
+                    .filter { it.isNotBlank() }
+                    .joinToString(", ")
+                    .ifBlank { "Barangay, municipality, and province not added yet" },
+                icon = Icons.Outlined.Place
+            )
+        }
+
+        item {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ProfileInfoTile(
+                    title = "Land tenure",
+                    value = profile.landTenure.ifBlank { "Not set" },
+                    icon = Icons.Outlined.VerifiedUser,
+                    modifier = Modifier.weight(1f)
+                )
+                ProfileInfoTile(
+                    title = "Contact",
+                    value = profile.contact.ifBlank { "No contact added" },
+                    icon = Icons.Outlined.Call,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            ProfileInfoTile(
+                title = "Farm commodities",
+                value = profile.commodities.ifBlank {
+                    "Add the crops, livestock, fisheries, or other commodities you manage."
+                },
+                icon = Icons.Outlined.Grass
+            )
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+            ) {
+                Column(
+                    Modifier.padding(17.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    Text("Registry identifiers", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Farmer record ID", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                            Text(farmer.farmerId.ifBlank { "Not assigned" }, fontWeight = FontWeight.SemiBold)
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Farm record ID", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                            Text(farm.farmId.ifBlank { "Not assigned" }, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    Text(
+                        fields.size.toString() + if (fields.size == 1) " registered field" else " registered fields",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
+        item {
+            ProfileSectionHeading(
+                title = "Field registry",
+                subtitle = "Manage field records used by your farm map and crop tracking."
+            )
+        }
+
+        item {
+            FieldRegistrySection(
+                farm = farm,
+                fields = fields,
+                onAdd = onAddField,
+                onUpdate = onUpdateField
+            )
+        }
+
+        item {
+            ProfileSectionHeading(
+                title = "Agricultural assistance",
+                subtitle = "Keep applications, approvals, distribution, and outcomes organized."
+            )
+        }
+
+        item {
+            AssistanceSection(
+                assistance = assistance,
+                onAdd = onAddAssistance,
+                onUpdate = onUpdateAssistance
+            )
+        }
+
+        item {
+            ProfileSectionHeading(
+                title = "Backup & restore",
+                subtitle = "Export a safety copy or restore a saved AgriVision backup."
+            )
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriCard),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(
+                    Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = RoundedCornerShape(15.dp),
+                            color = AgriGreenSoft
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.Backup, contentDescription = null, tint = AgriGreen)
+                            }
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Protect your farm records", fontWeight = FontWeight.Bold)
+                            Text(
+                                "Your backup includes the local farm data snapshot. Store exported files somewhere safe.",
+                                color = AgriMuted,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = onExportBackup,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Outlined.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Export AgriVision Backup")
+                    }
+                    OutlinedButton(
+                        onClick = onImportBackup,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Outlined.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Import Existing Backup")
+                    }
+                    if (backupStatus.isNotBlank()) {
+                        Surface(
+                            color = AgriGreenSoft,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Outlined.Info, contentDescription = null, tint = AgriGreen)
+                                Text(
+                                    backupStatus,
+                                    color = AgriGreen,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+            ) {
+                Row(
+                    Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Outlined.VerifiedUser, contentDescription = null, tint = AgriGreen)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Private by design", fontWeight = FontWeight.Bold, color = AgriGreen)
+                        Text(
+                            "Farmer information stays on this device unless you intentionally export or share a backup.",
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileSectionHeading(
+    title: String,
+    subtitle: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, color = AgriText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(subtitle, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun ProfileQuickMetric(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(19.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            Modifier.padding(vertical = 14.dp, horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = AgriGreen, modifier = Modifier.size(20.dp))
+            Text(value, color = AgriText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Text(title, color = AgriMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun ProfileInfoTile(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            Modifier.padding(15.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(38.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = AgriGreenSoft
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = AgriGreen, modifier = Modifier.size(19.dp))
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(title, color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                Text(value, color = AgriText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }

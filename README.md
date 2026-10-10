@@ -29,9 +29,11 @@ Built with:
 
 ## Latest Version
 
-**Version 1.6.0** · Android version code: `7`
+**Version 1.7.0** · Android version code: `8`
 
-This release upgrades Tasks with a dedicated farm task center, overdue/open/completed/stock-alert metrics, date shortcuts for today and tomorrow, a date picker, task status filters, category icons, clearer due-state indicators, and farm-specific category chips when creating tasks. Task records continue to use the existing local storage model and save/toggle flow.
+This release upgrades the Profile Center with a farmer identity hero, registration completeness indicator, farm detail cards, at-a-glance field and assistance metrics, more readable registry identifiers, and full-width backup/restore actions. The existing farmer registry dialog, field registry, assistance workflow, and local Room-data backup flows are preserved.
+
+Version 1.6.0 upgraded Tasks with a dedicated farm task center, overdue/open/completed/stock-alert metrics, date shortcuts for today and tomorrow, a date picker, task status filters, category icons, clearer due-state indicators, and farm-specific category chips when creating tasks. Task records continue to use the existing local storage model and save/toggle flow.
 
 ## Field Mapping System
 
