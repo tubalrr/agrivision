@@ -5,6 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private var pendingReportType: String? = null
@@ -47,20 +53,36 @@ class MainActivity : ComponentActivity() {
             if (uri != null) pendingReportType?.let { farmViewModel.exportDaReport(uri, it, DaReportFormat.JSON) }
         }
 
+        // Create the ViewModel at startup so its initial data work can run behind the splash screen.
+        val startupViewModel = farmViewModel
+
         setContent {
-            AgriVisionApp(
-                onExportBackup = { exportBackup.launch("agrivision-backup.json") },
-                onImportBackup = { importBackup.launch(arrayOf("application/json", "text/plain")) },
-                onExportCasePackage = { exportCasePackage.launch("agrivision-da-case-package.json") },
-                onExportDaReport = { reportType, format ->
-                    pendingReportType = reportType
-                    when (format) {
-                        DaReportFormat.PDF -> exportReportPdf.launch(DaReportExporter.fileName(reportType, format))
-                        DaReportFormat.CSV -> exportReportCsv.launch(DaReportExporter.fileName(reportType, format))
-                        DaReportFormat.JSON -> exportReportJson.launch(DaReportExporter.fileName(reportType, format))
-                    }
-                }
-            )
+            var showSplash by remember { mutableStateOf(true) }
+
+            LaunchedEffect(Unit) {
+                // Keep the branded startup visible long enough to make app launch feel intentional.
+                delay(1400)
+                showSplash = false
+            }
+
+            if (showSplash) {
+                AgriLoadingScreen()
+            } else {
+                AgriVisionApp(
+                    onExportBackup = { exportBackup.launch("agrivision-backup.json") },
+                    onImportBackup = { importBackup.launch(arrayOf("application/json", "text/plain")) },
+                    onExportCasePackage = { exportCasePackage.launch("agrivision-da-case-package.json") },
+                    onExportDaReport = { reportType, format ->
+                        pendingReportType = reportType
+                        when (format) {
+                            DaReportFormat.PDF -> exportReportPdf.launch(DaReportExporter.fileName(reportType, format))
+                            DaReportFormat.CSV -> exportReportCsv.launch(DaReportExporter.fileName(reportType, format))
+                            DaReportFormat.JSON -> exportReportJson.launch(DaReportExporter.fileName(reportType, format))
+                        }
+                    },
+                    farmViewModel = startupViewModel
+                )
+            }
         }
     }
 }
