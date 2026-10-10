@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Brush
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 
 import androidx.compose.foundation.clickable
 
@@ -47,7 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import java.text.SimpleDateFormat
+import java.text.ParsePosition
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -59,6 +63,7 @@ internal fun DashboardScreen(
     livestock: List<Livestock>,
     crops: List<CropRecord>,
     production: List<ProductionRecord>,
+    sales: List<SaleRecord>,
     expenses: List<ExpenseRecord>,
     inventory: List<InventoryItem>,
     tasks: List<FarmTask>,
@@ -625,6 +630,21 @@ internal fun DashboardScreen(
         }
 
         item {
+            SectionTitle("Farm Analytics")
+        }
+
+        item {
+            CashFlowAnalyticsCard(
+                sales = sales,
+                expenses = expenses
+            )
+        }
+
+        item {
+            ProductionTrendCard(production = production)
+        }
+
+        item {
             Card(
                 Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
@@ -679,6 +699,345 @@ internal fun DashboardScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+private data class DashboardMonth(
+    val key: String,
+    val label: String,
+    val sales: Double,
+    val expenses: Double,
+    val productionCount: Int
+)
+
+private fun parseDashboardDate(value: String): Date? {
+    val cleaned = value.trim()
+    if (cleaned.isBlank()) return null
+
+    val calendar = Calendar.getInstance()
+    when (cleaned.lowercase(Locale.US)) {
+        "today" -> return calendar.time
+        "yesterday" -> {
+            calendar.add(Calendar.DAY_OF_YEAR, -1)
+            return calendar.time
+        }
+        "tomorrow" -> {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+            return calendar.time
+        }
+    }
+
+    val patterns = listOf(
+        "yyyy-MM-dd",
+        "yyyy/MM/dd",
+        "MM/dd/yyyy",
+        "M/d/yyyy",
+        "dd/MM/yyyy",
+        "d/M/yyyy",
+        "MMM d, yyyy",
+        "MMMM d, yyyy",
+        "d MMM yyyy",
+        "MMM yyyy",
+        "MMMM yyyy"
+    )
+    for (pattern in patterns) {
+        val formatter = SimpleDateFormat(pattern, Locale.US).apply { isLenient = false }
+        val position = ParsePosition(0)
+        val parsed = formatter.parse(cleaned, position)
+        if (parsed != null && position.index == cleaned.length) return parsed
+    }
+    return null
+}
+
+private fun dashboardMonths(
+    sales: List<SaleRecord>,
+    expenses: List<ExpenseRecord>,
+    production: List<ProductionRecord>
+): List<DashboardMonth> {
+    val keyFormat = SimpleDateFormat("yyyy-MM", Locale.US)
+    val labelFormat = SimpleDateFormat("MMM", Locale.US)
+    val datedSales = sales.mapNotNull { record ->
+        parseDashboardDate(record.date)?.let { keyFormat.format(it) to record }
+    }
+    val datedExpenses = expenses.mapNotNull { record ->
+        parseDashboardDate(record.date)?.let { keyFormat.format(it) to record }
+    }
+    val datedProduction = production.mapNotNull { record ->
+        parseDashboardDate(record.period)?.let { keyFormat.format(it) to record }
+    }
+    val current = Calendar.getInstance()
+    return (5 downTo 0).map { offset ->
+        val month = Calendar.getInstance().apply {
+            set(current.get(Calendar.YEAR), current.get(Calendar.MONTH), 1, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+            add(Calendar.MONTH, -offset)
+        }
+        val date = month.time
+        val key = keyFormat.format(date)
+        DashboardMonth(
+            key = key,
+            label = labelFormat.format(date),
+            sales = datedSales.filter { it.first == key }.sumOf { it.second.amount },
+            expenses = datedExpenses.filter { it.first == key }.sumOf { it.second.amount },
+            productionCount = datedProduction.count { it.first == key }
+        )
+    }
+}
+
+@Composable
+private fun CashFlowAnalyticsCard(
+    sales: List<SaleRecord>,
+    expenses: List<ExpenseRecord>
+) {
+    val months = remember(sales, expenses) { dashboardMonths(sales, expenses, emptyList()) }
+    val datedSalesCount = remember(sales) { sales.count { parseDashboardDate(it.date) != null } }
+    val datedExpensesCount = remember(expenses) { expenses.count { parseDashboardDate(it.date) != null } }
+    val hasDatedFinance = datedSalesCount + datedExpensesCount > 0
+    val currentMonth = months.lastOrNull()
+    val maxValue = (months.maxOfOrNull { maxOf(it.sales, it.expenses) } ?: 0.0).coerceAtLeast(1.0)
+    val monthSales = currentMonth?.sales ?: 0.0
+    val monthExpenses = currentMonth?.expenses ?: 0.0
+    val net = monthSales - monthExpenses
+
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(13.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Cash flow", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                    Text("Monthly sales vs expenses · last 6 months", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                }
+                Surface(color = AgriGreenSoft, shape = RoundedCornerShape(12.dp)) {
+                    Icon(
+                        Icons.Outlined.TrendingUp,
+                        contentDescription = null,
+                        tint = AgriGreen,
+                        modifier = Modifier.padding(10.dp).size(21.dp)
+                    )
+                }
+            }
+
+            if (!hasDatedFinance) {
+                Column(
+                    Modifier.fillMaxWidth().background(AgriGreenSoft, RoundedCornerShape(18.dp)).padding(15.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text("Your trend starts with dated records", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Add sales and expense entries with dates to populate the six-month chart. No sample figures are shown.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            } else {
+                Canvas(Modifier.fillMaxWidth().height(142.dp)) {
+                    val chartHeight = size.height - 6.dp.toPx()
+                    val step = size.width / months.size
+                    val barWidth = (step * .23f).coerceAtLeast(4.dp.toPx())
+                    val radius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                    for (grid in 0..4) {
+                        val y = chartHeight * grid / 4f
+                        drawLine(
+                            color = AgriLine,
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                    months.forEachIndexed { index, month ->
+                        val groupCenter = step * (index + .5f)
+                        val salesHeight = ((month.sales / maxValue).toFloat() * (chartHeight - 4.dp.toPx())).coerceAtLeast(0f)
+                        val expenseHeight = ((month.expenses / maxValue).toFloat() * (chartHeight - 4.dp.toPx())).coerceAtLeast(0f)
+                        drawRoundRect(
+                            color = AgriGreen,
+                            topLeft = Offset(groupCenter - barWidth - 2.dp.toPx(), chartHeight - salesHeight),
+                            size = Size(barWidth, salesHeight),
+                            cornerRadius = radius
+                        )
+                        drawRoundRect(
+                            color = AgriDanger.copy(alpha = .82f),
+                            topLeft = Offset(groupCenter + 2.dp.toPx(), chartHeight - expenseHeight),
+                            size = Size(barWidth, expenseHeight),
+                            cornerRadius = radius
+                        )
+                    }
+                }
+                Row(Modifier.fillMaxWidth()) {
+                    months.forEach { month ->
+                        Text(
+                            month.label,
+                            modifier = Modifier.weight(1f),
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    DashboardChartLegend(color = AgriGreen, label = "Sales")
+                    DashboardChartLegend(color = AgriDanger, label = "Expenses")
+                }
+                HorizontalDivider(color = AgriLine)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DashboardAnalyticsMetric("This month · Sales", "₱" + money(monthSales), Modifier.weight(1f))
+                    DashboardAnalyticsMetric("This month · Expenses", "₱" + money(monthExpenses), Modifier.weight(1f))
+                }
+                Surface(
+                    color = if (net >= 0) AgriGreenSoft else Color(0xFFFFE8E3),
+                    shape = RoundedCornerShape(15.dp)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (net >= 0) Icons.Outlined.ArrowUpward else Icons.Outlined.ArrowDownward,
+                            contentDescription = null,
+                            tint = if (net >= 0) AgriGreen else AgriDanger,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Dated net cash flow", style = MaterialTheme.typography.labelSmall, color = AgriMuted)
+                            Text(
+                                (if (net < 0) "−₱" else "₱") + money(kotlin.math.abs(net)),
+                                color = if (net >= 0) AgriGreen else AgriDanger,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductionTrendCard(production: List<ProductionRecord>) {
+    val months = remember(production) { dashboardMonths(emptyList(), emptyList(), production) }
+    val datedCount = remember(production) { production.count { parseDashboardDate(it.period) != null } }
+    val recentCount = months.sumOf { it.productionCount }
+    val peak = (months.maxOfOrNull { it.productionCount } ?: 0).coerceAtLeast(1)
+
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Production activity", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                    Text("Dated production logs · last 6 months", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                }
+                Surface(color = AgriGoldSoft, shape = RoundedCornerShape(12.dp)) {
+                    Icon(
+                        Icons.Outlined.Eco,
+                        contentDescription = null,
+                        tint = AgriGreen,
+                        modifier = Modifier.padding(10.dp).size(21.dp)
+                    )
+                }
+            }
+            if (datedCount == 0) {
+                Column(
+                    Modifier.fillMaxWidth().background(AgriGreenSoft, RoundedCornerShape(18.dp)).padding(15.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text("Production trends will appear here", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (production.isEmpty()) "No production records have been added yet."
+                        else "Existing production entries don't have a recognized date yet. Use a date such as 2026-10-10 to chart them.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            } else {
+                Canvas(Modifier.fillMaxWidth().height(112.dp)) {
+                    val chartHeight = size.height - 4.dp.toPx()
+                    val step = size.width / months.size
+                    val barWidth = (step * .4f).coerceAtLeast(5.dp.toPx())
+                    val radius = CornerRadius(5.dp.toPx(), 5.dp.toPx())
+                    for (grid in 0..3) {
+                        val y = chartHeight * grid / 3f
+                        drawLine(
+                            color = AgriLine,
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                    months.forEachIndexed { index, month ->
+                        val barHeight = (month.productionCount.toFloat() / peak) * (chartHeight - 4.dp.toPx())
+                        val left = step * (index + .5f) - barWidth / 2f
+                        drawRoundRect(
+                            color = if (index == months.lastIndex) AgriGold else AgriGreen.copy(alpha = .72f),
+                            topLeft = Offset(left, chartHeight - barHeight),
+                            size = Size(barWidth, barHeight),
+                            cornerRadius = radius
+                        )
+                    }
+                }
+                Row(Modifier.fillMaxWidth()) {
+                    months.forEach { month ->
+                        Text(
+                            month.label,
+                            modifier = Modifier.weight(1f),
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("$recentCount dated production record(s)", fontWeight = FontWeight.Bold, color = AgriGreen)
+                        Text("From the last six calendar months", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("Total logs: " + production.size, color = AgriText, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardChartLegend(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.size(9.dp).clip(CircleShape).background(color))
+        Text(label, color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun DashboardAnalyticsMetric(
+    title: String,
+    value: String,
+    modifier: Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(15.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCream)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(title, color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+            Text(value, color = AgriText, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
         }
     }
 }

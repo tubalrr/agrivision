@@ -174,6 +174,7 @@ internal fun AgriVisionApp(
                     livestock = livestock,
                     crops = crops,
                     production = production,
+                    sales = sales,
                     expenses = expenses,
                     inventory = inventory,
                     tasks = tasks,

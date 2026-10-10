@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.9.0** · Android version code: `10`
+
+This release adds a dashboard analytics center with six-month sales-versus-expenses charts and production activity trends derived from dated records. Current-month sales, expenses, and net cash flow summaries use recorded data; empty-state guidance is shown when there are no recognized dates rather than inventing values. Existing farm health, task triage, incident workflow, and farm operations summaries remain available.
+
 **Version 1.8.0** · Android version code: `9`
 
 This release adds App Preferences for remembering the last tab, toggling navigation haptics, confirming before backup import, and using a compact bottom navigation bar. Preferences are saved locally on the device, and users can reset them to defaults. Backup restore now offers a confirmation prompt by default.
