@@ -1,5 +1,13 @@
 package com.tubalrr.agrivision
 
+import androidx.compose.ui.draw.clip
+
+import androidx.compose.foundation.shape.CircleShape
+
+import androidx.compose.foundation.border
+
+import androidx.compose.foundation.background
+
 import android.content.pm.PackageManager
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -62,6 +70,7 @@ internal fun FieldMapScreen(
     var showFields by remember { mutableStateOf(true) }
     var showCrops by remember { mutableStateOf(true) }
     var showIncidents by remember { mutableStateOf(true) }
+    var selectedMapType by remember { mutableStateOf(MapType.SATELLITE) }
     var editing by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf(MapEditTarget.FIELD) }
     var selectedFieldId by remember { mutableStateOf("") }
@@ -166,6 +175,40 @@ internal fun FieldMapScreen(
         }
     }
 
+    val focusSelectedField: () -> Unit = {
+        val field = selectedField
+        val point = field?.let {
+            it.latitude?.let { lat ->
+                it.longitude?.let { lon -> MapPoint(lat, lon) }
+            } ?: it.boundaryPoints.centroid()
+        }
+        if (point != null) {
+            scope.launch {
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngZoom(point.toLatLng(), 16.5f),
+                    650
+                )
+            }
+        }
+    }
+
+    val focusSelectedIncident: () -> Unit = {
+        val incident = selectedIncident
+        val point = incident?.let {
+            it.latitude?.let { lat ->
+                it.longitude?.let { lon -> MapPoint(lat, lon) }
+            } ?: it.affectedAreaBoundary.centroid()
+        }
+        if (point != null) {
+            scope.launch {
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngZoom(point.toLatLng(), 16.5f),
+                    650
+                )
+            }
+        }
+    }
+
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(18.dp, 16.dp, 18.dp, 28.dp),
@@ -221,6 +264,48 @@ internal fun FieldMapScreen(
 
         item {
             Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Map, null, tint = AgriGreen, modifier = Modifier.size(19.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Map appearance", color = AgriText, fontWeight = FontWeight.Bold)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        listOf(
+                            "Satellite" to MapType.SATELLITE,
+                            "Hybrid" to MapType.HYBRID,
+                            "Road" to MapType.NORMAL,
+                            "Terrain" to MapType.TERRAIN
+                        ).forEach { (label, type) ->
+                            FilterChip(
+                                selected = selectedMapType == type,
+                                onClick = { selectedMapType = type },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
+                    Text(
+                        "Switch between imagery and map labels without changing your saved field data.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
+        item {
+            Card(
                 Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(28.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -231,7 +316,7 @@ internal fun FieldMapScreen(
                             modifier = Modifier.fillMaxSize(),
                             cameraPositionState = cameraPositionState,
                             properties = MapProperties(
-                                mapType = MapType.SATELLITE,
+                                mapType = selectedMapType,
                                 isMyLocationEnabled = false
                             ),
                             uiSettings = MapUiSettings(
@@ -430,6 +515,108 @@ internal fun FieldMapScreen(
                             color = AgriMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+                }
+            }
+        }
+
+        if (selectedField != null || selectedIncident != null) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().border(1.dp, AgriLine, RoundedCornerShape(22.dp)),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.Map, null, tint = AgriGreen, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Selected map features", color = AgriText, fontWeight = FontWeight.ExtraBold)
+                        }
+
+                        selectedField?.let { field ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(AgriGreenSoft),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Outlined.LocalFlorist, null, tint = AgriGreen, modifier = Modifier.size(21.dp))
+                                }
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(field.name, color = AgriText, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        (field.crop.ifBlank { "No crop assigned" }) + " · " +
+                                                String.format(Locale.US, "%.2f ha", field.areaHectares),
+                                        color = AgriMuted,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        "Status: " + field.currentStatus +
+                                                if (field.latitude != null && field.longitude != null) {
+                                                    " · %.5f, %.5f".format(Locale.US, field.latitude, field.longitude)
+                                                } else {
+                                                    " · " + field.boundaryPoints.size + " boundary point(s)"
+                                                },
+                                        color = AgriMuted,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                                FilledTonalButton(
+                                    onClick = focusSelectedField,
+                                    enabled = field.latitude != null && field.longitude != null || field.boundaryPoints.isNotEmpty(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Focus") }
+                            }
+                        }
+
+                        if (selectedField != null && selectedIncident != null) {
+                            HorizontalDivider(color = AgriLine)
+                        }
+
+                        selectedIncident?.let { incident ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(Color(0xFFFFE8DD)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Outlined.WarningAmber, null, tint = AgriDanger, modifier = Modifier.size(21.dp))
+                                }
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(incident.type, color = AgriText, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        incident.severity + " · " + incident.status + " · " + incident.fieldId.ifBlank { "Unlinked field" },
+                                        color = AgriMuted,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        if (incident.latitude != null && incident.longitude != null) {
+                                            "%.5f, %.5f".format(Locale.US, incident.latitude, incident.longitude)
+                                        } else {
+                                            incident.affectedAreaBoundary.size.toString() + " affected-area point(s)"
+                                        },
+                                        color = AgriMuted,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                                FilledTonalButton(
+                                    onClick = focusSelectedIncident,
+                                    enabled = incident.latitude != null && incident.longitude != null || incident.affectedAreaBoundary.isNotEmpty(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Focus") }
+                            }
+                        }
                     }
                 }
             }
