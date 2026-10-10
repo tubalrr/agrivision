@@ -29,9 +29,9 @@ Built with:
 
 ## Latest Version
 
-**Version 1.2.0** · Android version code: `3`
+**Version 1.3.0** · Android version code: `4`
 
-This release gives the dashboard a more expressive agricultural visual identity, with a custom illustrated farm hero, animated sunrise accent, branded farm overview metrics, and quick-action tiles for reports, tasks, and inventory. It also includes the branded loading screen, new launcher logo, and the earlier premium card and navigation refinements.
+This release upgrades the Farm workspace with a farm-specific hero, live overview metrics for livestock, crop cycles, registered fields and stock alerts, category cards with record counts, and a new Fields section with area, crop, status, planting and harvest details plus direct access to the Field Map. It also includes the branded startup screen, refreshed launcher logo, and the v1.2 dashboard visual upgrade.
 
 ## Field Mapping System
 
