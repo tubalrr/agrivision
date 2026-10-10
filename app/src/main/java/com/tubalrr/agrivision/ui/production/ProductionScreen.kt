@@ -1,5 +1,9 @@
 package com.tubalrr.agrivision
 
+import androidx.compose.ui.unit.sp
+
+import androidx.compose.ui.graphics.Brush
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -56,6 +60,17 @@ internal fun ProductionFinanceScreen(
     var showFeedDialog by remember { mutableStateOf(false) }
     var selectedDaReport by remember { mutableStateOf(DaReportExporter.reportTypes.first()) }
     var selectedDaFormat by remember { mutableStateOf(DaReportFormat.PDF) }
+    var daReportCategory by remember { mutableStateOf("All reports") }
+    var reportMenuExpanded by remember { mutableStateOf(false) }
+    val reportGroups = listOf(
+        "All reports" to DaReportExporter.reportTypes,
+        "Registry" to listOf("Farmer Profile", "Farm Registry", "Field Summary"),
+        "Production" to listOf("Crop Production", "Harvest", "Crop Lifecycle", "Livestock Inventory", "Livestock Lifecycle", "Feed Logs"),
+        "Finance & Inputs" to listOf("Farm Inputs", "Inventory Transactions", "Expenses", "Sales"),
+        "Incidents & DA" to listOf("Incidents", "Incident Audit", "Assistance")
+    )
+    val availableReportTypes = reportGroups.firstOrNull { it.first == daReportCategory }?.second
+        ?: DaReportExporter.reportTypes
 
     if (showDialog) {
         AddProductionFinanceDialog(
@@ -83,43 +98,138 @@ internal fun ProductionFinanceScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriGreenDeep),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF174B32), AgriGreenDeep, Color(0xFF0A281B))
+                        )
+                    )
+                    .border(1.dp, Color(0xFF2E7550), RoundedCornerShape(28.dp))
+                    .padding(21.dp)
             ) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("REPORTS & PERFORMANCE", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                    Text("Turn farm records into decisions.", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-                    Text("Production, finance, incidents and DA-ready reports in one place.", color = Color.White.copy(alpha = .78f))
-                }
-            }
-        }
-        item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriGreen), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Farm Performance", color = Color.White.copy(alpha = .72f), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ReportMetric("Sales", "₱" + money(totalSales), Modifier.weight(1f))
-                        ReportMetric("Expenses", "₱" + money(totalExpenses), Modifier.weight(1f))
-                        ReportMetric("Net", "₱" + money(netIncome), Modifier.weight(1f))
+                Icon(
+                    Icons.Outlined.Assessment,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.07f),
+                    modifier = Modifier.size(116.dp).align(Alignment.CenterEnd)
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Icon(Icons.Outlined.Insights, null, tint = AgriGold, modifier = Modifier.size(17.dp))
+                        Text(
+                            "FARM REPORT CENTER",
+                            color = AgriGold,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.1.sp
+                        )
+                    }
+                    Text(
+                        "Your farm.\nClearly understood.",
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        lineHeight = 32.sp
+                    )
+                    Text(
+                        "Review performance, check record readiness and export organized farm reports.",
+                        color = Color.White.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color.White.copy(alpha = 0.1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Outlined.Storage, null, tint = Color(0xFFB9E85A), modifier = Modifier.size(14.dp))
+                            Text(
+                                "Based on your saved farm records",
+                                color = Color.White.copy(alpha = 0.9f),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                 }
             }
         }
 
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ReportStatCard("Animals", totalAnimals.toString(), "heads", Modifier.weight(1f))
-                ReportStatCard("Tasks", openTasks.toString(), "open", Modifier.weight(1f))
-                ReportStatCard("Production", production.size.toString(), "records", Modifier.weight(1f))
+            Card(
+                Modifier.fillMaxWidth().border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(26.dp)),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = AgriGreen),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(Modifier.padding(19.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Farm performance", color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                            Text("Net result", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = (if (netIncome >= 0.0) Color(0xFFB9E85A) else Color(0xFFFFD4C7)).copy(alpha = 0.18f)
+                        ) {
+                            Text(
+                                if (netIncome >= 0.0) "Positive" else "Negative",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                color = if (netIncome >= 0.0) Color(0xFFD9F4A0) else Color(0xFFFFD4C7),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Text(
+                        "₱" + money(netIncome),
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Column(
+                            Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.1f)).padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(Icons.Outlined.TrendingUp, null, tint = Color(0xFFB9E85A), modifier = Modifier.size(18.dp))
+                            Text("Sales", color = Color.White.copy(alpha = 0.76f), style = MaterialTheme.typography.labelSmall)
+                            Text("₱" + money(totalSales), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        }
+                        Column(
+                            Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.1f)).padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(Icons.Outlined.ReceiptLong, null, tint = Color(0xFFFFD4C7), modifier = Modifier.size(18.dp))
+                            Text("Expenses", color = Color.White.copy(alpha = 0.76f), style = MaterialTheme.typography.labelSmall)
+                            Text("₱" + money(totalExpenses), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
             }
         }
 
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    ReportStatCard("Livestock", totalAnimals.toString(), "total heads", Modifier.weight(1f))
+                    ReportStatCard("Open tasks", openTasks.toString(), "need action", Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    ReportStatCard("Production", production.size.toString(), "records logged", Modifier.weight(1f))
+                    ReportStatCard("Active incidents", fieldIncidents.count { it.status != "Completed" }.toString(), "cases in progress", Modifier.weight(1f))
+                }
+            }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = tab == "Production", onClick = { tab = "Production" }, label = { Text("Production") }, leadingIcon = { Icon(Icons.Outlined.Assessment, null) }, shape = RoundedCornerShape(12.dp))
                 FilterChip(selected = tab == "Feed Logs", onClick = { tab = "Feed Logs" }, label = { Text("Feed Logs") }, leadingIcon = { Icon(Icons.Outlined.Restaurant, null) }, shape = RoundedCornerShape(12.dp))
                 FilterChip(selected = tab == "Finance", onClick = { tab = "Finance" }, label = { Text("Finance") }, leadingIcon = { Icon(Icons.Outlined.MonetizationOn, null) }, shape = RoundedCornerShape(12.dp))
@@ -187,18 +297,62 @@ internal fun ProductionFinanceScreen(
                             color = AgriMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
-                        Text("Report", fontWeight = FontWeight.SemiBold)
-                        DaReportExporter.reportTypes.chunked(2).forEach { row ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                row.forEach { type ->
-                                    FilterChip(
-                                        selected = selectedDaReport == type,
-                                        onClick = { selectedDaReport = type },
-                                        label = { Text(type, maxLines = 1) },
-                                        modifier = Modifier.weight(1f)
+                        Text("Report category", fontWeight = FontWeight.SemiBold)
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            reportGroups.forEach { (group, reports) ->
+                                FilterChip(
+                                    selected = daReportCategory == group,
+                                    onClick = {
+                                        daReportCategory = group
+                                        if (selectedDaReport !in reports) selectedDaReport = reports.first()
+                                    },
+                                    label = { Text(group, maxLines = 1) }
+                                )
+                            }
+                        }
+                        Text(
+                            availableReportTypes.size.toString() + " report types available",
+                            color = AgriMuted,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                        Box(Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { reportMenuExpanded = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(Icons.Outlined.Description, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(selectedDaReport, modifier = Modifier.weight(1f))
+                                Icon(Icons.Outlined.ArrowDropDown, null, modifier = Modifier.size(20.dp))
+                            }
+                            DropdownMenu(
+                                expanded = reportMenuExpanded,
+                                onDismissRequest = { reportMenuExpanded = false }
+                            ) {
+                                availableReportTypes.forEach { type ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                type,
+                                                fontWeight = if (selectedDaReport == type) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                if (selectedDaReport == type) Icons.Outlined.RadioButtonChecked else Icons.Outlined.RadioButtonUnchecked,
+                                                null
+                                            )
+                                        },
+                                        onClick = {
+                                            selectedDaReport = type
+                                            reportMenuExpanded = false
+                                        }
                                     )
                                 }
-                                if (row.size == 1) Spacer(Modifier.weight(1f))
                             }
                         }
                         Text("Format", fontWeight = FontWeight.SemiBold)
@@ -210,6 +364,41 @@ internal fun ProductionFinanceScreen(
                                     label = { Text(format.extension.uppercase()) },
                                     modifier = Modifier.weight(1f)
                                 )
+                            }
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(15.dp),
+                            colors = CardDefaults.cardColors(containerColor = AgriCream)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(AgriGreenSoft),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        when (selectedDaFormat) {
+                                            DaReportFormat.PDF -> Icons.Outlined.PictureAsPdf
+                                            DaReportFormat.CSV -> Icons.Outlined.TableChart
+                                            DaReportFormat.JSON -> Icons.Outlined.DataObject
+                                        },
+                                        null,
+                                        tint = AgriGreen,
+                                        modifier = Modifier.size(21.dp)
+                                    )
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(selectedDaReport, color = AgriText, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        DaReportExporter.fileName(selectedDaReport, selectedDaFormat),
+                                        color = AgriMuted,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                             }
                         }
                         if (exportStatus.isNotBlank()) {
