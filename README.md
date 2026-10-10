@@ -29,9 +29,9 @@ Built with:
 
 ## Latest Version
 
-**Version 1.1.0** · Android version code: `2`
+**Version 1.2.0** · Android version code: `3`
 
-This release includes a premium UI refresh for the dashboard, shared farm cards and status badges, bottom navigation, and farm category selectors. The release focuses on visual clarity and navigation polish; it does not intentionally change the farm data model or business logic.
+This release gives the dashboard a more expressive agricultural visual identity, with a custom illustrated farm hero, animated sunrise accent, branded farm overview metrics, and quick-action tiles for reports, tasks, and inventory. It also includes the branded loading screen, new launcher logo, and the earlier premium card and navigation refinements.
 
 ## Field Mapping System
 
