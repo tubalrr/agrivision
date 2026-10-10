@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.10.0** · Android version code: `11`
+
+This release adds Farm Achievements to the dashboard: locally calculated XP, farm levels, and 11 milestones for field registration, crop/livestock records, production, task completion, finance, inventory, incidents, and assistance. Progress updates from existing farm records with visible locked/earned badges and a next milestone, without a new database table or fictional sample data.
+
 **Version 1.9.0** · Android version code: `10`
 
 This release adds a dashboard analytics center with six-month sales-versus-expenses charts and production activity trends derived from dated records. Current-month sales, expenses, and net cash flow summaries use recorded data; empty-state guidance is shown when there are no recognized dates rather than inventing values. Existing farm health, task triage, incident workflow, and farm operations summaries remain available.

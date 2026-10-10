@@ -645,6 +645,23 @@ internal fun DashboardScreen(
         }
 
         item {
+            FarmAchievementsCard(
+                achievements = buildFarmAchievements(
+                    fields = fields,
+                    crops = crops,
+                    livestock = livestock,
+                    production = production,
+                    tasks = tasks,
+                    sales = sales,
+                    expenses = expenses,
+                    inventory = inventory,
+                    incidents = fieldIncidents,
+                    assistance = assistance
+                )
+            )
+        }
+
+        item {
             Card(
                 Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
@@ -1038,6 +1055,196 @@ private fun DashboardAnalyticsMetric(
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(title, color = AgriMuted, style = MaterialTheme.typography.labelSmall)
             Text(value, color = AgriText, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+private data class FarmAchievement(
+    val title: String,
+    val description: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val progress: Int,
+    val target: Int,
+    val points: Int
+) {
+    val unlocked: Boolean get() = progress >= target
+}
+
+private fun buildFarmAchievements(
+    fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
+    crops: List<CropRecord>,
+    livestock: List<Livestock>,
+    production: List<ProductionRecord>,
+    tasks: List<FarmTask>,
+    sales: List<SaleRecord>,
+    expenses: List<ExpenseRecord>,
+    inventory: List<InventoryItem>,
+    incidents: List<FieldIncident>,
+    assistance: List<AssistanceRecord>
+): List<FarmAchievement> {
+    val completedTasks = tasks.count { it.done }
+    val financeReady = sales.isNotEmpty() && expenses.isNotEmpty()
+    return listOf(
+        FarmAchievement("First Field", "Register your first farm field.", Icons.Outlined.Map, fields.size, 1, 40),
+        FarmAchievement("Field Explorer", "Register three or more fields.", Icons.Outlined.Explore, fields.size, 3, 80),
+        FarmAchievement("Crop Tracker", "Add your first crop record.", Icons.Outlined.LocalFlorist, crops.size, 1, 40),
+        FarmAchievement("Livestock Keeper", "Register a livestock group.", Icons.Outlined.Pets, livestock.size, 1, 40),
+        FarmAchievement("First Production", "Record your first production entry.", Icons.Outlined.Assessment, production.size, 1, 50),
+        FarmAchievement("Task Finisher", "Complete five farm tasks.", Icons.Outlined.Checklist, completedTasks, 5, 80),
+        FarmAchievement("Financial Steward", "Record at least one sale and one expense.", Icons.Outlined.MonetizationOn, if (financeReady) 1 else 0, 1, 75),
+        FarmAchievement("Stock Keeper", "Add an item to inventory.", Icons.Outlined.Inventory2, inventory.size, 1, 40),
+        FarmAchievement("Incident Reporter", "Keep your first field incident on record.", Icons.Outlined.NotificationsActive, incidents.size, 1, 50),
+        FarmAchievement("Assistance Tracker", "Record an agricultural assistance request.", Icons.Outlined.VerifiedUser, assistance.size, 1, 50),
+        FarmAchievement("Farm Planner", "Create five farm tasks.", Icons.Outlined.EventNote, tasks.size, 5, 60)
+    )
+}
+
+@Composable
+private fun FarmAchievementsCard(achievements: List<FarmAchievement>) {
+    val earned = achievements.filter { it.unlocked }
+    val xp = earned.sumOf { it.points }
+    val next = achievements.firstOrNull { !it.unlocked }
+    val allUnlocked = next == null
+    val levelSize = 150
+    val level = xp / levelSize + 1
+    val progress = if (allUnlocked) 1f else (xp % levelSize).toFloat() / levelSize
+
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriGreenDeep),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color(0xFF103B2A), Color(0xFF176B45), Color(0xFF245841))
+                    ),
+                    shape = RoundedCornerShape(26.dp)
+                )
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(13.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .background(AgriGold),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Outlined.EmojiEvents, contentDescription = null, tint = AgriGreenDeep, modifier = Modifier.size(27.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Farm Achievements", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                    Text("Every record helps your farm story grow.", color = Color.White.copy(alpha = .76f), style = MaterialTheme.typography.bodySmall)
+                }
+                Surface(color = Color.White.copy(alpha = .12f), shape = RoundedCornerShape(13.dp)) {
+                    Column(Modifier.padding(horizontal = 11.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("LEVEL", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.labelSmall)
+                        Text(level.toString(), color = AgriGold, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                    }
+                }
+            }
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("$xp XP", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
+                    Text("${earned.size} of ${achievements.size} badges unlocked", color = Color.White.copy(alpha = .75f), style = MaterialTheme.typography.bodySmall)
+                }
+                Text(if (allUnlocked) "Milestones complete" else "Next level: ${level + 1}", color = AgriGold, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+            }
+
+            LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(7.dp),
+                color = AgriGold,
+                trackColor = Color.White.copy(alpha = .16f)
+            )
+
+            Text(
+                when {
+                    allUnlocked -> "All current badges unlocked! Keep adding real farm records as your operation grows."
+                    next != null -> "NEXT BADGE · ${next.title} · ${next.progress.coerceAtMost(next.target)}/${next.target}"
+                    else -> "Keep up the great work!"
+                },
+                color = Color.White.copy(alpha = .9f),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                achievements.forEach { badge ->
+                    Card(
+                        Modifier.width(150.dp).height(142.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (badge.unlocked) Color(0xFFE7F3E7) else Color.White.copy(alpha = .08f)
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (badge.unlocked) AgriGold.copy(alpha = .9f) else Color.White.copy(alpha = .12f)
+                        )
+                    ) {
+                        Column(
+                            Modifier.fillMaxSize().padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(if (badge.unlocked) AgriGoldSoft else Color.White.copy(alpha = .1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    if (badge.unlocked) Icons.Outlined.EmojiEvents else badge.icon,
+                                    contentDescription = null,
+                                    tint = if (badge.unlocked) AgriGreen else Color.White.copy(alpha = .7f),
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                            Text(
+                                badge.title,
+                                color = if (badge.unlocked) AgriText else Color.White,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                badge.description,
+                                color = if (badge.unlocked) AgriMuted else Color.White.copy(alpha = .72f),
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                if (badge.unlocked) "+${badge.points} XP" else "${badge.progress.coerceAtMost(badge.target)}/${badge.target} progress",
+                                color = if (badge.unlocked) AgriGreen else AgriGold,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+            }
+
+            Text(
+                "XP and badges are calculated from your saved farm records on this device; they are motivational milestones, not an official farm rating.",
+                color = Color.White.copy(alpha = .64f),
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
