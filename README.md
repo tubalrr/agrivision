@@ -29,9 +29,9 @@ Built with:
 
 ## Latest Version
 
-**Version 1.5.0** · Android version code: `6`
+**Version 1.6.0** · Android version code: `7`
 
-This release refreshes Reports & Performance with a stronger finance summary, more useful operational metrics, mobile-friendly tab navigation, and a categorized DA report picker for Registry, Production, Finance & Inputs, and Incidents & DA. Export formats remain PDF, CSV and JSON, with a file preview before export. Report values continue to come from saved farm records.
+This release upgrades Tasks with a dedicated farm task center, overdue/open/completed/stock-alert metrics, date shortcuts for today and tomorrow, a date picker, task status filters, category icons, clearer due-state indicators, and farm-specific category chips when creating tasks. Task records continue to use the existing local storage model and save/toggle flow.
 
 ## Field Mapping System
 
