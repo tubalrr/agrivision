@@ -190,6 +190,10 @@ internal fun AgriVisionApp(
                         farmCategory = "Inventory"
                         selected = 2
                     },
+                    onOpenFarm = { category ->
+                        farmCategory = category
+                        selected = 2
+                    },
                     totalAnimals = totalLivestock,
                     totalExpenses = totalExpenses,
                     totalSales = totalSales,

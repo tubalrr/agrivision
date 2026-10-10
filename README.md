@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.11.0** · Android version code: `12`
+
+This release replaces the gamified achievements card with a practical Farm Action Center. It surfaces overdue and upcoming tasks, crops near their expected harvest dates, low/out-of-stock or soon-to-expire inventory, and high-priority or review-pending field incidents. Action buttons open the corresponding Tasks, Inventory, Crops, or incident review workflow. Reminders are derived from existing saved data and date fields; no sample farm statistics or new data schema are introduced.
+
 **Version 1.10.0** · Android version code: `11`
 
 This release adds Farm Achievements to the dashboard: locally calculated XP, farm levels, and 11 milestones for field registration, crop/livestock records, production, task completion, finance, inventory, incidents, and assistance. Progress updates from existing farm records with visible locked/earned badges and a next milestone, without a new database table or fictional sample data.

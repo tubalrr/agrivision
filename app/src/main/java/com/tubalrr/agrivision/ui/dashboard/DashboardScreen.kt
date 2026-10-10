@@ -50,6 +50,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import java.text.SimpleDateFormat
 import java.text.ParsePosition
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -76,6 +79,7 @@ internal fun DashboardScreen(
     farmViewModel: FarmViewModel,
     onOpenTasks: () -> Unit = {},
     onOpenInventory: () -> Unit = {},
+    onOpenFarm: (String) -> Unit = {},
     totalAnimals: Int,
     totalExpenses: Double,
     totalSales: Double,
@@ -645,19 +649,15 @@ internal fun DashboardScreen(
         }
 
         item {
-            FarmAchievementsCard(
-                achievements = buildFarmAchievements(
-                    fields = fields,
-                    crops = crops,
-                    livestock = livestock,
-                    production = production,
-                    tasks = tasks,
-                    sales = sales,
-                    expenses = expenses,
-                    inventory = inventory,
-                    incidents = fieldIncidents,
-                    assistance = assistance
-                )
+            FarmActionCenter(
+                crops = crops,
+                inventory = inventory,
+                tasks = tasks,
+                incidents = fieldIncidents,
+                onOpenTasks = onOpenTasks,
+                onOpenInventory = onOpenInventory,
+                onOpenCrops = { onOpenFarm("Crops") },
+                onReviewIncident = { reviewIncident = it }
             )
         }
 
@@ -1059,192 +1059,317 @@ private fun DashboardAnalyticsMetric(
     }
 }
 
-private data class FarmAchievement(
+private data class FarmActionItem(
     val title: String,
-    val description: String,
+    val detail: String,
+    val category: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val progress: Int,
-    val target: Int,
-    val points: Int
-) {
-    val unlocked: Boolean get() = progress >= target
+    val priority: Int,
+    val priorityLabel: String,
+    val buttonLabel: String,
+    val onClick: () -> Unit
+)
+
+private fun dashboardDaysFromToday(value: String): Long? {
+    val parsed = parseDashboardDate(value) ?: return null
+    val target = parsed.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+    return ChronoUnit.DAYS.between(LocalDate.now(), target)
 }
 
-private fun buildFarmAchievements(
-    fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
+private fun buildFarmActionItems(
     crops: List<CropRecord>,
-    livestock: List<Livestock>,
-    production: List<ProductionRecord>,
-    tasks: List<FarmTask>,
-    sales: List<SaleRecord>,
-    expenses: List<ExpenseRecord>,
     inventory: List<InventoryItem>,
+    tasks: List<FarmTask>,
     incidents: List<FieldIncident>,
-    assistance: List<AssistanceRecord>
-): List<FarmAchievement> {
-    val completedTasks = tasks.count { it.done }
-    val financeReady = sales.isNotEmpty() && expenses.isNotEmpty()
-    return listOf(
-        FarmAchievement("First Field", "Register your first farm field.", Icons.Outlined.Map, fields.size, 1, 40),
-        FarmAchievement("Field Explorer", "Register three or more fields.", Icons.Outlined.Explore, fields.size, 3, 80),
-        FarmAchievement("Crop Tracker", "Add your first crop record.", Icons.Outlined.LocalFlorist, crops.size, 1, 40),
-        FarmAchievement("Livestock Keeper", "Register a livestock group.", Icons.Outlined.Pets, livestock.size, 1, 40),
-        FarmAchievement("First Production", "Record your first production entry.", Icons.Outlined.Assessment, production.size, 1, 50),
-        FarmAchievement("Task Finisher", "Complete five farm tasks.", Icons.Outlined.Checklist, completedTasks, 5, 80),
-        FarmAchievement("Financial Steward", "Record at least one sale and one expense.", Icons.Outlined.MonetizationOn, if (financeReady) 1 else 0, 1, 75),
-        FarmAchievement("Stock Keeper", "Add an item to inventory.", Icons.Outlined.Inventory2, inventory.size, 1, 40),
-        FarmAchievement("Incident Reporter", "Keep your first field incident on record.", Icons.Outlined.NotificationsActive, incidents.size, 1, 50),
-        FarmAchievement("Assistance Tracker", "Record an agricultural assistance request.", Icons.Outlined.VerifiedUser, assistance.size, 1, 50),
-        FarmAchievement("Farm Planner", "Create five farm tasks.", Icons.Outlined.EventNote, tasks.size, 5, 60)
-    )
+    onOpenTasks: () -> Unit,
+    onOpenInventory: () -> Unit,
+    onOpenCrops: () -> Unit,
+    onReviewIncident: (FieldIncident) -> Unit
+): List<FarmActionItem> {
+    val actions = mutableListOf<FarmActionItem>()
+
+    tasks.filterNot { it.done }.forEach { task ->
+        val days = dashboardDaysFromToday(task.date) ?: return@forEach
+        if (days <= 7L) {
+            val overdue = days < 0L
+            val dueToday = days == 0L
+            val timing = when {
+                overdue -> "Overdue by ${-days} day(s)"
+                dueToday -> "Due today"
+                else -> "Due in ${days} day(s)"
+            }
+            actions += FarmActionItem(
+                title = task.title.ifBlank { "Untitled farm task" },
+                detail = listOf(task.category.ifBlank { "Farm task" }, timing).joinToString(" · "),
+                category = "Task",
+                icon = Icons.Outlined.Checklist,
+                priority = if (overdue) 0 else if (dueToday) 1 else 3,
+                priorityLabel = if (overdue) "OVERDUE" else if (dueToday) "TODAY" else "UPCOMING",
+                buttonLabel = "Open tasks",
+                onClick = onOpenTasks
+            )
+        }
+    }
+
+    crops.forEach { crop ->
+        val days = dashboardDaysFromToday(crop.expectedHarvest) ?: return@forEach
+        if (days in -7L..14L) {
+            val passed = days < 0L
+            val timing = when {
+                passed -> "Planned date passed by ${-days} day(s); verify actual crop status"
+                days == 0L -> "Expected harvest date is today"
+                days <= 3L -> "Expected in ${days} day(s)"
+                else -> "Expected in ${days} days"
+            }
+            actions += FarmActionItem(
+                title = "${crop.crop.ifBlank { crop.name.ifBlank { "Crop" } }} · harvest planning",
+                detail = listOf(crop.name.takeIf { it.isNotBlank() && it != crop.crop }, timing)
+                    .filterNotNull().joinToString(" · "),
+                category = "Harvest",
+                icon = Icons.Outlined.LocalFlorist,
+                priority = if (passed) 1 else if (days <= 3L) 2 else 4,
+                priorityLabel = if (passed) "CHECK" else if (days <= 3L) "SOON" else "PLAN AHEAD",
+                buttonLabel = "Open crops",
+                onClick = onOpenCrops
+            )
+        }
+    }
+
+    inventory.forEach { item ->
+        val outOfStock = item.stock <= 0.0 ||
+            item.status.contains("out of stock", ignoreCase = true) ||
+            item.status.contains("empty", ignoreCase = true)
+        val markedLow = item.status.contains("low", ignoreCase = true)
+        val expiryDays = dashboardDaysFromToday(item.expiryDate)
+        val nearExpiry = expiryDays != null && expiryDays <= 30L
+        if (outOfStock || markedLow || nearExpiry) {
+            val detailParts = mutableListOf<String>()
+            if (outOfStock) detailParts += "Recorded remaining stock: ${String.format(Locale.US, "%.2f", item.stock)} ${item.unit}".trim()
+            else if (markedLow) detailParts += "Marked as low stock"
+            if (expiryDays != null && expiryDays < 0L) detailParts += "Expiry date passed by ${-expiryDays} day(s)"
+            else if (expiryDays != null && expiryDays <= 7L) detailParts += "Expires in ${expiryDays} day(s)"
+            else if (expiryDays != null && expiryDays <= 30L) detailParts += "Expires in ${expiryDays} days"
+            val expired = expiryDays != null && expiryDays < 0L
+            val priority = when {
+                outOfStock || expired -> 0
+                markedLow || (expiryDays != null && expiryDays <= 7L) -> 1
+                else -> 3
+            }
+            actions += FarmActionItem(
+                title = when {
+                    outOfStock -> "Restock: ${item.name}"
+                    expired -> "Check expired input: ${item.name}"
+                    markedLow -> "Low stock: ${item.name}"
+                    else -> "Check expiry: ${item.name}"
+                },
+                detail = detailParts.joinToString(" · ").ifBlank { item.category },
+                category = "Input",
+                icon = Icons.Outlined.Inventory2,
+                priority = priority,
+                priorityLabel = if (priority == 0) "URGENT" else if (priority == 1) "SOON" else "CHECK",
+                buttonLabel = "Open inventory",
+                onClick = onOpenInventory
+            )
+        }
+    }
+
+    incidents.filter { incident ->
+        incident.status != "Completed" && incident.status != "Draft" &&
+            (incident.severity.equals("Critical", true) ||
+             incident.severity.equals("High", true) ||
+             incident.status.equals("Submitted", true) ||
+             incident.status.equals("Under Review", true))
+    }.forEach { incident ->
+        val critical = incident.severity.equals("Critical", true)
+        val high = incident.severity.equals("High", true)
+        actions += FarmActionItem(
+            title = "${incident.type.ifBlank { "Field incident" }} · ${incident.id}",
+            detail = "${incident.severity} severity · ${incident.status}" +
+                if (incident.commodity.isNotBlank()) " · ${incident.commodity}" else "",
+            category = "Incident",
+            icon = Icons.Outlined.ReportProblem,
+            priority = if (critical) 0 else if (high) 1 else 2,
+            priorityLabel = if (critical) "CRITICAL" else if (high) "HIGH" else "REVIEW",
+            buttonLabel = "Review case",
+            onClick = { onReviewIncident(incident) }
+        )
+    }
+
+    return actions.sortedWith(
+        compareBy<FarmActionItem> { it.priority }
+            .thenBy { it.title.lowercase(Locale.US) }
+    ).take(6)
 }
 
 @Composable
-private fun FarmAchievementsCard(achievements: List<FarmAchievement>) {
-    val earned = achievements.filter { it.unlocked }
-    val xp = earned.sumOf { it.points }
-    val next = achievements.firstOrNull { !it.unlocked }
-    val allUnlocked = next == null
-    val levelSize = 150
-    val level = xp / levelSize + 1
-    val progress = if (allUnlocked) 1f else (xp % levelSize).toFloat() / levelSize
+private fun FarmActionCenter(
+    crops: List<CropRecord>,
+    inventory: List<InventoryItem>,
+    tasks: List<FarmTask>,
+    incidents: List<FieldIncident>,
+    onOpenTasks: () -> Unit,
+    onOpenInventory: () -> Unit,
+    onOpenCrops: () -> Unit,
+    onReviewIncident: (FieldIncident) -> Unit
+) {
+    val actions = buildFarmActionItems(
+        crops = crops,
+        inventory = inventory,
+        tasks = tasks,
+        incidents = incidents,
+        onOpenTasks = onOpenTasks,
+        onOpenInventory = onOpenInventory,
+        onOpenCrops = onOpenCrops,
+        onReviewIncident = onReviewIncident
+    )
+    val todayOrOverdueTasks = tasks.count { task ->
+        !task.done && (dashboardDaysFromToday(task.date)?.let { it <= 0L } == true)
+    }
+    val harvestWindow = crops.count { crop ->
+        dashboardDaysFromToday(crop.expectedHarvest)?.let { it in -7L..14L } == true
+    }
+    val stockToCheck = inventory.count { item ->
+        item.stock <= 0.0 ||
+            item.status.contains("low", ignoreCase = true) ||
+            item.status.contains("out of stock", ignoreCase = true) ||
+            (dashboardDaysFromToday(item.expiryDate)?.let { it <= 30L } == true)
+    }
+    val casesToReview = incidents.count { incident ->
+        incident.status != "Completed" && incident.status != "Draft" &&
+            (incident.severity.equals("Critical", true) ||
+             incident.severity.equals("High", true) ||
+             incident.status.equals("Submitted", true) ||
+             incident.status.equals("Under Review", true))
+    }
 
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = AgriGreenDeep),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = AgriCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFF103B2A), Color(0xFF176B45), Color(0xFF245841))
-                    ),
-                    shape = RoundedCornerShape(26.dp)
-                )
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(13.dp)
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(
-                    Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(15.dp))
-                        .background(AgriGold),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Outlined.EmojiEvents, contentDescription = null, tint = AgriGreenDeep, modifier = Modifier.size(27.dp))
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(color = AgriGreenSoft, shape = RoundedCornerShape(14.dp)) {
+                    Icon(
+                        Icons.Outlined.TipsAndUpdates,
+                        contentDescription = null,
+                        tint = AgriGreen,
+                        modifier = Modifier.padding(10.dp).size(24.dp)
+                    )
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Farm Achievements", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
-                    Text("Every record helps your farm story grow.", color = Color.White.copy(alpha = .76f), style = MaterialTheme.typography.bodySmall)
-                }
-                Surface(color = Color.White.copy(alpha = .12f), shape = RoundedCornerShape(13.dp)) {
-                    Column(Modifier.padding(horizontal = 11.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("LEVEL", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.labelSmall)
-                        Text(level.toString(), color = AgriGold, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
-                    }
+                    Text("Farm Action Center", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                    Text("Practical reminders from your farm records", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("$xp XP", color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.headlineSmall)
-                    Text("${earned.size} of ${achievements.size} badges unlocked", color = Color.White.copy(alpha = .75f), style = MaterialTheme.typography.bodySmall)
-                }
-                Text(if (allUnlocked) "Milestones complete" else "Next level: ${level + 1}", color = AgriGold, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                FarmActionStat("Due / overdue", todayOrOverdueTasks, Icons.Outlined.Schedule, Modifier.weight(1f))
+                FarmActionStat("Harvest window", harvestWindow, Icons.Outlined.LocalFlorist, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                FarmActionStat("Stock / expiry", stockToCheck, Icons.Outlined.Inventory2, Modifier.weight(1f))
+                FarmActionStat("Cases to review", casesToReview, Icons.Outlined.ReportProblem, Modifier.weight(1f))
             }
 
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(7.dp),
-                color = AgriGold,
-                trackColor = Color.White.copy(alpha = .16f)
-            )
+            HorizontalDivider(color = AgriLine)
 
-            Text(
-                when {
-                    allUnlocked -> "All current badges unlocked! Keep adding real farm records as your operation grows."
-                    next != null -> "NEXT BADGE · ${next.title} · ${next.progress.coerceAtMost(next.target)}/${next.target}"
-                    else -> "Keep up the great work!"
-                },
-                color = Color.White.copy(alpha = .9f),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                achievements.forEach { badge ->
-                    Card(
-                        Modifier.width(150.dp).height(142.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (badge.unlocked) Color(0xFFE7F3E7) else Color.White.copy(alpha = .08f)
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (badge.unlocked) AgriGold.copy(alpha = .9f) else Color.White.copy(alpha = .12f)
-                        )
+            if (actions.isEmpty()) {
+                Column(
+                    Modifier.fillMaxWidth().background(AgriGreenSoft, RoundedCornerShape(17.dp)).padding(15.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text("No immediate actions found", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Add or update due dates, expected harvest dates, stock quantities, and incident status to get useful reminders here.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            } else {
+                actions.forEachIndexed { index, action ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(11.dp)
                     ) {
-                        Column(
-                            Modifier.fillMaxSize().padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        Surface(
+                            modifier = Modifier.size(41.dp),
+                            color = if (action.priority <= 1) Color(0xFFFFE8E2) else AgriGreenSoft,
+                            shape = RoundedCornerShape(13.dp)
                         ) {
-                            Box(
-                                Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(if (badge.unlocked) AgriGoldSoft else Color.White.copy(alpha = .1f)),
-                                contentAlignment = Alignment.Center
-                            ) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    if (badge.unlocked) Icons.Outlined.EmojiEvents else badge.icon,
+                                    action.icon,
                                     contentDescription = null,
-                                    tint = if (badge.unlocked) AgriGreen else Color.White.copy(alpha = .7f),
-                                    modifier = Modifier.size(19.dp)
+                                    tint = if (action.priority <= 1) AgriDanger else AgriGreen,
+                                    modifier = Modifier.size(21.dp)
                                 )
                             }
-                            Text(
-                                badge.title,
-                                color = if (badge.unlocked) AgriText else Color.White,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.labelLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                badge.description,
-                                color = if (badge.unlocked) AgriMuted else Color.White.copy(alpha = .72f),
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(Modifier.weight(1f))
-                            Text(
-                                if (badge.unlocked) "+${badge.points} XP" else "${badge.progress.coerceAtMost(badge.target)}/${badge.target} progress",
-                                color = if (badge.unlocked) AgriGreen else AgriGold,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.ExtraBold
-                            )
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    action.title,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    fontWeight = FontWeight.Bold,
+                                    color = AgriText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    action.priorityLabel,
+                                    color = if (action.priority <= 1) AgriDanger else AgriWarning,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                            Text(action.detail, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                            TextButton(
+                                onClick = action.onClick,
+                                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)
+                            ) {
+                                Text(action.buttonLabel)
+                            }
                         }
                     }
+                    if (index < actions.lastIndex) HorizontalDivider(color = AgriLine.copy(alpha = .7f))
+                }
+                if (actions.size == 6) {
+                    Text("Showing the 6 highest-priority items. Open the relevant section to review the rest.", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
                 }
             }
+        }
+    }
+}
 
-            Text(
-                "XP and badges are calculated from your saved farm records on this device; they are motivational milestones, not an official farm rating.",
-                color = Color.White.copy(alpha = .64f),
-                style = MaterialTheme.typography.labelSmall
-            )
+@Composable
+private fun FarmActionStat(
+    label: String,
+    value: Int,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(15.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCream)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = AgriGreen, modifier = Modifier.size(18.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(value.toString(), color = AgriText, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+                Text(label, color = AgriMuted, style = MaterialTheme.typography.labelSmall, maxLines = 2)
+            }
         }
     }
 }

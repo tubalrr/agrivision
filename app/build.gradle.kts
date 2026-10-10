@@ -25,8 +25,8 @@ android {
         applicationId = "com.tubalrr.agrivision"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.10.0"
+        versionCode = 12
+        versionName = "1.11.0"
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
     }
 
