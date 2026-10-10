@@ -54,6 +54,8 @@ internal fun DashboardScreen(
     val reviewIncidents = fieldIncidents.count { it.status == "Under Review" }
     val verifiedIncidents = fieldIncidents.count { it.status == "Verified" }
     val activeIncidents = fieldIncidents.filter { it.status != "Completed" }
+    val attentionReports = fieldIncidents.count { it.status != "Completed" && it.status != "Draft" }
+    val queueCount = fieldIncidents.count { it.status == "Draft" } + openTasks + lowStock
     val urgentCases = activeIncidents.count {
         it.severity == "Critical" || it.severity == "High"
     }
@@ -147,8 +149,8 @@ internal fun DashboardScreen(
                 Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("FARM OPERATIONS", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        if (fieldIncidents.isEmpty()) "Your farm is ready for the next activity."
-                        else "\${fieldIncidents.size} field report(s) need your attention.",
+                        if (attentionReports == 0) "Your farm is ready for the next activity."
+                        else "$attentionReports active field report(s) need attention.",
                         color = Color.White,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold
@@ -172,8 +174,8 @@ internal fun DashboardScreen(
             ) {
                 SectionTitle("Action Queue")
                 Text(
-                    (fieldIncidents.count { it.status == "Draft" } + openTasks).toString() + " action(s)",
-                    color = if (openTasks > 0 || fieldIncidents.any { it.status == "Draft" }) AgriWarning else AgriGreen,
+                    "$queueCount action(s)",
+                    color = if (queueCount > 0) AgriWarning else AgriGreen,
                     fontWeight = FontWeight.SemiBold
                 )
             }
