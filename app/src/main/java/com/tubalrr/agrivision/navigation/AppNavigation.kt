@@ -116,6 +116,8 @@ internal fun AgriVisionApp(
                 )
                 2 -> FarmScreen(
                     padding = padding,
+                    farm = farm,
+                    onOpenMap = { selected = 1 },
                     category = farmCategory,
                     onCategoryChange = { farmCategory = it },
                     livestock = livestock,
