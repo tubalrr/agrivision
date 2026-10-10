@@ -29,9 +29,9 @@ Built with:
 
 ## Latest Version
 
-**Version 1.3.0** · Android version code: `4`
+**Version 1.4.0** · Android version code: `5`
 
-This release upgrades the Farm workspace with a farm-specific hero, live overview metrics for livestock, crop cycles, registered fields and stock alerts, category cards with record counts, and a new Fields section with area, crop, status, planting and harvest details plus direct access to the Field Map. It also includes the branded startup screen, refreshed launcher logo, and the v1.2 dashboard visual upgrade.
+This release upgrades Field Map with interactive Satellite, Hybrid, Road and Terrain styles, separate focus controls for selected fields and incidents, coordinate and boundary details in a selected-feature card, and clearer map layer controls. Existing farm, field, crop and incident map geometry continues to use the local Room-backed records.
 
 ## Field Mapping System
 
