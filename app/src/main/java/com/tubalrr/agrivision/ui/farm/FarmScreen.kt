@@ -21,6 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 @Composable
 internal fun FarmScreen(
     padding: PaddingValues,
+    category: String,
+    onCategoryChange: (String) -> Unit,
     livestock: List<Livestock>,
     livestockLifecycleEvents: List<LivestockLifecycleEvent>,
     crops: List<CropRecord>,
@@ -36,7 +38,6 @@ internal fun FarmScreen(
     onAddEquipment: (EquipmentRecord) -> Unit,
     onAddCropLifecycleEvent: (CropLifecycleEvent) -> Unit
 ) {
-    var category by remember { mutableStateOf("Livestock") }
     var showAddDialog by remember { mutableStateOf(false) }
 
     if (showAddDialog) {
@@ -87,10 +88,10 @@ internal fun FarmScreen(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FarmCategory("Livestock", Icons.Outlined.Pets, category == "Livestock") { category = "Livestock" }
-                FarmCategory("Crops", Icons.Outlined.LocalFlorist, category == "Crops") { category = "Crops" }
-                FarmCategory("Inventory", Icons.Outlined.Inventory2, category == "Inventory") { category = "Inventory" }
-                FarmCategory("Equipment", Icons.Outlined.PrecisionManufacturing, category == "Equipment") { category = "Equipment" }
+                FarmCategory("Livestock", Icons.Outlined.Pets, category == "Livestock") { onCategoryChange("Livestock") }
+                FarmCategory("Crops", Icons.Outlined.LocalFlorist, category == "Crops") { onCategoryChange("Crops") }
+                FarmCategory("Inventory", Icons.Outlined.Inventory2, category == "Inventory") { onCategoryChange("Inventory") }
+                FarmCategory("Equipment", Icons.Outlined.PrecisionManufacturing, category == "Equipment") { onCategoryChange("Equipment") }
             }
         }
 
