@@ -27,9 +27,11 @@ Built with:
 - Photo field records
 - Backup and restore
 
-## Status
+## Latest Version
 
-🚧 Android foundation
+**Version 1.1.0** · Android version code: `2`
+
+This release includes a premium UI refresh for the dashboard, shared farm cards and status badges, bottom navigation, and farm category selectors. The release focuses on visual clarity and navigation polish; it does not intentionally change the farm data model or business logic.
 
 ## Field Mapping System
 
@@ -65,5 +67,4 @@ The API key is kept out of source control. Add this to the project root `local.p
 MAPS_API_KEY=YOUR_API_KEY
 ```
 
-Then enable **Maps SDK for Android** for the Google Maps Platform project used by the key. The Android manifest receives the value through the `com.google.android.geo.API_KEY` metadata placeholder. 
-
+Then enable **Maps SDK for Android** for the Google Maps Platform project used by the key. The Android manifest receives the value through the `com.google.android.geo.API_KEY` metadata placeholder.
