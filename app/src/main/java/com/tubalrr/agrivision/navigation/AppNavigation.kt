@@ -198,6 +198,58 @@ internal fun AgriBottomBar(selected: Int, onSelected: (Int) -> Unit) {
         "Tasks" to Icons.Outlined.Checklist,
         "Profile" to Icons.Outlined.Person
     )
+    val barShape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+
+    NavigationBar(
+        containerColor = AgriCard,
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(82.dp)
+            .clip(barShape)
+            .border(1.dp, AgriLine, barShape),
+        windowInsets = NavigationBarDefaults.windowInsets
+    ) {
+        items.forEachIndexed { index, item ->
+            NavigationBarItem(
+                selected = selected == index,
+                onClick = { onSelected(index) },
+                icon = {
+                    Icon(
+                        item.second,
+                        contentDescription = item.first,
+                        tint = if (selected == index) AgriGreen else AgriMuted,
+                        modifier = Modifier.size(if (selected == index) 23.dp else 21.dp)
+                    )
+                },
+                label = {
+                    Text(
+                        item.first,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selected == index) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1
+                    )
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = AgriGreen,
+                    selectedTextColor = AgriGreen,
+                    unselectedIconColor = AgriMuted,
+                    unselectedTextColor = AgriMuted,
+                    indicatorColor = AgriGreenSoft
+                )
+            )
+        }
+    }
+}
+(selected: Int, onSelected: (Int) -> Unit) {
+    val items = listOf(
+        "Dashboard" to Icons.Outlined.Dashboard,
+        "Map" to Icons.Outlined.Map,
+        "Farm" to Icons.Outlined.Yard,
+        "Reports" to Icons.Outlined.Assessment,
+        "Tasks" to Icons.Outlined.Checklist,
+        "Profile" to Icons.Outlined.Person
+    )
     NavigationBar(
         containerColor = AgriCard,
         tonalElevation = 0.dp,
