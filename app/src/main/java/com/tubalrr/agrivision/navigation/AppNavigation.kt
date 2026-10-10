@@ -33,6 +33,8 @@ internal fun AgriVisionApp(
     farmViewModel: FarmViewModel = viewModel()
 ) {
     var selected by remember { mutableStateOf(0) }
+    // Keep the selected farm section when switching tabs or opening a dashboard shortcut.
+    var farmCategory by remember { mutableStateOf("Livestock") }
 
     val farmer by farmViewModel.farmer.collectAsStateWithLifecycle()
     val farm by farmViewModel.farm.collectAsStateWithLifecycle()
@@ -94,7 +96,10 @@ internal fun AgriVisionApp(
                     fields = fields,
                     farmViewModel = farmViewModel,
                     onOpenTasks = { selected = 4 },
-                    onOpenInventory = { selected = 2 },
+                    onOpenInventory = {
+                        farmCategory = "Inventory"
+                        selected = 2
+                    },
                     totalAnimals = totalLivestock,
                     totalExpenses = totalExpenses,
                     totalSales = totalSales,
@@ -111,6 +116,8 @@ internal fun AgriVisionApp(
                 )
                 2 -> FarmScreen(
                     padding = padding,
+                    category = farmCategory,
+                    onCategoryChange = { farmCategory = it },
                     livestock = livestock,
                     livestockLifecycleEvents = livestockLifecycleEvents,
                     crops = crops,
