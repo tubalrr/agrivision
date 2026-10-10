@@ -1,6 +1,7 @@
 package com.tubalrr.agrivision
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -70,10 +71,10 @@ internal fun FarmScreen(
     ) {
         item {
             Card(
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().border(1.dp, AgriGreen.copy(alpha = .25f), RoundedCornerShape(26.dp)),
                 shape = RoundedCornerShape(26.dp),
                 colors = CardDefaults.cardColors(containerColor = AgriGreenDeep),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("MY FARM", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
@@ -286,25 +287,40 @@ internal fun FarmCategory(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val cardShape = RoundedCornerShape(18.dp)
     Card(
         onClick = onClick,
-        modifier = Modifier.width(90.dp).height(86.dp),
-        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .width(94.dp)
+            .height(86.dp)
+            .border(
+                1.dp,
+                if (selected) AgriGreen else AgriLine,
+                cardShape
+            ),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) AgriGreenSoft else AgriCard
-        )
+            containerColor = if (selected) AgriGreen else AgriCard
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (selected) 2.dp else 0.dp)
     ) {
         Column(
             Modifier.fillMaxSize().padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(23.dp))
+            Icon(
+                icon,
+                contentDescription = name,
+                tint = if (selected) Color.White else AgriGreen,
+                modifier = Modifier.size(23.dp)
+            )
             Spacer(Modifier.height(6.dp))
             Text(
                 name,
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (selected) Color.White else AgriText
             )
         }
     }
