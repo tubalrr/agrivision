@@ -29,9 +29,9 @@ Built with:
 
 ## Latest Version
 
-**Version 1.4.0** · Android version code: `5`
+**Version 1.5.0** · Android version code: `6`
 
-This release upgrades Field Map with interactive Satellite, Hybrid, Road and Terrain styles, separate focus controls for selected fields and incidents, coordinate and boundary details in a selected-feature card, and clearer map layer controls. Existing farm, field, crop and incident map geometry continues to use the local Room-backed records.
+This release refreshes Reports & Performance with a stronger finance summary, more useful operational metrics, mobile-friendly tab navigation, and a categorized DA report picker for Registry, Production, Finance & Inputs, and Incidents & DA. Export formats remain PDF, CSV and JSON, with a file preview before export. Report values continue to come from saved farm records.
 
 ## Field Mapping System
 
