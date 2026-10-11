@@ -18,7 +18,7 @@ enum class DaReportFormat(val extension: String, val mimeType: String) {
 
 object DaReportExporter {
     val reportTypes = listOf(
-        "Farmer Profile", "Farm Registry", "Crop Production", "Livestock Inventory",
+        "Farmer Profile", "Farm Registry", "Farmer Applications", "Crop Production", "Livestock Inventory",
         "Farm Inputs", "Feed Logs", "Crop Lifecycle", "Livestock Lifecycle",
         "Inventory Transactions", "Expenses", "Sales", "Incidents", "Incident Audit",
         "Assistance", "Harvest", "Field Summary"
@@ -27,8 +27,14 @@ object DaReportExporter {
     fun fileName(type: String, format: DaReportFormat) =
         "agrivision-" + type.lowercase(Locale.US).replace(Regex("[^a-z0-9]+"), "-").trim('-') + "." + format.extension
 
-    fun write(snapshot: FarmSnapshot, type: String, format: DaReportFormat, sink: (ByteArray) -> Unit) {
-        val data = validateData(data(snapshot, type))
+    fun write(
+        snapshot: FarmSnapshot,
+        type: String,
+        format: DaReportFormat,
+        registryEntries: List<FarmerFarmRegistryEntry> = emptyList(),
+        sink: (ByteArray) -> Unit
+    ) {
+        val data = validateData(data(snapshot, type, registryEntries))
         sink(
             when (format) {
                 DaReportFormat.JSON -> json(snapshot, type, data).toString(2).toByteArray(Charsets.UTF_8)
@@ -55,7 +61,11 @@ object DaReportExporter {
         return data
     }
 
-    private fun data(s: FarmSnapshot, type: String): Data = when (type) {
+    private fun data(
+        s: FarmSnapshot,
+        type: String,
+        registryEntries: List<FarmerFarmRegistryEntry>
+    ): Data = when (type) {
         "Farmer Profile" -> Data(
             listOf("Field", "Value"),
             listOf(
@@ -73,6 +83,21 @@ object DaReportExporter {
                     farm.barangay, farm.totalArea, farm.landTenure, farm.commodities, farm.registryStatus
                 ))
             } ?: emptyList()
+        )
+        "Farmer Applications" -> Data(
+            listOf(
+                "Farm Record ID", "Farmer ID", "Farmer Name", "Contact Number", "Farm Name",
+                "Province", "Municipality/City", "Barangay", "Farm Area", "Land Tenure",
+                "Commodities", "Application Status", "Review Notes"
+            ),
+            registryEntries.map { entry ->
+                val p = entry.profile
+                listOf(
+                    entry.farmId, p.farmerId, p.farmerName, p.contact, p.farmName,
+                    p.province, p.municipality, p.barangay, p.farmSize, p.landTenure,
+                    p.commodities, p.registryStatus.ifBlank { "For Review" }, p.reviewNotes
+                )
+            }
         )
         "Crop Production" -> Data(
             listOf("Product", "Quantity", "Period", "Source Type", "Source ID", "Field ID", "Area (ha)", "Production Type"),
@@ -153,8 +178,9 @@ object DaReportExporter {
         put("reportVersion", 1)
         put("reportType", type)
         put("generatedAt", now())
-        put("farmerId", s.profile.farmerId)
-        put("farmId", s.farm?.farmId ?: "")
+        put("scope", if (type == "Farmer Applications") "all_saved_farmer_applications" else "current_farm")
+        put("farmerId", if (type == "Farmer Applications") "" else s.profile.farmerId)
+        put("farmId", if (type == "Farmer Applications") "" else s.farm?.farmId ?: "")
         put("recordCount", d.rows.size)
         put("columns", JSONArray(d.columns))
         put("records", JSONArray().apply {
@@ -251,16 +277,21 @@ object DaReportExporter {
             y += 18f
             canvas!!.drawText(type, margin, y, reportPaint)
             y += 16f
-            canvas!!.drawText(
-                "Farmer: " + s.profile.farmerName.ifBlank { "Not registered" },
-                margin, y, metaPaint
-            )
-            y += 12f
-            canvas!!.drawText(
-                "Farm: " + (s.farm?.farmName ?: s.profile.farmName).ifBlank { "Not registered" },
-                margin, y, metaPaint
-            )
-            y += 12f
+            if (type == "Farmer Applications") {
+                canvas!!.drawText("Scope: All saved farmer/farm applications", margin, y, metaPaint)
+                y += 12f
+            } else {
+                canvas!!.drawText(
+                    "Farmer: " + s.profile.farmerName.ifBlank { "Not registered" },
+                    margin, y, metaPaint
+                )
+                y += 12f
+                canvas!!.drawText(
+                    "Farm: " + (s.farm?.farmName ?: s.profile.farmName).ifBlank { "Not registered" },
+                    margin, y, metaPaint
+                )
+                y += 12f
+            }
             canvas!!.drawText("Generated: " + now() + " • Records: " + d.rows.size, margin, y, metaPaint)
             y += 16f
             canvas!!.drawLine(margin, y, pageWidth - margin, y, metaPaint)
