@@ -46,6 +46,14 @@ internal fun LocationCaptureButton(onLocationCaptured: (Double, Double) -> Unit)
                         onLocationCaptured(location.latitude, location.longitude)
                         Toast.makeText(context, "Coordinates captured.", Toast.LENGTH_SHORT).show()
                     }
+
+                    override fun onProviderEnabled(provider: String) = Unit
+                    override fun onProviderDisabled(provider: String) {
+                        Toast.makeText(context, "Location provider was disabled.", Toast.LENGTH_SHORT).show()
+                    }
+
+                    @Suppress("DEPRECATION")
+                    override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) = Unit
                 }, Looper.getMainLooper())
                 Toast.makeText(context, "Getting location…", Toast.LENGTH_SHORT).show()
             } catch (_: SecurityException) {
