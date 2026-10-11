@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.11.1** · Android version code: `13`
+
+This patch makes overdue task metrics actionable. Tapping Overdue in Tasks filters to unfinished past-due tasks across all dates, and the Dashboard's overdue count opens the same filtered view. The filter is also available alongside All, Open, and Completed. The count and list are computed from saved task dates and completion state.
+
 **Version 1.11.0** · Android version code: `12`
 
 This release replaces the gamified achievements card with a practical Farm Action Center. It surfaces overdue and upcoming tasks, crops near their expected harvest dates, low/out-of-stock or soon-to-expire inventory, and high-priority or review-pending field incidents. Action buttons open the corresponding Tasks, Inventory, Crops, or incident review workflow. Reminders are derived from existing saved data and date fields; no sample farm statistics or new data schema are introduced.

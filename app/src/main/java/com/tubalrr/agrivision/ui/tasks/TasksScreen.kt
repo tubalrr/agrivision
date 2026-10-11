@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Brush
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
@@ -33,6 +34,8 @@ internal fun TasksScreen(
     padding: PaddingValues,
     tasks: List<FarmTask>,
     inventory: List<InventoryItem>,
+    requestedFilter: String? = null,
+    onFilterRequestHandled: () -> Unit = {},
     onAddTask: (FarmTask) -> Unit,
     onToggleTask: (FarmTask) -> Unit
 ) {
@@ -52,14 +55,23 @@ internal fun TasksScreen(
     val openTasks = tasks.filter { !it.done }
     val completedTasks = tasks.count { it.done }
     val overdueTasks = openTasks.count { isTaskOverdue(it.date, todayKey) }
-    val dateTasks = tasks.filter {
+    val overdueList = tasks.filter { !it.done && isTaskOverdue(it.date, todayKey) }
+    val dateTasks = if (selectedFilter == "Overdue") overdueList else tasks.filter {
         it.date == selectedDate || (selectedDate == todayKey && it.date.equals("Today", ignoreCase = true))
+    }
+
+    LaunchedEffect(requestedFilter) {
+        requestedFilter?.let { filter ->
+            selectedFilter = filter
+            onFilterRequestHandled()
+        }
     }
     val selectedOpen = dateTasks.count { !it.done }
     val selectedCompleted = dateTasks.count { it.done }
     val visibleTasks = dateTasks.filter {
         when (selectedFilter) {
             "Open" -> !it.done
+            "Overdue" -> !it.done && isTaskOverdue(it.date, todayKey)
             "Completed" -> it.done
             else -> true
         }
@@ -93,7 +105,9 @@ internal fun TasksScreen(
         ).apply { setOnDismissListener { showDatePicker = false }; show() }
     }
 
-    val formattedSelectedDate = try {
+    val formattedSelectedDate = if (selectedFilter == "Overdue") {
+        "All dates · overdue tasks"
+    } else try {
         SimpleDateFormat("EEEE, MMM d, yyyy", Locale.US).format(
             SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedDate)!!
         )
@@ -182,11 +196,12 @@ internal fun TasksScreen(
                     TaskMetricCard(
                         title = "Overdue",
                         value = overdueTasks.toString(),
-                        detail = "past due",
+                        detail = "tap to view",
                         icon = Icons.Outlined.WarningAmber,
                         accent = Color(0xFFFFE5DC),
                         tint = Color(0xFFAC4E2E),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onClick = { selectedFilter = if (selectedFilter == "Overdue") "All" else "Overdue" }
                     )
                     TaskMetricCard(
                         title = "Open tasks",
@@ -268,7 +283,7 @@ internal fun TasksScreen(
                         )
                     }
                     Text(
-                        selectedTasksCountLabel(dateTasks.size, selectedOpen, selectedCompleted),
+                        if (selectedFilter == "Overdue") "${dateTasks.size} overdue task(s) across all dates" else selectedTasksCountLabel(dateTasks.size, selectedOpen, selectedCompleted),
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -287,7 +302,7 @@ internal fun TasksScreen(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
-                    listOf("All", "Open", "Completed").forEach { filter ->
+                    listOf("All", "Open", "Overdue", "Completed").forEach { filter ->
                         FilterChip(
                             selected = selectedFilter == filter,
                             onClick = { selectedFilter = filter },
@@ -399,13 +414,16 @@ private fun TaskMetricCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     accent: Color,
     tint: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
     Card(
-        modifier = modifier.border(1.dp, AgriLine, RoundedCornerShape(21.dp)),
+        modifier = modifier
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .border(1.dp, AgriLine, RoundedCornerShape(21.dp)),
         shape = RoundedCornerShape(21.dp),
         colors = CardDefaults.cardColors(containerColor = AgriCard),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (onClick != null) 1.dp else 0.dp)
     ) {
         Row(
             Modifier.fillMaxWidth().padding(13.dp),

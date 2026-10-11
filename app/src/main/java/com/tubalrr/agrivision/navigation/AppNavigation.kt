@@ -60,6 +60,7 @@ internal fun AgriVisionApp(
         )
     }
     var showSettings by remember { mutableStateOf(false) }
+    var pendingTaskFilter by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(selected, rememberLastTab) {
         if (rememberLastTab) {
@@ -185,7 +186,8 @@ internal fun AgriVisionApp(
                     farm = farm,
                     fields = fields,
                     farmViewModel = farmViewModel,
-                    onOpenTasks = { selected = 4 },
+                    onOpenTasks = { pendingTaskFilter = null; selected = 4 },
+                    onOpenOverdueTasks = { pendingTaskFilter = "Overdue"; selected = 4 },
                     onOpenInventory = {
                         farmCategory = "Inventory"
                         selected = 2
@@ -260,6 +262,8 @@ internal fun AgriVisionApp(
                     padding = padding,
                     tasks = tasks,
                     inventory = inventory,
+                    requestedFilter = pendingTaskFilter,
+                    onFilterRequestHandled = { pendingTaskFilter = null },
                     onAddTask = farmViewModel::addTask,
                     onToggleTask = farmViewModel::toggleTask
                 )

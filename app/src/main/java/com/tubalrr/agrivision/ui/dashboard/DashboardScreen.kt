@@ -78,6 +78,7 @@ internal fun DashboardScreen(
     fields: List<com.tubalrr.agrivision.domain.model.FieldRecord>,
     farmViewModel: FarmViewModel,
     onOpenTasks: () -> Unit = {},
+    onOpenOverdueTasks: () -> Unit = onOpenTasks,
     onOpenInventory: () -> Unit = {},
     onOpenFarm: (String) -> Unit = {},
     totalAnimals: Int,
@@ -655,6 +656,7 @@ internal fun DashboardScreen(
                 tasks = tasks,
                 incidents = fieldIncidents,
                 onOpenTasks = onOpenTasks,
+                onOpenOverdueTasks = onOpenOverdueTasks,
                 onOpenInventory = onOpenInventory,
                 onOpenCrops = { onOpenFarm("Crops") },
                 onReviewIncident = { reviewIncident = it }
@@ -1208,6 +1210,7 @@ private fun FarmActionCenter(
     tasks: List<FarmTask>,
     incidents: List<FieldIncident>,
     onOpenTasks: () -> Unit,
+    onOpenOverdueTasks: () -> Unit,
     onOpenInventory: () -> Unit,
     onOpenCrops: () -> Unit,
     onReviewIncident: (FieldIncident) -> Unit
@@ -1222,8 +1225,8 @@ private fun FarmActionCenter(
         onOpenCrops = onOpenCrops,
         onReviewIncident = onReviewIncident
     )
-    val todayOrOverdueTasks = tasks.count { task ->
-        !task.done && (dashboardDaysFromToday(task.date)?.let { it <= 0L } == true)
+    val overdueTaskCount = tasks.count { task ->
+        !task.done && (dashboardDaysFromToday(task.date)?.let { it < 0L } == true)
     }
     val harvestWindow = crops.count { crop ->
         dashboardDaysFromToday(crop.expectedHarvest)?.let { it in -7L..14L } == true
@@ -1265,7 +1268,13 @@ private fun FarmActionCenter(
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                FarmActionStat("Due / overdue", todayOrOverdueTasks, Icons.Outlined.Schedule, Modifier.weight(1f))
+                FarmActionStat(
+                    label = "Overdue tasks",
+                    value = overdueTaskCount,
+                    icon = Icons.Outlined.Schedule,
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenOverdueTasks
+                )
                 FarmActionStat("Harvest window", harvestWindow, Icons.Outlined.LocalFlorist, Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -1353,10 +1362,11 @@ private fun FarmActionStat(
     label: String,
     value: Int,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier
+    modifier: Modifier,
+    onClick: (() -> Unit)? = null
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(15.dp),
         colors = CardDefaults.cardColors(containerColor = AgriCream)
     ) {
@@ -1369,6 +1379,9 @@ private fun FarmActionStat(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(value.toString(), color = AgriText, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
                 Text(label, color = AgriMuted, style = MaterialTheme.typography.labelSmall, maxLines = 2)
+            }
+            if (onClick != null) {
+                Icon(Icons.Outlined.ChevronRight, contentDescription = "View overdue tasks", tint = AgriGreen)
             }
         }
     }
