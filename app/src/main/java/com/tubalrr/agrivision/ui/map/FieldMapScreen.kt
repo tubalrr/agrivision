@@ -773,10 +773,12 @@ private fun MapEditorCard(
         MapEditTarget.FIELD -> "Field: 1 point or 3+ boundary points"
         MapEditTarget.INCIDENT -> "Affected area: 3+ points"
     }
+    // Never allow a save flow that cannot be committed because its target record is missing.
     val saveEnabled = when (target) {
         MapEditTarget.FARM -> draftPoints.size >= 3
-        MapEditTarget.FIELD -> draftPoints.size == 1 || draftPoints.size >= 3
-        MapEditTarget.INCIDENT -> draftPoints.size >= 3
+        MapEditTarget.FIELD -> selectedField != null &&
+            (draftPoints.size == 1 || draftPoints.size >= 3)
+        MapEditTarget.INCIDENT -> selectedIncident != null && draftPoints.size >= 3
     }
 
     Card(
