@@ -1,6 +1,7 @@
 package com.tubalrr.agrivision
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -52,13 +53,26 @@ internal class FarmReminderWorker(context: Context, params: WorkerParameters) : 
                 if (caseAlerts > 0) add("$caseAlerts active case(s) need review")
             }
             if (parts.isEmpty()) {
-                NotificationManagerCompat.from(applicationContext).cancel(1601)
+                cancelReminder()
             } else {
                 showReminder(parts.joinToString(" · "))
             }
             Result.success()
         } catch (_: Exception) {
             Result.retry()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    @SuppressLint("MissingPermission")
+    private fun cancelReminder() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        try {
+            NotificationManagerCompat.from(applicationContext).cancel(1601)
+        } catch (_: SecurityException) {
+            // The user may revoke notification permission between the check and the call.
         }
     }
 
