@@ -104,11 +104,13 @@ internal fun ProfileScreen(
                     )
                     HorizontalDivider(color = AgriLine)
                     Text("Records to restore", fontWeight = FontWeight.ExtraBold, color = AgriText)
-                    Text("Fields: ${preview.fieldCount} · Crops: ${preview.cropCount}")
-                    Text("Livestock groups: ${preview.livestockCount}")
-                    Text("Sales + expenses: ${financeRecords}")
-                    Text("Inventory items: ${preview.inventoryCount} · Tasks: ${preview.taskCount}")
-                    Text("Field incidents: ${preview.incidentCount} · Assistance records: ${preview.assistanceCount}")
+                    Text("Fields: ${preview.fieldCount} · Crops: ${preview.cropCount} · Livestock groups: ${preview.livestockCount}")
+                    Text("Production records: ${preview.productionCount} · Sales + expenses: ${financeRecords}")
+                    Text("Crop history: ${preview.cropHistoryCount} · Livestock history: ${preview.livestockHistoryCount}")
+                    Text("Inventory items: ${preview.inventoryCount} · Stock movements: ${preview.inventoryMovementCount}")
+                    Text("Feed logs: ${preview.feedLogCount} · Equipment: ${preview.equipmentCount} · Tasks: ${preview.taskCount}")
+                    Text("Field incidents: ${preview.incidentCount} · Incident timeline events: ${preview.incidentEventCount}")
+                    Text("Assistance records: ${preview.assistanceCount}")
                     Text("Incident photos available: ${preview.photoCount}")
                     if (preview.unavailablePhotoCount > 0) {
                         Text(
