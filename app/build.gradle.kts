@@ -59,6 +59,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("androidx.work:work-runtime:2.12.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("com.google.maps.android:maps-compose:8.6.0")
 
