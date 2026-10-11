@@ -9,6 +9,7 @@ import com.tubalrr.agrivision.EquipmentRecord
 import com.tubalrr.agrivision.ExpenseRecord
 import com.tubalrr.agrivision.FarmTask
 import com.tubalrr.agrivision.FarmerProfile
+import com.tubalrr.agrivision.FarmerFarmRegistryEntry
 import com.tubalrr.agrivision.FieldIncident
 import com.tubalrr.agrivision.IncidentEvent
 import com.tubalrr.agrivision.InventoryItem
@@ -144,6 +145,90 @@ class FarmRepository(
                 )
             }
         }
+
+    /**
+     * All submitted farmer/farm applications. The operational screens still use DEFAULT_FARM_ID;
+     * this registry stream is intentionally separate until the active-farm selector is wired through
+     * the operational modules.
+     */
+    fun observeRegistryEntries(): Flow<List<FarmerFarmRegistryEntry>> =
+        dao.observeFarms().map { farms ->
+            farms
+                .filter { it.farmerName.isNotBlank() || it.farmerId.isNotBlank() || it.farmName.isNotBlank() }
+                .map { farm ->
+                    FarmerFarmRegistryEntry(
+                        farmId = farm.farmId,
+                        profile = FarmerProfile(
+                            farmerName = farm.farmerName,
+                            farmerId = farm.farmerId,
+                            contact = farm.contact,
+                            province = farm.province,
+                            municipality = farm.municipality,
+                            barangay = farm.barangay,
+                            farmName = farm.farmName,
+                            farmSize = farm.farmSize,
+                            landTenure = farm.landTenure,
+                            commodities = farm.commodities,
+                            registryStatus = farm.registryStatus,
+                            reviewNotes = farm.reviewNotes
+                        )
+                    )
+                }
+        }
+
+    /**
+     * Saves a new application or edits an existing one. When the default farm slot is still empty,
+     * the first application uses it so the existing single-farm modules remain usable. Later
+     * applications get their own stable farm IDs and never overwrite another applicant.
+     */
+    suspend fun saveRegistryEntry(profile: FarmerProfile, existingFarmId: String? = null) {
+        require(profile.farmerName.isNotBlank()) { "Farmer name is required." }
+
+        val farmerId = profile.farmerId.trim().ifBlank {
+            "FAR-" + System.currentTimeMillis().toString().takeLast(8)
+        }
+        val defaultFarm = dao.observeFarm(DEFAULT_FARM_ID).first()
+        val farmId = existingFarmId?.takeIf { it.isNotBlank() } ?: run {
+            if (
+                defaultFarm == null ||
+                (defaultFarm.farmerName.isBlank() && defaultFarm.farmerId.isBlank() && defaultFarm.farmName.isBlank())
+            ) {
+                DEFAULT_FARM_ID
+            } else {
+                "farm-" + UUID.randomUUID().toString()
+            }
+        }
+        val existingFarm = dao.observeFarm(farmId).first()
+        val now = System.currentTimeMillis()
+
+        dao.upsertFarmer(
+            FarmerEntity(
+                farmerId = farmerId,
+                fullName = profile.farmerName.trim(),
+                contact = profile.contact.trim(),
+                updatedAt = now
+            )
+        )
+        dao.upsertFarm(
+            FarmEntity(
+                farmId = farmId,
+                farmerId = farmerId,
+                farmerName = profile.farmerName.trim(),
+                farmName = profile.farmName.trim(),
+                province = profile.province.trim(),
+                municipality = profile.municipality.trim(),
+                barangay = profile.barangay.trim(),
+                farmSize = profile.farmSize.trim(),
+                landTenure = profile.landTenure.trim(),
+                commodities = profile.commodities.trim(),
+                contact = profile.contact.trim(),
+                registryStatus = profile.registryStatus.ifBlank { "For Review" },
+                reviewNotes = profile.reviewNotes,
+                boundaryPointsJson = existingFarm?.boundaryPointsJson ?: "[]",
+                updatedAt = now
+            )
+        )
+    }
 
     fun observeLivestock(): Flow<List<Livestock>> =
         dao.observeLivestock(DEFAULT_FARM_ID).map { list ->
