@@ -246,8 +246,14 @@ private fun FieldRegistryDialog(
                     }
                 }
                 item {
+                    LocationCaptureButton { lat, lon ->
+                        latitude = lat.toString()
+                        longitude = lon.toString()
+                    }
+                }
+                item {
                     Text(
-                        "Coordinates are stored only when entered. No GPS permission is required for this registry form.",
+                        "GPS is optional. Latitude must be between −90 and 90; longitude between −180 and 180.",
                         color = AgriMuted,
                         style = MaterialTheme.typography.labelSmall
                     )
@@ -303,12 +309,15 @@ private fun FieldRegistryDialog(
             val areaValue = area.toDoubleOrNull()
             val latValue = latitude.toDoubleOrNull()
             val lonValue = longitude.toDoubleOrNull()
+            val coordinatesValid = (latValue == null && lonValue == null) ||
+                (latValue != null && lonValue != null && latValue in -90.0..90.0 && lonValue in -180.0..180.0)
             TextButton(
                 enabled = fieldId.isNotBlank() &&
                         name.isNotBlank() &&
                         areaValue != null &&
+                        areaValue.isFinite() &&
                         areaValue >= 0.0 &&
-                        ((latValue == null && lonValue == null) || (latValue != null && lonValue != null)),
+                        coordinatesValid,
                 onClick = {
                     onSave(
                         FieldRecord(
