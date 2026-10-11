@@ -33,6 +33,8 @@ import androidx.compose.material.icons.outlined.*
 @Composable
 internal fun ProfileScreen(
     padding: PaddingValues,
+    staffProfile: DaStaffProfile,
+    onStaffProfileSaved: (DaStaffProfile) -> Unit,
     profile: FarmerProfile,
     farmer: FarmerRecord,
     farm: FarmRecord,
@@ -54,6 +56,7 @@ internal fun ProfileScreen(
     onCancelBackupRestore: () -> Unit = {}
 ) {
     var showEdit by remember { mutableStateOf(false) }
+    var showStaffEdit by remember { mutableStateOf(false) }
     var showImportConfirmation by remember { mutableStateOf(false) }
 
     if (showImportConfirmation) {
@@ -159,6 +162,17 @@ internal fun ProfileScreen(
         )
     }
 
+    if (showStaffEdit) {
+        DaStaffProfileDialog(
+            profile = staffProfile,
+            onDismiss = { showStaffEdit = false },
+            onSave = {
+                onStaffProfileSaved(it)
+                showStaffEdit = false
+            }
+        )
+    }
+
     if (showEdit) {
         FarmerRegistryDialog(
             profile = profile,
@@ -205,19 +219,19 @@ internal fun ProfileScreen(
             ) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "PROFILE CENTER",
+                        "STAFF WORKSPACE",
                         color = AgriGreen,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Farmer & Farm",
+                        "DA Staff Profile",
                         color = AgriText,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
-                        "Your farmer identity, field registry, and farm records in one place.",
+                        "Staff identity and office details, with farmer records managed separately.",
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -253,6 +267,20 @@ internal fun ProfileScreen(
                     }
                 }
             }
+        }
+
+        item {
+            DaStaffProfileCard(
+                profile = staffProfile,
+                onEdit = { showStaffEdit = true }
+            )
+        }
+
+        item {
+            ProfileSectionHeading(
+                title = "Farmer & Farm Registry",
+                subtitle = "Farmer and farm information handled by this DA staff member."
+            )
         }
 
         item {
@@ -295,7 +323,7 @@ internal fun ProfileScreen(
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(
-                                "FARMER PROFILE",
+                                "FARMER REGISTRY RECORD",
                                 color = Color.White.copy(alpha = .72f),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
@@ -663,6 +691,244 @@ internal fun ProfileScreen(
             }
         }
     }
+}
+
+@Composable
+private fun DaStaffProfileCard(
+    profile: DaStaffProfile,
+    onEdit: () -> Unit
+) {
+    val initials = profile.fullName.trim()
+        .split(Regex("\\s+"))
+        .filter { it.isNotBlank() }
+        .take(2)
+        .map { it.first().uppercaseChar() }
+        .joinToString("")
+        .ifBlank { "DA" }
+    val isComplete = profile.fullName.isNotBlank() &&
+        profile.staffId.isNotBlank() &&
+        profile.designation.isNotBlank() &&
+        profile.office.isNotBlank()
+
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriGreen),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.linearGradient(listOf(AgriGreen, Color(0xFF245841))),
+                    shape = RoundedCornerShape(28.dp)
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Surface(modifier = Modifier.size(66.dp), shape = CircleShape, color = AgriGold) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            initials,
+                            color = AgriGreen,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        "DEPARTMENT OF AGRICULTURE",
+                        color = Color.White.copy(alpha = .74f),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        profile.fullName.ifBlank { "Set up staff profile" },
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        profile.designation.ifBlank { "DA Staff" } +
+                            if (profile.staffId.isNotBlank()) " · " + profile.staffId else "",
+                        color = Color.White.copy(alpha = .84f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White.copy(alpha = .12f)
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(
+                        if (isComplete) "Staff profile saved on this device" else "Complete your staff profile",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        listOf(profile.office, profile.municipality, profile.province, profile.region)
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                            .joinToString(" · ")
+                            .ifBlank { "Add office and assignment details" },
+                        color = Color.White.copy(alpha = .82f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Button(
+                onClick = onEdit,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(15.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = AgriGreen
+                )
+            ) {
+                Icon(Icons.Outlined.Badge, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (profile.fullName.isBlank()) "Set Up Staff Profile" else "Edit Staff Profile", fontWeight = FontWeight.Bold)
+            }
+
+            Text(
+                "Local staff details only. This profile does not sign in, verify DA employment, or sync to a server.",
+                color = Color.White.copy(alpha = .78f),
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun DaStaffProfileDialog(
+    profile: DaStaffProfile,
+    onDismiss: () -> Unit,
+    onSave: (DaStaffProfile) -> Unit
+) {
+    var fullName by remember(profile) { mutableStateOf(profile.fullName) }
+    var staffId by remember(profile) { mutableStateOf(profile.staffId) }
+    var designation by remember(profile) { mutableStateOf(profile.designation) }
+    var office by remember(profile) { mutableStateOf(profile.office) }
+    var region by remember(profile) { mutableStateOf(profile.region) }
+    var province by remember(profile) { mutableStateOf(profile.province) }
+    var municipality by remember(profile) { mutableStateOf(profile.municipality) }
+    var contactNumber by remember(profile) { mutableStateOf(profile.contactNumber) }
+    var officialEmail by remember(profile) { mutableStateOf(profile.officialEmail) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Badge, contentDescription = null, tint = AgriGreen) },
+        title = { Text("DA Staff Profile", fontWeight = FontWeight.ExtraBold) },
+        text = {
+            Column(
+                Modifier.heightIn(max = 470.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                Text(
+                    "These details identify the staff member using this device. They are stored locally and are not login credentials.",
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedTextField(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Full name *") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = staffId,
+                    onValueChange = { staffId = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Staff ID / Employee number *") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = designation,
+                    onValueChange = { designation = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Designation / role") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = office,
+                    onValueChange = { office = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Office / unit") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = region,
+                    onValueChange = { region = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Region") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = province,
+                    onValueChange = { province = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Province") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = municipality,
+                    onValueChange = { municipality = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Municipality / City") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = contactNumber,
+                    onValueChange = { contactNumber = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Official contact number") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = officialEmail,
+                    onValueChange = { officialEmail = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Official email (optional)") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = fullName.isNotBlank() && staffId.isNotBlank(),
+                onClick = {
+                    onSave(
+                        DaStaffProfile(
+                            fullName = fullName,
+                            staffId = staffId,
+                            designation = designation,
+                            office = office,
+                            region = region,
+                            province = province,
+                            municipality = municipality,
+                            contactNumber = contactNumber,
+                            officialEmail = officialEmail
+                        )
+                    )
+                }
+            ) { Text("Save Staff Profile") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
