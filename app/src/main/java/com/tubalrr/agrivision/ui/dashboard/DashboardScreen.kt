@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -87,6 +88,8 @@ internal fun DashboardScreen(
     netIncome: Double,
     openTasks: Int
 ) {
+    val dashboardLocales = LocalConfiguration.current.locales
+    val dashboardLocale = if (dashboardLocales.isEmpty) Locale.getDefault() else dashboardLocales[0]
     val lowStock = inventory.count { it.status.equals("Low", ignoreCase = true) }
     val completedTasks = tasks.count { it.done }
     val totalTasks = tasks.size
@@ -205,7 +208,7 @@ internal fun DashboardScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(Calendar.getInstance().time),
+                            SimpleDateFormat("EEEE, MMM d", dashboardLocale).format(Calendar.getInstance().time),
                             color = AgriMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
