@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val exportBackup = registerForActivityResult(
-            ActivityResultContracts.CreateDocument("application/json")
+            ActivityResultContracts.CreateDocument("application/zip")
         ) { uri ->
             if (uri != null) farmViewModel.exportBackup(uri)
         }
@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         val importBackup = registerForActivityResult(
             ActivityResultContracts.OpenDocument()
         ) { uri ->
-            if (uri != null) farmViewModel.importBackup(uri)
+            if (uri != null) farmViewModel.previewBackup(uri)
         }
 
         val exportCasePackage = registerForActivityResult(
@@ -69,8 +69,8 @@ class MainActivity : ComponentActivity() {
                 AgriLoadingScreen()
             } else {
                 AgriVisionApp(
-                    onExportBackup = { exportBackup.launch("agrivision-backup.json") },
-                    onImportBackup = { importBackup.launch(arrayOf("application/json", "text/plain")) },
+                    onExportBackup = { exportBackup.launch("agrivision-backup.zip") },
+                    onImportBackup = { importBackup.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "application/json", "text/plain")) },
                     onExportCasePackage = { exportCasePackage.launch("agrivision-da-case-package.json") },
                     onExportDaReport = { reportType, format ->
                         pendingReportType = reportType
