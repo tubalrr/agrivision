@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.18.0** · Android version code: `22`
+
+This release adds finance controls: new finance and production entries use a date picker with ISO dates; Finance filters this month, last month, this year or all time; a six-month cash-flow trend separates dated income and expenses; unpaid sales and expense balances can be marked paid without duplicate transactions; crop and livestock results use only explicitly linked saved records; livestock shows linked production and feed usage separately; exports include transaction IDs, settlement status and source links. These are recorded actuals, not forecasts. Legacy transactions migrate as Paid because earlier app versions did not track settlement, so AgriVision does not guess which historic records remain outstanding.
+
 **Version 1.17.0** · Android version code: `21`
 
 This release hardens backup and restore. The exported `.zip` archive contains the full local JSON data snapshot and attached incident photos, with size checks and SHA-256 integrity verification for every bundled photo. Restore now validates the archive and record relationships, checks duplicate stable IDs and numeric/GPS values, stages photo files privately, and presents a record-count preview plus a final Replace & Restore confirmation before touching the database. The database replacement remains transactional; failed validation or restoration preserves existing Room data, and restore replaces rather than merges records. Older JSON backups remain supported, with inaccessible photo references clearly flagged and detached rather than silently left broken. Guardrails cap each photo at 12 MB, aggregate photos at 250 MB, and the manifest at 64 MB.
