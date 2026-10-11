@@ -38,6 +38,8 @@ internal fun ProfileScreen(
     onStaffProfileSaved: (DaStaffProfile) -> Unit,
     profile: FarmerProfile,
     farmer: FarmerRecord,
+    registryEntries: List<FarmerFarmRegistryEntry>,
+    onSaveRegistryEntry: (String?, FarmerProfile) -> Unit,
     farm: FarmRecord,
     fields: List<FieldRecord>,
     onProfileSaved: (FarmerProfile) -> Unit,
@@ -56,9 +58,11 @@ internal fun ProfileScreen(
     onConfirmBackupRestore: () -> Unit = {},
     onCancelBackupRestore: () -> Unit = {}
 ) {
-    var showEdit by remember { mutableStateOf(false) }
+    var showFarmerApplication by remember { mutableStateOf(false) }
+    var editingFarmId by remember { mutableStateOf<String?>(null) }
+    var editingFarmerProfile by remember { mutableStateOf<FarmerProfile?>(null) }
+    var registrySearch by remember { mutableStateOf("") }
     var showStaffEdit by remember { mutableStateOf(false) }
-    var showRegistryDetails by remember { mutableStateOf(false) }
     var showImportConfirmation by remember { mutableStateOf(false) }
 
     if (showImportConfirmation) {
@@ -175,38 +179,36 @@ internal fun ProfileScreen(
         )
     }
 
-    if (showEdit) {
+    if (showFarmerApplication) {
         FarmerRegistryDialog(
-            profile = profile,
-            onDismiss = { showEdit = false },
-            onSave = {
-                onProfileSaved(it)
-                showEdit = false
+            profile = editingFarmerProfile ?: FarmerProfile("", "", "", "", "", "", "", "", "", ""),
+            applicationMode = editingFarmId == null,
+            onDismiss = {
+                showFarmerApplication = false
+                editingFarmId = null
+                editingFarmerProfile = null
+            },
+            onSave = { value ->
+                onSaveRegistryEntry(editingFarmId, value)
+                showFarmerApplication = false
+                editingFarmId = null
+                editingFarmerProfile = null
             }
         )
     }
 
-    val registrationReady = profile.farmerName.isNotBlank() && profile.farmerId.isNotBlank()
-    val details = listOf(
-        profile.farmerName.isNotBlank(),
-        profile.farmerId.isNotBlank(),
-        profile.contact.isNotBlank(),
-        profile.farmName.isNotBlank(),
-        profile.province.isNotBlank(),
-        profile.municipality.isNotBlank(),
-        profile.barangay.isNotBlank(),
-        profile.farmSize.isNotBlank(),
-        profile.landTenure.isNotBlank(),
-        profile.commodities.isNotBlank()
-    )
-    val completion = details.count { it } * 100 / details.size
-    val initials = profile.farmerName.trim()
-        .split(Regex("\\s+"))
-        .filter { it.isNotBlank() }
-        .take(2)
-        .map { it.first().uppercaseChar() }
-        .joinToString("")
-        .ifBlank { "F" }
+    val filteredRegistryEntries = remember(registryEntries, registrySearch) {
+        val query = registrySearch.trim()
+        if (query.isBlank()) registryEntries
+        else registryEntries.filter { entry ->
+            val p = entry.profile
+            listOf(
+                p.farmerName, p.farmerId, p.contact, p.farmName,
+                p.province, p.municipality, p.barangay, p.commodities,
+                p.registryStatus, entry.farmId
+            ).any { it.contains(query, ignoreCase = true) }
+        }
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
@@ -279,171 +281,197 @@ internal fun ProfileScreen(
         }
 
         item {
-            ProfileSectionHeading(
-                title = "Farmer & Farm Registry",
-                subtitle = "Farmer and farm information handled by this DA staff member."
-            )
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ProfileSectionHeading(
+                    title = "Farmer & Farm Registry",
+                    subtitle = "Register a farmer through an application form, then review and update each compact record."
+                )
+                Button(
+                    onClick = {
+                        editingFarmId = null
+                        editingFarmerProfile = null
+                        showFarmerApplication = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(vertical = 13.dp)
+                ) {
+                    Icon(Icons.Outlined.PersonAdd, contentDescription = null, modifier = Modifier.size(19.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Register Farmer / New Application", fontWeight = FontWeight.Bold)
+                }
+                OutlinedTextField(
+                    value = registrySearch,
+                    onValueChange = { registrySearch = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Search farmer, ID, farm, or location") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                    shape = RoundedCornerShape(14.dp)
+                )
+                Text(
+                    "${registryEntries.size} farmer/farm record" + if (registryEntries.size == 1) "" else "s",
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
 
-        item {
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriCard),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+        if (filteredRegistryEntries.isEmpty()) {
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = AgriCard)
                 ) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(11.dp)
+                    Column(
+                        Modifier.fillMaxWidth().padding(22.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Surface(
-                            modifier = Modifier.size(46.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            color = AgriGreenSoft
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    initials,
-                                    color = AgriGreen,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                            }
-                        }
-                        Column(
-                            Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Text(
-                                profile.farmerName.ifBlank { "No farmer record yet" },
-                                color = AgriText,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                profile.farmName.ifBlank { "Farm name not registered" },
-                                color = AgriGreen,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                listOf(profile.barangay, profile.municipality, profile.province)
-                                    .filter { it.isNotBlank() }
-                                    .joinToString(", ")
-                                    .ifBlank { "Location not added" },
-                                color = AgriMuted,
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (registrationReady) AgriGreenSoft else Color(0xFFFFF1D6)
-                        ) {
-                            Text(
-                                if (registrationReady) "REGISTERED" else "INCOMPLETE",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                color = if (registrationReady) AgriGreen else AgriWarning,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(
-                            onClick = { showRegistryDetails = !showRegistryDetails },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                if (showRegistryDetails) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(if (showRegistryDetails) "Hide details" else "View details")
-                        }
-                        Spacer(Modifier.weight(1f))
-                        OutlinedButton(
-                            onClick = { showEdit = true },
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(if (profile.farmerName.isBlank()) "Register" else "Edit record")
-                        }
-                    }
-
-                    if (showRegistryDetails) {
-                        HorizontalDivider(color = AgriLine)
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("Farmer ID", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                                Text(farmer.farmerId.ifBlank { profile.farmerId.ifBlank { "Not assigned" } },
-                                    color = AgriText, fontWeight = FontWeight.SemiBold)
-                            }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("Farm record ID", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                                Text(farm.farmId.ifBlank { "Not assigned" }, color = AgriText, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("Farm size", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                                Text(profile.farmSize.ifBlank { "Not set" }, color = AgriText, fontWeight = FontWeight.SemiBold)
-                            }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("Contact", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                                Text(profile.contact.ifBlank { "Not provided" }, color = AgriText, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
+                        Icon(
+                            Icons.Outlined.PersonAdd,
+                            contentDescription = null,
+                            tint = AgriGreen,
+                            modifier = Modifier.size(34.dp)
+                        )
                         Text(
-                            "Land tenure: " + profile.landTenure.ifBlank { "Not set" } +
-                                " · " + fields.size + if (fields.size == 1) " registered field" else " registered fields",
+                            if (registrySearch.isBlank()) "No farmer applications yet" else "No matching records",
+                            color = AgriText,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            if (registrySearch.isBlank())
+                                "Tap Register Farmer / New Application to encode a farmer and farm."
+                            else
+                                "Try another farmer name, reference number, farm, or location.",
                             color = AgriMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
-                        Text(
-                            "Commodities: " + profile.commodities.ifBlank { "Not added" },
-                            color = AgriText,
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                    }
+                }
+            }
+        } else {
+            items(filteredRegistryEntries, key = { it.farmId }) { entry ->
+                val p = entry.profile
+                val initials = p.farmerName.trim()
+                    .split(Regex("\\s+"))
+                    .filter { it.isNotBlank() }
+                    .take(2)
+                    .map { it.first().uppercaseChar() }
+                    .joinToString("")
+                    .ifBlank { "F" }
+                val status = p.registryStatus.ifBlank { "For Review" }
+                val statusApproved = status.contains("approved", ignoreCase = true) ||
+                    status.contains("registered", ignoreCase = true) ||
+                    status.contains("complete", ignoreCase = true)
+
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = AgriCard),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Row(
                             Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text("Record completeness", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                                LinearProgressIndicator(
-                                    progress = { completion / 100f },
-                                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                            Surface(
+                                modifier = Modifier.size(44.dp),
+                                shape = RoundedCornerShape(13.dp),
+                                color = AgriGreenSoft
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(initials, color = AgriGreen, fontWeight = FontWeight.ExtraBold)
+                                }
+                            }
+                            Column(
+                                Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text(
+                                    p.farmerName.ifBlank { "Unnamed farmer" },
+                                    color = AgriText,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    p.farmName.ifBlank { "Farm not specified" },
                                     color = AgriGreen,
-                                    trackColor = AgriLine
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    listOf(p.barangay, p.municipality, p.province)
+                                        .filter { it.isNotBlank() }
+                                        .joinToString(", ")
+                                        .ifBlank { "Location not provided" },
+                                    color = AgriMuted,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Text("$completion%", color = AgriGreen, fontWeight = FontWeight.ExtraBold)
+                            Surface(
+                                shape = RoundedCornerShape(9.dp),
+                                color = if (statusApproved) AgriGreenSoft else Color(0xFFFFF1D6)
+                            ) {
+                                Text(
+                                    status.uppercase(Locale.ROOT),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    color = if (statusApproved) AgriGreen else AgriWarning,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        HorizontalDivider(color = AgriLine)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text("Farmer ID", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                                Text(
+                                    p.farmerId.ifBlank { "Auto-assigned on save" },
+                                    color = AgriText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    editingFarmId = entry.farmId
+                                    editingFarmerProfile = p
+                                    showFarmerApplication = true
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Edit")
+                            }
                         }
                     }
                 }
@@ -1296,7 +1324,8 @@ internal fun RegistryInfoCard(title: String, value: String, modifier: Modifier =
 internal fun FarmerRegistryDialog(
     profile: FarmerProfile,
     onDismiss: () -> Unit,
-    onSave: (FarmerProfile) -> Unit
+    onSave: (FarmerProfile) -> Unit,
+    applicationMode: Boolean = false
 ) {
     var farmerName by remember { mutableStateOf(profile.farmerName) }
     var farmerId by remember { mutableStateOf(profile.farmerId) }
@@ -1311,9 +1340,34 @@ internal fun FarmerRegistryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Farmer & Farm Registry", fontWeight = FontWeight.Bold) },
+        title = {
+            Text(
+                if (applicationMode) "Farmer Registration Application" else "Edit Farmer / Farm Record",
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (applicationMode) {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AgriGreenSoft
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("New registration", color = AgriGreen, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "This application is saved on this device with status For Review. Leave the reference number blank to generate a local farmer ID automatically.",
+                                    color = AgriText,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
                 item { Text("Farmer Information", color = AgriGreen, fontWeight = FontWeight.Bold) }
                 item { OutlinedTextField(farmerName, { farmerName = it }, Modifier.fillMaxWidth(), label = { Text("Farmer name") }, singleLine = true) }
                 item { OutlinedTextField(farmerId, { farmerId = it }, Modifier.fillMaxWidth(), label = { Text("Farmer ID / reference no.") }, singleLine = true) }
@@ -1337,11 +1391,13 @@ internal fun FarmerRegistryDialog(
                         FarmerProfile(
                             farmerName.trim(), farmerId.trim(), contact.trim(),
                             province.trim(), municipality.trim(), barangay.trim(),
-                            farmName.trim(), farmSize.trim(), landTenure.trim(), commodities.trim()
+                            farmName.trim(), farmSize.trim(), landTenure.trim(), commodities.trim(),
+                            registryStatus = if (applicationMode) "For Review" else profile.registryStatus,
+                            reviewNotes = profile.reviewNotes
                         )
                     )
                 }
-            ) { Text("Save Registry") }
+            ) { Text(if (applicationMode) "Submit Application" else "Save Changes") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
