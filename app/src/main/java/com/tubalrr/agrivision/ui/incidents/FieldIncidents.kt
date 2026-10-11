@@ -1,6 +1,7 @@
 package com.tubalrr.agrivision
 
 import android.app.DatePickerDialog
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -427,8 +428,15 @@ internal fun AddFieldIncidentDialog(
     var longitudeText by remember { mutableStateOf("") }
     var showPicker by remember { mutableStateOf(false) }
 
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        evidenceUri = uri?.toString().orEmpty()
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { storeIncidentEvidence(context, uri) }
+                .onSuccess { evidenceUri = it.toString() }
+                .onFailure {
+                    evidenceUri = ""
+                    Toast.makeText(context, it.message ?: "Unable to save the selected photo.", Toast.LENGTH_LONG).show()
+                }
+        }
     }
 
     if (showPicker) {
@@ -584,6 +592,12 @@ internal fun AddFieldIncidentDialog(
                     )
                 }
                 item {
+                    LocationCaptureButton { lat, lon ->
+                        latitudeText = lat.toString()
+                        longitudeText = lon.toString()
+                    }
+                }
+                item {
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
@@ -594,7 +608,7 @@ internal fun AddFieldIncidentDialog(
                 }
                 item {
                     OutlinedButton(
-                        onClick = { imagePicker.launch("image/*") },
+                        onClick = { imagePicker.launch(arrayOf("image/*")) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp)
                     ) {
@@ -603,7 +617,7 @@ internal fun AddFieldIncidentDialog(
                 }
                 item {
                     Text(
-                        "Coordinates are entered explicitly; the app does not request GPS permission.",
+                        "GPS capture is optional. Attached photos are copied into private app storage so the local file remains available after the picker closes.",
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -611,11 +625,17 @@ internal fun AddFieldIncidentDialog(
             }
         },
         confirmButton = {
+            val latitudeValue = latitudeText.toDoubleOrNull()
+            val longitudeValue = longitudeText.toDoubleOrNull()
+            val coordinatesValid = (latitudeText.isBlank() && longitudeText.isBlank()) ||
+                (latitudeValue != null && longitudeValue != null &&
+                    latitudeValue in -90.0..90.0 && longitudeValue in -180.0..180.0)
             TextButton(
                 enabled = fields.isNotEmpty() &&
                         fieldId.isNotBlank() &&
                         commodity.isNotBlank() &&
-                        description.isNotBlank(),
+                        description.isNotBlank() &&
+                        coordinatesValid,
                 onClick = {
                     onSave(
                         FieldIncident(
@@ -631,8 +651,8 @@ internal fun AddFieldIncidentDialog(
                             farmerId = farmerId,
                             farmId = farmId,
                             fieldId = fieldId,
-                            latitude = latitudeText.toDoubleOrNull(),
-                            longitude = longitudeText.toDoubleOrNull()
+                            latitude = latitudeValue,
+                            longitude = longitudeValue
                         )
                     )
                 }
