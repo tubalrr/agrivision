@@ -102,12 +102,16 @@ internal object FarmBackupArchive {
         json.put("archiveVersion", ARCHIVE_VERSION)
         json.put("exportedAt", System.currentTimeMillis())
         json.put("incidentEvidence", photoManifest)
+        val manifestBytes = json.toString(2).toByteArray(Charsets.UTF_8)
+        require(manifestBytes.size.toLong() <= MAX_MANIFEST_BYTES) {
+            "Farm data is too large for a single backup manifest. Export a smaller data set or contact support."
+        }
 
         val tempArchive = File(context.cacheDir, "agrivision-backup-${UUID.randomUUID()}.zip")
         try {
             ZipOutputStream(BufferedOutputStream(FileOutputStream(tempArchive))).use { zip ->
                 zip.putNextEntry(ZipEntry(MANIFEST_ENTRY))
-                zip.write(json.toString(2).toByteArray(Charsets.UTF_8))
+                zip.write(manifestBytes)
                 zip.closeEntry()
 
                 photos.forEach { photo ->
