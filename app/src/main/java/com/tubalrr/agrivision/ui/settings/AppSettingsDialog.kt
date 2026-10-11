@@ -66,7 +66,7 @@ internal fun AppSettingsDialog(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("App Preferences", fontWeight = FontWeight.ExtraBold)
-                Text("AgriVision · Version 1.18.0", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                Text("AgriVision · Version 1.19.0", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
             }
         },
         text = {
