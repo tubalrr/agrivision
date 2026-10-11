@@ -176,6 +176,22 @@ data class FarmerProfile(
     val reviewNotes: String = ""
 )
 
+/**
+ * Local identity of the DA staff member operating this device.
+ * This is a profile card, not an authenticated account or permission system.
+ */
+data class DaStaffProfile(
+    val fullName: String = "",
+    val staffId: String = "",
+    val designation: String = "DA Staff",
+    val office: String = "",
+    val region: String = "",
+    val province: String = "",
+    val municipality: String = "",
+    val contactNumber: String = "",
+    val officialEmail: String = ""
+)
+
 
 object FinancialCategories {
     val incomeCategories = listOf(
