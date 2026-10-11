@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import java.util.UUID
+import java.util.Locale
 import kotlin.math.roundToInt
 
 data class FeedLogRecord(
