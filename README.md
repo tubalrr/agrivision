@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.15.0** · Android version code: `18`
+
+This release reorganizes the dashboard around farmer priorities: Farm Action Center and financial/health snapshots appear before incident history and analytics. Duplicate action-queue/report prompts are removed, recent incident previews are capped at three, spacing and card proportions are tightened, and dashboard accent colors better respect the selected light/dark palette. Existing records, task shortcuts, inventory actions, case triage, and analytics remain connected to saved farm data.
+
 **Version 1.14.1** · Android version code: `17`
 
 This patch fixes theme palette updates to remain compatible with existing non-composable farm helpers. The selected appearance still persists locally and updates both the shared surface colors and Material 3 color scheme.

@@ -166,8 +166,8 @@ internal fun DashboardScreen(
 
     LazyColumn(
         Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(18.dp, 16.dp, 18.dp, 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        contentPadding = PaddingValues(16.dp, 14.dp, 16.dp, 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Row(
@@ -214,7 +214,7 @@ internal fun DashboardScreen(
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(if (queueCount > 0) Color(0xFFFFE6D9) else AgriGreenSoft)
+                        .background(if (queueCount > 0) { if (AgriIsDark) Color(0xFF512522) else Color(0xFFFFE6D9) } else AgriGreenSoft)
                         .padding(horizontal = 11.dp, vertical = 8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -249,9 +249,9 @@ internal fun DashboardScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(298.dp)
-                    .border(1.dp, AgriGreen.copy(alpha = 0.18f), RoundedCornerShape(30.dp)),
-                shape = RoundedCornerShape(30.dp),
+                    .height(274.dp)
+                    .border(1.dp, AgriGreen.copy(alpha = 0.18f), RoundedCornerShape(28.dp)),
+                shape = RoundedCornerShape(28.dp),
                 colors = CardDefaults.cardColors(containerColor = AgriGreenDeep),
                 elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
             ) {
@@ -260,7 +260,7 @@ internal fun DashboardScreen(
                         .fillMaxSize()
                         .background(
                             Brush.linearGradient(
-                                colors = listOf(Color(0xFF174A32), Color(0xFF0D2F20), Color(0xFF102E22))
+                                colors = if (AgriIsDark) listOf(Color(0xFF17271D), Color(0xFF0B1710), Color(0xFF101F16)) else listOf(Color(0xFF174A32), Color(0xFF0D2F20), Color(0xFF102E22))
                             )
                         )
                 ) {
@@ -319,8 +319,8 @@ internal fun DashboardScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(21.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(19.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
@@ -425,8 +425,8 @@ internal fun DashboardScreen(
                         title = "Report",
                         subtitle = "Field issue",
                         icon = Icons.Outlined.AddCircleOutline,
-                        accent = Color(0xFFFFE8D8),
-                        iconTint = Color(0xFFB45C2D),
+                        accent = if (AgriIsDark) AgriSurfaceVariant else Color(0xFFFFE8D8),
+                        iconTint = if (AgriIsDark) AgriGold else Color(0xFFB45C2D),
                         modifier = Modifier.weight(1f),
                         onClick = { showIncidentDialog = true }
                     )
@@ -434,7 +434,7 @@ internal fun DashboardScreen(
                         title = "Tasks",
                         subtitle = "$openTasks open",
                         icon = Icons.Outlined.Checklist,
-                        accent = Color(0xFFDFF1E3),
+                        accent = if (AgriIsDark) AgriSurfaceVariant else AgriGreenSoft,
                         iconTint = AgriGreen,
                         modifier = Modifier.weight(1f),
                         onClick = onOpenTasks
@@ -443,8 +443,8 @@ internal fun DashboardScreen(
                         title = "Stock",
                         subtitle = if (lowStock == 0) "All stocked" else "$lowStock low",
                         icon = Icons.Outlined.Inventory2,
-                        accent = Color(0xFFFFF0C7),
-                        iconTint = Color(0xFF96701B),
+                        accent = if (AgriIsDark) AgriSurfaceVariant else AgriGoldSoft,
+                        iconTint = if (AgriIsDark) AgriGold else Color(0xFF96701B),
                         modifier = Modifier.weight(1f),
                         onClick = onOpenInventory
                     )
@@ -453,16 +453,55 @@ internal fun DashboardScreen(
         }
 
         item {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SectionTitle("Action Queue")
-                Text(
-                    "$queueCount action(s)",
-                    color = if (queueCount > 0) AgriWarning else AgriGreen,
-                    fontWeight = FontWeight.SemiBold
+            FarmActionCenter(
+                crops = crops,
+                inventory = inventory,
+                tasks = tasks,
+                incidents = fieldIncidents,
+                onOpenTasks = onOpenTasks,
+                onOpenOverdueTasks = onOpenOverdueTasks,
+                onOpenInventory = onOpenInventory,
+                onOpenCrops = { onOpenFarm("Crops") },
+                onReviewIncident = { reviewIncident = it }
+            )
+        }
+
+        item { SectionTitle("Farm Operations") }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DashboardKpiCard(
+                    "Sales",
+                    "₱" + money(totalSales),
+                    Icons.Outlined.MonetizationOn,
+                    AgriGreenSoft,
+                    Modifier.weight(1f)
+                )
+                DashboardKpiCard(
+                    "Expenses",
+                    "₱" + money(totalExpenses),
+                    Icons.Outlined.ReceiptLong,
+                    AgriGoldSoft,
+                    Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DashboardKpiCard(
+                    "Net Income",
+                    "₱" + money(netIncome),
+                    Icons.Outlined.Assessment,
+                    AgriGreenSoft,
+                    Modifier.weight(1f)
+                )
+                DashboardKpiCard(
+                    "Production",
+                    production.size.toString(),
+                    Icons.Outlined.LocalFlorist,
+                    AgriSurfaceVariant,
+                    Modifier.weight(1f)
                 )
             }
         }
@@ -471,26 +510,35 @@ internal fun DashboardScreen(
             Card(
                 Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriCard),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                colors = CardDefaults.cardColors(containerColor = AgriCard)
             ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ActionQueueRow(
-                        title = "Field incidents",
-                        detail = fieldIncidents.count { it.status == "Draft" }.toString() + " draft report(s)",
-                        action = { showIncidentDialog = true }
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Farm Health",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            if (lowStock == 0 && openTasks == 0) "Healthy" else "Needs attention",
+                            color = if (lowStock == 0 && openTasks == 0) AgriGreen else AgriWarning,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    StatusRow("Livestock", totalAnimals.toString() + " heads", Icons.Outlined.Pets, AgriGreen)
+                    StatusRow("Crops", crops.size.toString() + " records", Icons.Outlined.LocalFlorist, AgriGreen)
+                    StatusRow(
+                        "Inventory",
+                        if (lowStock == 0) "All stocked" else lowStock.toString() + " low",
+                        Icons.Outlined.Inventory2,
+                        if (lowStock > 0) AgriWarning else AgriGreen
                     )
-                    HorizontalDivider(color = AgriLine)
-                    ActionQueueRow(
-                        title = "Farm tasks",
-                        detail = openTasks.toString() + " open task(s)",
-                        action = onOpenTasks
-                    )
-                    HorizontalDivider(color = AgriLine)
-                    ActionQueueRow(
-                        title = "Inventory",
-                        detail = if (lowStock == 0) "No low-stock alerts" else lowStock.toString() + " item(s) low",
-                        action = onOpenInventory
+                    StatusRow(
+                        "Tasks",
+                        completedTasks.toString() + "/" + totalTasks + " completed",
+                        Icons.Outlined.Checklist,
+                        if (openTasks > 0) AgriWarning else AgriGreen
                     )
                 }
             }
@@ -507,29 +555,6 @@ internal fun DashboardScreen(
                     reviewIncident = incident
                 }
             )
-        }
-
-        item {
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1D6))
-            ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Report a field incident", color = AgriGreen, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Pest, disease, flooding, drought, crop damage or animal health events can be logged with date, severity and photo evidence.",
-                        color = AgriText,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Button(
-                        onClick = { showIncidentDialog = true },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("+ New Field Report")
-                    }
-                }
-            }
         }
 
         item {
@@ -569,7 +594,7 @@ internal fun DashboardScreen(
                 }
             }
         } else {
-            items(fieldIncidents.takeLast(5).asReversed()) { incident ->
+            items(fieldIncidents.takeLast(3).asReversed()) { incident ->
                 FieldIncidentCard(
                     incident = incident,
                     hasAssistanceRequest = assistance.any { it.incidentId == incident.id },
@@ -594,46 +619,6 @@ internal fun DashboardScreen(
             }
         }
 
-        item { SectionTitle("Farm Operations") }
-
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DashboardKpiCard(
-                    "Sales",
-                    "₱" + money(totalSales),
-                    Icons.Outlined.MonetizationOn,
-                    AgriGreenSoft,
-                    Modifier.weight(1f)
-                )
-                DashboardKpiCard(
-                    "Expenses",
-                    "₱" + money(totalExpenses),
-                    Icons.Outlined.ReceiptLong,
-                    Color(0xFFE9DFC7),
-                    Modifier.weight(1f)
-                )
-            }
-        }
-
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DashboardKpiCard(
-                    "Net Income",
-                    "₱" + money(netIncome),
-                    Icons.Outlined.Assessment,
-                    Color(0xFFE1EEDB),
-                    Modifier.weight(1f)
-                )
-                DashboardKpiCard(
-                    "Production",
-                    production.size.toString(),
-                    Icons.Outlined.LocalFlorist,
-                    Color(0xFFECE8D9),
-                    Modifier.weight(1f)
-                )
-            }
-        }
-
         item {
             SectionTitle("Farm Analytics")
         }
@@ -647,58 +632,6 @@ internal fun DashboardScreen(
 
         item {
             ProductionTrendCard(production = production)
-        }
-
-        item {
-            FarmActionCenter(
-                crops = crops,
-                inventory = inventory,
-                tasks = tasks,
-                incidents = fieldIncidents,
-                onOpenTasks = onOpenTasks,
-                onOpenOverdueTasks = onOpenOverdueTasks,
-                onOpenInventory = onOpenInventory,
-                onOpenCrops = { onOpenFarm("Crops") },
-                onReviewIncident = { reviewIncident = it }
-            )
-        }
-
-        item {
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = AgriCard)
-            ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Farm Health",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            if (lowStock == 0 && openTasks == 0) "Healthy" else "Needs attention",
-                            color = if (lowStock == 0 && openTasks == 0) AgriGreen else AgriWarning,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    StatusRow("Livestock", totalAnimals.toString() + " heads", Icons.Outlined.Pets, AgriGreen)
-                    StatusRow("Crops", crops.size.toString() + " records", Icons.Outlined.LocalFlorist, AgriGreen)
-                    StatusRow(
-                        "Inventory",
-                        if (lowStock == 0) "All stocked" else lowStock.toString() + " low",
-                        Icons.Outlined.Inventory2,
-                        if (lowStock > 0) AgriWarning else AgriGreen
-                    )
-                    StatusRow(
-                        "Tasks",
-                        completedTasks.toString() + "/" + totalTasks + " completed",
-                        Icons.Outlined.Checklist,
-                        if (openTasks > 0) AgriWarning else AgriGreen
-                    )
-                }
-            }
         }
 
         item {
@@ -1521,7 +1454,7 @@ internal fun DashboardKpiCard(
     background: Color,
     modifier: Modifier
 ) {
-    val cardShape = RoundedCornerShape(22.dp)
+    val cardShape = RoundedCornerShape(20.dp)
     Card(
         modifier.border(1.dp, AgriLine, cardShape),
         shape = cardShape,
@@ -1529,14 +1462,14 @@ internal fun DashboardKpiCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            Modifier.padding(16.dp),
+            Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Box(
                 Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .clip(RoundedCornerShape(13.dp))
-                    .background(Color.White.copy(alpha = .72f)),
+                    .background(if (AgriIsDark) AgriSurfaceVariant else Color.White.copy(alpha = .72f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, null, tint = AgriGreen, modifier = Modifier.size(21.dp))
@@ -1566,20 +1499,20 @@ private fun DashboardQuickAction(
 ) {
     Card(
         modifier = modifier
-            .height(126.dp)
+            .height(114.dp)
             .clickable(onClick = onClick)
-            .border(1.dp, AgriLine, RoundedCornerShape(21.dp)),
+            .border(1.dp, AgriLine, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(21.dp),
         colors = CardDefaults.cardColors(containerColor = AgriCard),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(11.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(39.dp)
+                    .size(36.dp)
                     .clip(RoundedCornerShape(13.dp))
                     .background(accent),
                 contentAlignment = Alignment.Center
