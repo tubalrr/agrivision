@@ -236,7 +236,10 @@ class FarmRepository(
                     category = it.category,
                     amount = it.amount,
                     note = it.note,
-                    date = it.date
+                    date = it.date,
+                    sourceType = it.sourceType,
+                    sourceId = it.sourceId,
+                    fieldId = it.fieldId
                 )
             }
         }
@@ -248,7 +251,10 @@ class FarmRepository(
                     product = it.product,
                     amount = it.amount,
                     date = it.date,
-                    incomeCategory = it.incomeCategory
+                    incomeCategory = it.incomeCategory,
+                    sourceType = it.sourceType,
+                    sourceId = it.sourceId,
+                    fieldId = it.fieldId
                 )
             }
         }
@@ -863,7 +869,10 @@ suspend fun saveField(record: FieldRecord) {
                 date = date,
                 category = record.category,
                 amount = record.amount,
-                note = record.note
+                note = record.note,
+                sourceType = record.sourceType,
+                sourceId = record.sourceId,
+                fieldId = record.fieldId
             )
         )
     }
@@ -879,7 +888,10 @@ suspend fun saveField(record: FieldRecord) {
                 date = record.date.ifBlank { "Today" },
                 product = record.product,
                 amount = record.amount,
-                incomeCategory = record.incomeCategory
+                incomeCategory = record.incomeCategory,
+                sourceType = record.sourceType,
+                sourceId = record.sourceId,
+                fieldId = record.fieldId
             )
         )
     }
