@@ -27,7 +27,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         const val BACKUP_FORMAT_VERSION = 1
-        const val ROOM_SCHEMA_VERSION = 10
+        const val ROOM_SCHEMA_VERSION = 11
     }
 
     private val _backupStatus = MutableStateFlow("")
@@ -554,12 +554,18 @@ private fun ExpenseRecord.toJson() = JSONObject().apply {
     put("amount", amount)
     put("note", note)
     put("date", date)
+    put("sourceType", sourceType)
+    put("sourceId", sourceId)
+    put("fieldId", fieldId)
 }
 private fun SaleRecord.toJson() = JSONObject().apply {
     put("product", product)
     put("amount", amount)
     put("date", date)
     put("incomeCategory", incomeCategory)
+    put("sourceType", sourceType)
+    put("sourceId", sourceId)
+    put("fieldId", fieldId)
 }
 private fun InventoryItem.toJson() = JSONObject().apply {
     put("name", name)
@@ -794,14 +800,20 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             category = o.optString("category"),
             amount = o.optDouble("amount", 0.0),
             note = o.optString("note"),
-            date = o.optString("date")
+            date = o.optString("date"),
+            sourceType = o.optString("sourceType"),
+            sourceId = o.optString("sourceId"),
+            fieldId = o.optString("fieldId")
         ) }
     val sales = mutableListOf<SaleRecord>()
     parseList(salesArray) { o, _ -> sales += SaleRecord(
             product = o.optString("product"),
             amount = o.optDouble("amount", 0.0),
             date = o.optString("date"),
-            incomeCategory = o.optString("incomeCategory", "Other Income")
+            incomeCategory = o.optString("incomeCategory", "Other Income"),
+            sourceType = o.optString("sourceType"),
+            sourceId = o.optString("sourceId"),
+            fieldId = o.optString("fieldId")
         ) }
     val inventory = mutableListOf<InventoryItem>()
     parseList(inventoryArray) { o, _ ->
