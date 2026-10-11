@@ -327,16 +327,16 @@ object DaReportExporter {
 /**
  * Escapes a CSV field for spreadsheet applications.
  *
- * Quoting protects CSV structure; the apostrophe additionally keeps user-controlled
- * values beginning with spreadsheet formula operators from being evaluated as formulas.
+ * CSV quoting protects the file structure. Prefixing dangerous user-controlled values
+ * with an apostrophe prevents spreadsheet applications from evaluating them as formulas.
  */
 internal fun escapeCsvCell(value: String): String {
     val firstSignificant = value.firstOrNull { !it.isWhitespace() }
     val numericLiteral = value.trim().matches(Regex("-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)"))
-    val formulaLike = firstSignificant in setOf('=', '+', '-', '@', '＝', '＋', '－', '＠', '\\t', '\\r', '\\n')
+    val formulaLike = firstSignificant in setOf('=', '+', '-', '@', '＝', '＋', '－', '＠')
     val safeValue = if (formulaLike && !numericLiteral) "'$value" else value
     val escaped = safeValue.replace("\"", "\"\"")
-    return if (escaped.contains(',') || escaped.contains('"') || escaped.contains('\\n') || escaped.contains('\\r')) {
+    return if (escaped.contains(',') || escaped.contains('"') || escaped.contains('\n') || escaped.contains('\r')) {
         "\"" + escaped + "\""
     } else {
         escaped
