@@ -380,7 +380,9 @@ internal fun AgriVisionApp(
                     onFeedLog = farmViewModel::addFeedLog,
                     onExpense = farmViewModel::addExpense,
                     onSale = farmViewModel::addSale,
-                    onSubmissionSaved = farmViewModel::saveReportSubmission
+                    onSubmissionSaved = farmViewModel::saveReportSubmission,
+                    onExpensePaymentStatus = farmViewModel::setExpensePaymentStatus,
+                    onSalePaymentStatus = farmViewModel::setSalePaymentStatus
                 )
                 4 -> TasksScreen(
                     padding = padding,
