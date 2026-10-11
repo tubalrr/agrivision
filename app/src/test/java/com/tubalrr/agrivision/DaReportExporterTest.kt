@@ -40,4 +40,32 @@ class DaReportExporterTest {
         assertEquals(0xBF, bytes[2].toInt() and 0xFF)
         assertEquals(csv, String(bytes, Charsets.UTF_8).removePrefix("\uFEFF"))
     }
+
+    @Test
+    fun longUnbrokenReportTokensAreSplitToFitCellWidth() {
+        val lines = wrapReportText("farm-ID-123456789", 5f) { it.length.toFloat() }
+
+        assertEquals(listOf("farm-", "ID-12", "34567", "89"), lines)
+        org.junit.Assert.assertTrue(lines.all { it.length <= 5 })
+    }
+
+    @Test
+    fun reportTextWrappingKeepsWordBoundariesAndExplicitLineBreaks() {
+        assertEquals(
+            listOf("one two", "three"),
+            wrapReportText("one two three", 7f) { it.length.toFloat() }
+        )
+        assertEquals(
+            listOf("first line", "second"),
+            wrapReportText("first line\\nsecond", 11f) { it.length.toFloat() }
+        )
+    }
+
+    @Test
+    fun reportTextWrappingDoesNotSplitSurrogatePairs() {
+        val lines = wrapReportText("ab😀cd", 2f) { it.length.toFloat() }
+
+        assertEquals(listOf("ab", "😀", "cd"), lines)
+        org.junit.Assert.assertTrue(lines.none { it.any { char -> Character.isHighSurrogate(char) } && it.none { char -> Character.isLowSurrogate(char) } })
+    }
 }
