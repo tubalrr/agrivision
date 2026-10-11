@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.14.1** · Android version code: `17`
+
+This patch fixes theme palette updates to remain compatible with existing non-composable farm helpers. The selected appearance still persists locally and updates both the shared surface colors and Material 3 color scheme.
+
 **Version 1.14.0** · Android version code: `16`
 
 This release adds a persistent Appearance setting with two distinct visual themes: Field & Harvest Light and AgriVision Pro Dark. The Pro palette uses deep forest-green surfaces, higher-contrast text, luminous green actions and restrained harvest-brass accents. The selection is saved locally and applies across screens using the shared palette and Material 3 color scheme. Reset defaults returns to Field & Harvest.

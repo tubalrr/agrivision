@@ -53,9 +53,9 @@ internal fun AgriVisionApp(
         mutableStateOf(preferences.getBoolean("compact_navigation", false))
     }
     var themeMode by remember {
-        mutableStateOf(
-            if (preferences.getString("appearance_theme", "field") == "pro") "pro" else "field"
-        )
+        val savedMode = if (preferences.getString("appearance_theme", "field") == "pro") "pro" else "field"
+        setAgriThemePro(savedMode == "pro")
+        mutableStateOf(savedMode)
     }
     var selected by remember {
         mutableStateOf(
@@ -141,8 +141,7 @@ internal fun AgriVisionApp(
         )
     }
 
-    CompositionLocalProvider(LocalAgriPalette provides palette) {
-        MaterialTheme(colorScheme = scheme) {
+    MaterialTheme(colorScheme = scheme) {
         if (showSettings) {
             AppSettingsDialog(
                 rememberLastTab = rememberLastTab,
@@ -173,6 +172,7 @@ internal fun AgriVisionApp(
                 themeMode = themeMode,
                 onThemeModeChange = {
                     themeMode = if (it == "pro") "pro" else "field"
+                    setAgriThemePro(themeMode == "pro")
                     preferences.edit().putString("appearance_theme", themeMode).apply()
                 },
                 onReset = {
@@ -181,6 +181,7 @@ internal fun AgriVisionApp(
                     confirmBackupImport = true
                     compactNavigation = false
                     themeMode = "field"
+                    setAgriThemePro(false)
                     preferences.edit()
                         .putBoolean("remember_last_tab", false)
                         .putBoolean("haptic_navigation", true)
@@ -327,7 +328,6 @@ internal fun AgriVisionApp(
                     onUpdateField = farmViewModel::updateField
                 )
             }
-        }
         }
     }
 }

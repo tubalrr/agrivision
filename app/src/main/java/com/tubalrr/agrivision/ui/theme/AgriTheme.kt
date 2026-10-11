@@ -1,7 +1,8 @@
 package com.tubalrr.agrivision
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 
 internal data class AgriPalette(
@@ -71,31 +72,22 @@ internal val AgriProPalette = AgriPalette(
     isDark = true
 )
 
-internal val LocalAgriPalette = staticCompositionLocalOf { AgriFieldPalette }
+private var activeAgriPalette by mutableStateOf(AgriFieldPalette)
 
-internal val AgriCream: Color
-    @Composable get() = LocalAgriPalette.current.cream
-internal val AgriCard: Color
-    @Composable get() = LocalAgriPalette.current.card
-internal val AgriGreen: Color
-    @Composable get() = LocalAgriPalette.current.green
-internal val AgriGreenDeep: Color
-    @Composable get() = LocalAgriPalette.current.greenDeep
-internal val AgriGreenSoft: Color
-    @Composable get() = LocalAgriPalette.current.greenSoft
-internal val AgriSage: Color
-    @Composable get() = LocalAgriPalette.current.sage
-internal val AgriGold: Color
-    @Composable get() = LocalAgriPalette.current.gold
-internal val AgriGoldSoft: Color
-    @Composable get() = LocalAgriPalette.current.goldSoft
-internal val AgriText: Color
-    @Composable get() = LocalAgriPalette.current.text
-internal val AgriMuted: Color
-    @Composable get() = LocalAgriPalette.current.muted
-internal val AgriLine: Color
-    @Composable get() = LocalAgriPalette.current.line
-internal val AgriWarning: Color
-    @Composable get() = LocalAgriPalette.current.warning
-internal val AgriDanger: Color
-    @Composable get() = LocalAgriPalette.current.danger
+internal fun setAgriThemePro(enabled: Boolean) {
+    activeAgriPalette = if (enabled) AgriProPalette else AgriFieldPalette
+}
+
+internal val AgriCream: Color get() = activeAgriPalette.cream
+internal val AgriCard: Color get() = activeAgriPalette.card
+internal val AgriGreen: Color get() = activeAgriPalette.green
+internal val AgriGreenDeep: Color get() = activeAgriPalette.greenDeep
+internal val AgriGreenSoft: Color get() = activeAgriPalette.greenSoft
+internal val AgriSage: Color get() = activeAgriPalette.sage
+internal val AgriGold: Color get() = activeAgriPalette.gold
+internal val AgriGoldSoft: Color get() = activeAgriPalette.goldSoft
+internal val AgriText: Color get() = activeAgriPalette.text
+internal val AgriMuted: Color get() = activeAgriPalette.muted
+internal val AgriLine: Color get() = activeAgriPalette.line
+internal val AgriWarning: Color get() = activeAgriPalette.warning
+internal val AgriDanger: Color get() = activeAgriPalette.danger
