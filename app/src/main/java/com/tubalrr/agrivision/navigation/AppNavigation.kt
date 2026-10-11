@@ -52,6 +52,11 @@ internal fun AgriVisionApp(
     var compactNavigation by remember {
         mutableStateOf(preferences.getBoolean("compact_navigation", false))
     }
+    var themeMode by remember {
+        mutableStateOf(
+            if (preferences.getString("appearance_theme", "field") == "pro") "pro" else "field"
+        )
+    }
     var selected by remember {
         mutableStateOf(
             if (preferences.getBoolean("remember_last_tab", false)) {
@@ -100,39 +105,44 @@ internal fun AgriVisionApp(
     val netIncome = totalSales - totalExpenses
     val openTasks = tasks.count { !it.done }
 
-    val scheme = lightColorScheme(
-        primary = AgriGreen,
-        onPrimary = Color.White,
-        primaryContainer = AgriGreenSoft,
-        onPrimaryContainer = AgriGreenDeep,
-        secondary = AgriGold,
-        onSecondary = AgriText,
-        secondaryContainer = AgriGoldSoft,
-        onSecondaryContainer = AgriText,
-        tertiary = AgriSage,
-        onTertiary = AgriGreenDeep,
-        tertiaryContainer = Color(0xFFEAF2E8),
-        onTertiaryContainer = AgriGreenDeep,
-        error = AgriDanger,
-        onError = Color.White,
-        errorContainer = Color(0xFFFCE8E5),
-        onErrorContainer = Color(0xFF761F1A),
-        background = AgriCream,
-        onBackground = AgriText,
-        surface = AgriCard,
-        onSurface = AgriText,
-        surfaceVariant = Color(0xFFEDF2EB),
-        onSurfaceVariant = AgriMuted,
-        surfaceTint = AgriGreen,
-        outline = AgriLine,
-        outlineVariant = Color(0xFFE8EDE5),
-        inverseSurface = AgriGreenDeep,
-        inverseOnSurface = Color(0xFFF1F5EF),
-        inversePrimary = Color(0xFF9DD6AD),
-        scrim = Color(0x990B1D12)
-    )
+    val palette = if (themeMode == "pro") AgriProPalette else AgriFieldPalette
+    val scheme = if (palette.isDark) {
+        darkColorScheme(
+            primary = palette.green, onPrimary = palette.onPrimary,
+            primaryContainer = palette.greenSoft, onPrimaryContainer = palette.text,
+            secondary = palette.gold, onSecondary = palette.onSecondary,
+            secondaryContainer = palette.goldSoft, onSecondaryContainer = palette.text,
+            tertiary = palette.sage, onTertiary = palette.greenDeep,
+            tertiaryContainer = palette.surfaceVariant, onTertiaryContainer = palette.text,
+            error = palette.danger, onError = Color(0xFF3B0806),
+            errorContainer = palette.errorContainer, onErrorContainer = palette.onErrorContainer,
+            background = palette.cream, onBackground = palette.text,
+            surface = palette.card, onSurface = palette.text,
+            surfaceVariant = palette.surfaceVariant, onSurfaceVariant = palette.muted,
+            surfaceTint = palette.green, outline = palette.line, outlineVariant = palette.line
+        )
+    } else {
+        lightColorScheme(
+            primary = palette.green, onPrimary = palette.onPrimary,
+            primaryContainer = palette.greenSoft, onPrimaryContainer = palette.greenDeep,
+            secondary = palette.gold, onSecondary = palette.onSecondary,
+            secondaryContainer = palette.goldSoft, onSecondaryContainer = palette.text,
+            tertiary = palette.sage, onTertiary = palette.greenDeep,
+            tertiaryContainer = Color(0xFFEAF2E8), onTertiaryContainer = palette.greenDeep,
+            error = palette.danger, onError = Color.White,
+            errorContainer = palette.errorContainer, onErrorContainer = palette.onErrorContainer,
+            background = palette.cream, onBackground = palette.text,
+            surface = palette.card, onSurface = palette.text,
+            surfaceVariant = palette.surfaceVariant, onSurfaceVariant = palette.muted,
+            surfaceTint = palette.green, outline = palette.line,
+            outlineVariant = Color(0xFFE8EDE5),
+            inverseSurface = palette.greenDeep, inverseOnSurface = Color(0xFFF1F5EF),
+            inversePrimary = Color(0xFF9DD6AD), scrim = Color(0x990B1D12)
+        )
+    }
 
-    MaterialTheme(colorScheme = scheme) {
+    CompositionLocalProvider(LocalAgriPalette provides palette) {
+        MaterialTheme(colorScheme = scheme) {
         if (showSettings) {
             AppSettingsDialog(
                 rememberLastTab = rememberLastTab,
@@ -160,16 +170,23 @@ internal fun AgriVisionApp(
                     compactNavigation = it
                     preferences.edit().putBoolean("compact_navigation", it).apply()
                 },
+                themeMode = themeMode,
+                onThemeModeChange = {
+                    themeMode = if (it == "pro") "pro" else "field"
+                    preferences.edit().putString("appearance_theme", themeMode).apply()
+                },
                 onReset = {
                     rememberLastTab = false
                     hapticNavigation = true
                     confirmBackupImport = true
                     compactNavigation = false
+                    themeMode = "field"
                     preferences.edit()
                         .putBoolean("remember_last_tab", false)
                         .putBoolean("haptic_navigation", true)
                         .putBoolean("confirm_backup_import", true)
                         .putBoolean("compact_navigation", false)
+                        .putString("appearance_theme", "field")
                         .remove("last_selected_tab")
                         .apply()
                 },
@@ -311,6 +328,7 @@ internal fun AgriVisionApp(
                 )
             }
         }
+        }
     }
 }
 
@@ -348,14 +366,14 @@ internal fun AgriBottomBar(
                     Icon(
                         item.second,
                         contentDescription = item.first,
-                        tint = if (selected == index) AgriGreenDeep else AgriMuted,
+                        tint = if (selected == index) AgriGreen else AgriMuted,
                         modifier = Modifier.size(if (selected == index) 23.dp else 20.dp)
                     )
                 },
                 label = {
                     Text(
                         item.first,
-                        color = if (selected == index) AgriGreenDeep else AgriMuted,
+                        color = if (selected == index) AgriGreen else AgriMuted,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (selected == index) FontWeight.ExtraBold else FontWeight.Medium,
                         maxLines = 1
@@ -366,7 +384,7 @@ internal fun AgriBottomBar(
                     selectedTextColor = AgriGreen,
                     unselectedIconColor = AgriMuted,
                     unselectedTextColor = AgriMuted,
-                    indicatorColor = Color(0xFFD8EDDE)
+                    indicatorColor = AgriGreenSoft
                 )
             )
         }

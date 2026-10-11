@@ -1,5 +1,7 @@
 package com.tubalrr.agrivision
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -40,6 +43,8 @@ internal fun AppSettingsDialog(
     onConfirmBackupImportChange: (Boolean) -> Unit,
     compactNavigation: Boolean,
     onCompactNavigationChange: (Boolean) -> Unit,
+    themeMode: String,
+    onThemeModeChange: (String) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -59,7 +64,7 @@ internal fun AppSettingsDialog(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("App Preferences", fontWeight = FontWeight.ExtraBold)
-                Text("AgriVision · Version 1.8.0", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                Text("AgriVision · Version 1.14.0", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
             }
         },
         text = {
@@ -67,6 +72,71 @@ internal fun AppSettingsDialog(
                 modifier = Modifier.heightIn(max = 460.dp),
                 verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Appearance", color = AgriText, fontWeight = FontWeight.ExtraBold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilterChip(
+                                selected = themeMode == "field",
+                                onClick = { onThemeModeChange("field") },
+                                label = { Text("Field & Harvest") }
+                            )
+                            FilterChip(
+                                selected = themeMode == "pro",
+                                onClick = { onThemeModeChange("pro") },
+                                label = { Text("AgriVision Pro") }
+                            )
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = AgriGreenSoft)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Surface(
+                                    color = if (themeMode == "pro") AgriGoldSoft else AgriGreenSoft,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Outlined.Settings,
+                                            contentDescription = null,
+                                            tint = AgriGreen,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(
+                                        if (themeMode == "pro") "AgriVision Pro · Dark" else "Field & Harvest · Light",
+                                        color = AgriText,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        if (themeMode == "pro")
+                                            "Deep forest surfaces, soft sage text and brass accents."
+                                        else
+                                            "Clean farm green, warm white cards and harvest-gold accents.",
+                                        color = AgriMuted,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 item {
                     SettingsOption(
                         title = "Remember last section",

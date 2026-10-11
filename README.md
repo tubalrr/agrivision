@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.14.0** · Android version code: `16`
+
+This release adds a persistent Appearance setting with two distinct visual themes: Field & Harvest Light and AgriVision Pro Dark. The Pro palette uses deep forest-green surfaces, higher-contrast text, luminous green actions and restrained harvest-brass accents. The selection is saved locally and applies across screens using the shared palette and Material 3 color scheme. Reset defaults returns to Field & Harvest.
+
 **Version 1.13.0** · Android version code: `15`
 
 This release refreshes the global Field & Harvest visual system with a clearer forest-green, soft-sage and harvest-gold palette, more complete Material 3 semantic colors for surfaces, outlines and error states, and a refined rounded bottom-navigation dock with stronger active-tab contrast. Existing screens, records and navigation behavior are retained.
