@@ -1,10 +1,16 @@
 package com.tubalrr.agrivision
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.PackageManager
+import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -70,7 +76,23 @@ internal fun AgriVisionApp(
     }
     var showSettings by remember { mutableStateOf(false) }
     var showExitConfirmation by remember { mutableStateOf(false) }
+    var farmRemindersEnabled by remember { mutableStateOf(preferences.getBoolean("farm_reminders_enabled", false)) }
     var pendingTaskFilter by remember { mutableStateOf<String?>(null) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        farmRemindersEnabled = granted
+        preferences.edit().putBoolean("farm_reminders_enabled", granted).apply()
+        if (granted) FarmReminderScheduler.schedule(context) else FarmReminderScheduler.cancel(context)
+    }
+
+    LaunchedEffect(farmRemindersEnabled) {
+        val permissionGranted = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (farmRemindersEnabled && permissionGranted) FarmReminderScheduler.schedule(context)
+        if (!farmRemindersEnabled) FarmReminderScheduler.cancel(context)
+    }
 
     LaunchedEffect(selected, rememberLastTab) {
         if (rememberLastTab) {
@@ -208,6 +230,24 @@ internal fun AgriVisionApp(
                 onCompactNavigationChange = {
                     compactNavigation = it
                     preferences.edit().putBoolean("compact_navigation", it).apply()
+                },
+                farmRemindersEnabled = farmRemindersEnabled,
+                onFarmRemindersChange = { enabled ->
+                    if (!enabled) {
+                        farmRemindersEnabled = false
+                        preferences.edit().putBoolean("farm_reminders_enabled", false).apply()
+                        FarmReminderScheduler.cancel(context)
+                    } else {
+                        val permissionGranted = Build.VERSION.SDK_INT < 33 ||
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        if (permissionGranted) {
+                            farmRemindersEnabled = true
+                            preferences.edit().putBoolean("farm_reminders_enabled", true).apply()
+                            FarmReminderScheduler.schedule(context)
+                        } else {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
                 },
                 themeMode = themeMode,
                 onThemeModeChange = {
