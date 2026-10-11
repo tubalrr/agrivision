@@ -32,7 +32,7 @@ object DaReportExporter {
         sink(
             when (format) {
                 DaReportFormat.JSON -> json(snapshot, type, data).toString(2).toByteArray(Charsets.UTF_8)
-                DaReportFormat.CSV -> csv(data).toByteArray(Charsets.UTF_8)
+                DaReportFormat.CSV -> csvUtf8Bytes(csv(data))
                 DaReportFormat.PDF -> pdf(snapshot, type, data)
             }
         )
@@ -342,3 +342,12 @@ internal fun escapeCsvCell(value: String): String {
         escaped
     }
 }
+
+
+/**
+ * Adds a UTF-8 byte-order mark to CSV text so desktop spreadsheet apps such as Excel
+ * can reliably recognize Filipino names, peso symbols, and other non-ASCII characters.
+ * Formula-leading cell protection is applied before this encoding step.
+ */
+internal fun csvUtf8Bytes(csvText: String): ByteArray =
+    byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + csvText.toByteArray(Charsets.UTF_8)
