@@ -594,6 +594,74 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             require(value is JSONArray) { "Backup incidentEvidence section is invalid." }
             requireJsonObjectEntries("incidentEvidence", value)
         }
+        validateBackupCoordinates(json)
+    }
+
+    private fun validateBackupCoordinates(json: JSONObject) {
+        validateCoordinatePair(json.optJSONObject("farm"), "Farm")
+        val fields = json.optJSONArray("fields")
+        if (fields != null) {
+            for (index in 0 until fields.length()) {
+                val field = fields.optJSONObject(index) ?: error("Backup contains an invalid field record.")
+                val name = field.optString("name").ifBlank { "at position ${index + 1}" }
+                validateCoordinatePair(field, "Field $name")
+                validatePointArray(field, "boundaryPoints", "Field $name")
+            }
+        }
+        json.optJSONObject("farm")?.let { validatePointArray(it, "boundaryPoints", "Farm") }
+
+        val incidents = json.optJSONArray("fieldIncidents")
+        if (incidents != null) {
+            for (index in 0 until incidents.length()) {
+                val incident = incidents.optJSONObject(index)
+                    ?: error("Backup contains an invalid incident record.")
+                val id = incident.optString("id").ifBlank { "at position ${index + 1}" }
+                validateCoordinatePair(incident, "Incident $id")
+                validatePointArray(incident, "affectedAreaBoundary", "Incident $id")
+            }
+        }
+    }
+
+    private fun validateCoordinatePair(record: JSONObject?, label: String) {
+        if (record == null) return
+        val rawLat = record.opt("latitude")
+        val rawLon = record.opt("longitude")
+        val hasLat = rawLat != null && rawLat !== JSONObject.NULL
+        val hasLon = rawLon != null && rawLon !== JSONObject.NULL
+        require(hasLat == hasLon) { "$label must have both latitude and longitude, or neither." }
+        if (!hasLat) return
+        val latitude = coordinateNumber(rawLat)
+            ?: error("$label has a non-numeric latitude.")
+        val longitude = coordinateNumber(rawLon)
+            ?: error("$label has a non-numeric longitude.")
+        require(latitude.isFinite() && latitude in -90.0..90.0) { "$label latitude must be between -90 and 90." }
+        require(longitude.isFinite() && longitude in -180.0..180.0) { "$label longitude must be between -180 and 180." }
+    }
+
+    private fun validatePointArray(record: JSONObject, key: String, label: String) {
+        if (!record.has(key) || record.isNull(key)) return
+        val points = record.optJSONArray(key)
+            ?: error("$label has an invalid $key list.")
+        for (index in 0 until points.length()) {
+            val point = points.optJSONObject(index)
+                ?: error("$label has an invalid boundary point at position ${index + 1}.")
+            val latitude = coordinateNumber(point.opt("latitude"))
+                ?: error("$label boundary point ${index + 1} has an invalid latitude.")
+            val longitude = coordinateNumber(point.opt("longitude"))
+                ?: error("$label boundary point ${index + 1} has an invalid longitude.")
+            require(latitude.isFinite() && latitude in -90.0..90.0) {
+                "$label boundary point ${index + 1} latitude must be between -90 and 90."
+            }
+            require(longitude.isFinite() && longitude in -180.0..180.0) {
+                "$label boundary point ${index + 1} longitude must be between -180 and 180."
+            }
+        }
+    }
+
+    private fun coordinateNumber(value: Any?): Double? = when (value) {
+        is Number -> value.toDouble()
+        is String -> value.toDoubleOrNull()
+        else -> null
     }
 
     private fun requireJsonObjectEntries(section: String, array: JSONArray) {
