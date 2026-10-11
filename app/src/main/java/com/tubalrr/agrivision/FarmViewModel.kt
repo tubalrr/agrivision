@@ -13,6 +13,7 @@ import com.tubalrr.agrivision.domain.model.FarmRecord
 import com.tubalrr.agrivision.domain.model.FarmerRecord
 import com.tubalrr.agrivision.domain.model.FieldRecord
 import com.tubalrr.agrivision.domain.model.MapPoint
+import com.tubalrr.agrivision.domain.validation.MapGeometryValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -184,10 +185,18 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteField(value: FieldRecord) = launch { repository.deleteField(value) }
 
     fun saveFarmBoundary(points: List<MapPoint>) = launch {
+        val validation = MapGeometryValidator.validatePolygon(points, "Farm")
+        require(validation.valid) { validation.message }
         repository.saveFarmBoundary(points)
     }
 
     fun saveFieldMapping(field: FieldRecord, points: List<MapPoint>) = launch {
+        if (points.size >= 3) {
+            val validation = MapGeometryValidator.validatePolygon(points, "Field")
+            require(validation.valid) { validation.message }
+        } else {
+            require(points.size == 1) { "Field mapping needs one location point or at least 3 boundary points." }
+        }
         val center = points.centroid()
         repository.saveField(
             field.copy(
@@ -199,6 +208,8 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveIncidentMapping(incident: FieldIncident, points: List<MapPoint>) = launch {
+        val validation = MapGeometryValidator.validatePolygon(points, "Incident")
+        require(validation.valid) { validation.message }
         val center = points.centroid()
         repository.saveFieldIncident(
             incident.copy(
@@ -800,6 +811,10 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         }) { "Backup contains invalid livestock lifecycle values." }
 
         snapshot.fields.forEach { field ->
+            if (field.boundaryPoints.size >= 3) {
+                val geometry = MapGeometryValidator.validatePolygon(field.boundaryPoints, "Field " + field.name)
+                require(geometry.valid) { geometry.message }
+            }
             require((field.latitude == null && field.longitude == null) || (field.latitude != null && field.longitude != null)) {
                 "Field ${field.name} has incomplete GPS coordinates."
             }
@@ -814,6 +829,10 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         snapshot.fieldIncidents.forEach { incident ->
+            if (incident.affectedAreaBoundary.size >= 3) {
+                val geometry = MapGeometryValidator.validatePolygon(incident.affectedAreaBoundary, "Incident " + incident.id)
+                require(geometry.valid) { geometry.message }
+            }
             require((incident.latitude == null && incident.longitude == null) || (incident.latitude != null && incident.longitude != null)) {
                 "Incident ${incident.id} has incomplete GPS coordinates."
             }
