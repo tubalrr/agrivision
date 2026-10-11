@@ -145,6 +145,98 @@ class DaReportExporterTest {
     }
 
     @Test
+    fun farmerApplicationsReportExportsEverySavedApplication() {
+        val snapshot = testSnapshot()
+        val applications = listOf(
+            FarmerFarmRegistryEntry(
+                farmId = "farm-001",
+                profile = FarmerProfile(
+                    farmerName = "Ana Dela Cruz",
+                    farmerId = "F-001",
+                    contact = "09170000001",
+                    province = "North Cotabato",
+                    municipality = "Antipas",
+                    barangay = "Malangag",
+                    farmName = "Ana Rice Farm",
+                    farmSize = "2 ha",
+                    landTenure = "Owned",
+                    commodities = "Rice",
+                    registryStatus = "For Review"
+                )
+            ),
+            FarmerFarmRegistryEntry(
+                farmId = "farm-002",
+                profile = FarmerProfile(
+                    farmerName = "Ben Santos",
+                    farmerId = "F-002",
+                    contact = "09170000002",
+                    province = "Davao del Sur",
+                    municipality = "Bansalan",
+                    barangay = "Poblacion",
+                    farmName = "Ben Vegetable Farm",
+                    farmSize = "1.5 ha",
+                    landTenure = "Leased",
+                    commodities = "Vegetables",
+                    registryStatus = "Approved",
+                    reviewNotes = "Verified by DA staff"
+                )
+            )
+        )
+        var csvBytes = byteArrayOf()
+        var jsonBytes = byteArrayOf()
+
+        DaReportExporter.write(
+            snapshot,
+            "Farmer Applications",
+            DaReportFormat.CSV,
+            applications
+        ) { csvBytes = it }
+        DaReportExporter.write(
+            snapshot,
+            "Farmer Applications",
+            DaReportFormat.JSON,
+            applications
+        ) { jsonBytes = it }
+
+        val csvText = String(csvBytes, Charsets.UTF_8).removePrefix("\\uFEFF")
+        org.junit.Assert.assertTrue(csvText.contains("Ana Dela Cruz"))
+        org.junit.Assert.assertTrue(csvText.contains("Ben Santos"))
+        org.junit.Assert.assertTrue(csvText.contains("farm-002"))
+        assertEquals(3, csvText.trimEnd('\\n').split('\\n').size)
+
+        val json = org.json.JSONObject(String(jsonBytes, Charsets.UTF_8))
+        assertEquals("all_saved_farmer_applications", json.getString("scope"))
+        assertEquals("", json.getString("farmerId"))
+        assertEquals("", json.getString("farmId"))
+        assertEquals(2, json.getInt("recordCount"))
+        val rows = json.getJSONArray("records")
+        assertEquals(2, rows.length())
+        assertEquals("Ana Dela Cruz", rows.getJSONObject(0).getString("Farmer Name"))
+        assertEquals("Approved", rows.getJSONObject(1).getString("Application Status"))
+    }
+
+    @Test
+    fun farmerApplicationsReportKeepsHeadersWhenNoApplicationsExist() {
+        val snapshot = testSnapshot()
+        var csvBytes = byteArrayOf()
+
+        DaReportExporter.write(
+            snapshot,
+            "Farmer Applications",
+            DaReportFormat.CSV,
+            emptyList()
+        ) { csvBytes = it }
+
+        val lines = String(csvBytes, Charsets.UTF_8).removePrefix("\\uFEFF")
+            .trimEnd('\\n').split('\\n')
+        assertEquals(
+            "Farm Record ID,Farmer ID,Farmer Name,Contact Number,Farm Name,Province,Municipality/City,Barangay,Farm Area,Land Tenure,Commodities,Application Status,Review Notes",
+            lines.first()
+        )
+        assertEquals(1, lines.size)
+    }
+
+    @Test
     fun missingFarmRegistryExportsZeroDataRows() {
         val snapshot = testSnapshot()
         var csvBytes = byteArrayOf()
