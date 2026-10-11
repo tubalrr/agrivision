@@ -439,9 +439,18 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
                                 copied += newUri
                                 incident.copy(evidenceUri = newUri)
                             }
-                            incident.evidenceUri.isNotBlank() &&
-                                !FarmBackupArchive.isEvidenceReadable(context, incident.evidenceUri) ->
-                                incident.copy(evidenceUri = "")
+                            incident.evidenceUri.isNotBlank() -> {
+                                if (FarmBackupArchive.isEvidenceReadable(context, incident.evidenceUri)) {
+                                    val newUri = FarmBackupArchive.copyLegacyEvidenceIntoPrivateStorage(
+                                        context,
+                                        incident.evidenceUri
+                                    ).toString()
+                                    copied += newUri
+                                    incident.copy(evidenceUri = newUri)
+                                } else {
+                                    incident.copy(evidenceUri = "")
+                                }
+                            }
                             else -> incident
                         }
                     }
