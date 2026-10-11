@@ -667,7 +667,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         }
         require(snapshot.crops.all {
             val rawArea = it.area.trim()
-            val leadingNumber = Regex("""^-?\\d+(?:\\.\\d+)?""").find(rawArea)?.value?.toDoubleOrNull()
+            val leadingNumber = Regex("""^-?\d+(?:\.\d+)?""").find(rawArea)?.value?.toDoubleOrNull()
             rawArea.isBlank() || leadingNumber == null || (leadingNumber.isFinite() && leadingNumber >= 0.0)
         }) {
             "Backup contains an invalid crop area."
