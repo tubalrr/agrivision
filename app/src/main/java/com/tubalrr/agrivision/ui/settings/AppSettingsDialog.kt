@@ -152,7 +152,7 @@ internal fun AppSettingsDialog(
                     SettingsOption(
                         title = "Daily farm reminders",
                         description = "Notify about due tasks, harvest dates within 3 days, and low or expiring stock. Android may delay background delivery.",
-                        icon = Icons.Outlined.Notifications,
+                        icon = Icons.Outlined.Schedule,
                         checked = farmRemindersEnabled,
                         onCheckedChange = onFarmRemindersChange
                     )
