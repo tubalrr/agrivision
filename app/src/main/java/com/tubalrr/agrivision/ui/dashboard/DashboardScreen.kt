@@ -88,8 +88,7 @@ internal fun DashboardScreen(
     netIncome: Double,
     openTasks: Int
 ) {
-    val dashboardLocales = LocalConfiguration.current.locales
-    val dashboardLocale = if (dashboardLocales.isEmpty) Locale.getDefault() else dashboardLocales[0]
+    val dashboardLocale = LocalConfiguration.current.locales[0]
     val lowStock = inventory.count { it.status.equals("Low", ignoreCase = true) }
     val completedTasks = tasks.count { it.done }
     val totalTasks = tasks.size
