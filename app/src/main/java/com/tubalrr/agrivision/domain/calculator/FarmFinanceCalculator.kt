@@ -5,6 +5,7 @@ import com.tubalrr.agrivision.SaleRecord
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
 import java.util.Locale
 
 data class MonthlyFinanceSummary(
@@ -19,13 +20,15 @@ data class MonthlyFinanceSummary(
 
 object FarmFinanceCalculator {
     val periods = listOf("This month", "Last month", "This year", "All time")
+    // Strict resolution prevents impossible legacy dates (for example 31/02/2026)
+    // from being silently normalized to a different calendar day.
     private val dateFormatters = listOf(
         DateTimeFormatter.ISO_LOCAL_DATE,
-        DateTimeFormatter.ofPattern("d/M/uuuu", Locale.US),
-        DateTimeFormatter.ofPattern("M/d/uuuu", Locale.US),
-        DateTimeFormatter.ofPattern("d MMM uuuu", Locale.US),
-        DateTimeFormatter.ofPattern("MMM d, uuuu", Locale.US),
-        DateTimeFormatter.ofPattern("MMMM d, uuuu", Locale.US)
+        DateTimeFormatter.ofPattern("d/M/uuuu", Locale.US).withResolverStyle(ResolverStyle.STRICT),
+        DateTimeFormatter.ofPattern("M/d/uuuu", Locale.US).withResolverStyle(ResolverStyle.STRICT),
+        DateTimeFormatter.ofPattern("d MMM uuuu", Locale.US).withResolverStyle(ResolverStyle.STRICT),
+        DateTimeFormatter.ofPattern("MMM d, uuuu", Locale.US).withResolverStyle(ResolverStyle.STRICT),
+        DateTimeFormatter.ofPattern("MMMM d, uuuu", Locale.US).withResolverStyle(ResolverStyle.STRICT)
     )
 
     fun parseDate(raw: String): LocalDate? {
