@@ -134,6 +134,13 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         FarmerProfile("", "", "", "", "", "", "", "", "", "")
     )
 
+    val farmerRegistryEntries: StateFlow<List<FarmerFarmRegistryEntry>> =
+        repository.observeRegistryEntries().stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            emptyList()
+        )
+
     val farmer: StateFlow<FarmerRecord> = repository.observeFarmer().stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), FarmerRecord("", "")
     )
@@ -225,6 +232,10 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveProfile(value: FarmerProfile) = launch { repository.saveProfile(value) }
+
+    fun saveRegistryEntry(farmId: String?, value: FarmerProfile) = launch {
+        repository.saveRegistryEntry(value, farmId)
+    }
 
     fun addField(value: FieldRecord) = launch { repository.saveField(value) }
     fun updateField(value: FieldRecord) = launch { repository.saveField(value) }
