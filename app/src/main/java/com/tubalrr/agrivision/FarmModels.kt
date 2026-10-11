@@ -176,6 +176,12 @@ data class FarmerProfile(
     val reviewNotes: String = ""
 )
 
+/** A compact local registry row backed by one persisted farm/application record. */
+data class FarmerFarmRegistryEntry(
+    val farmId: String,
+    val profile: FarmerProfile
+)
+
 /**
  * Local identity of the DA staff member operating this device.
  * This is a profile card, not an authenticated account or permission system.
