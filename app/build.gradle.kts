@@ -13,6 +13,17 @@ val localProperties = Properties().apply {
     }
 }
 
+val releaseStoreFile = providers.environmentVariable("AGRIVISION_RELEASE_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("AGRIVISION_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("AGRIVISION_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("AGRIVISION_RELEASE_KEY_PASSWORD").orNull
+val releaseSigningConfigured =
+    !releaseStoreFile.isNullOrBlank() &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank() &&
+    rootProject.file(releaseStoreFile).isFile
+
 kotlin {
     jvmToolchain(17)
 }
@@ -30,8 +41,22 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword!!
+                keyAlias = releaseKeyAlias!!
+                keyPassword = releaseKeyPassword!!
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
