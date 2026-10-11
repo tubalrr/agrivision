@@ -28,7 +28,7 @@ import androidx.room.RoomDatabase
         IncidentEventEntity::class,
         ReportSubmissionEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -46,7 +46,7 @@ abstract class AgriDatabase : RoomDatabase() {
                     AgriDatabase::class.java,
                     "agrivision.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -326,6 +326,18 @@ abstract class AgriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE expenses ADD COLUMN sourceType TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN sourceId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN fieldId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE sales ADD COLUMN sourceType TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE sales ADD COLUMN sourceId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE sales ADD COLUMN fieldId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_expenses_farmId_sourceType_sourceId ON expenses(farmId, sourceType, sourceId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sales_farmId_sourceType_sourceId ON sales(farmId, sourceType, sourceId)")
+            }
+        }
 
     }
 }
