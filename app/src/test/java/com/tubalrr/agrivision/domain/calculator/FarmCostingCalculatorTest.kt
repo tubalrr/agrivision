@@ -1,0 +1,50 @@
+package com.tubalrr.agrivision.domain.calculator
+
+import com.tubalrr.agrivision.CropRecord
+import com.tubalrr.agrivision.ExpenseRecord
+import com.tubalrr.agrivision.ProductionRecord
+import com.tubalrr.agrivision.SaleRecord
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class FarmCostingCalculatorTest {
+    @Test fun onlyExplicitlyLinkedTransactionsAffectCropProfit() {
+        val crop = CropRecord(name = "Field A", crop = "Rice", area = "2.5", stage = "Growing", cropId = "C1", fieldId = "F1")
+        val rows = FarmCostingCalculator.summarize(
+            crops = listOf(crop),
+            expenses = listOf(
+                ExpenseRecord("Seeds", 1200.0, "Seed", "2026-10-01", "Crop", "C1", "F1"),
+                ExpenseRecord("Fuel", 500.0, "Tractor", "2026-10-02")
+            ),
+            sales = listOf(
+                SaleRecord("Rice", 3000.0, "2026-10-03", "Crop Sales", "Crop", "C1", "F1"),
+                SaleRecord("Other", 700.0, "2026-10-04")
+            ),
+            production = listOf(
+                ProductionRecord("Rice", "100 kg", "2026-10-05", sourceType = "Crop", sourceId = "C1", fieldId = "F1", areaHectares = 2.5)
+            )
+        )
+        val result = rows.single()
+        assertEquals(1200.0, result.expenses, 0.001)
+        assertEquals(3000.0, result.income, 0.001)
+        assertEquals(1800.0, result.netProfit, 0.001)
+        assertEquals(480.0, result.costPerHectare!!, 0.001)
+        assertEquals(100.0, result.harvestQuantity, 0.001)
+        assertEquals("kg", result.harvestUnit)
+    }
+
+    @Test fun zeroAreaDoesNotDivideByZero() {
+        val crop = CropRecord(name = "Field B", crop = "Corn", area = "0", stage = "Planting", cropId = "C2")
+        val result = FarmCostingCalculator.summarize(listOf(crop), emptyList(), emptyList(), emptyList()).single()
+        assertNull(result.costPerHectare)
+        assertEquals(0.0, result.netProfit, 0.001)
+    }
+
+    @Test fun unlinkedRowsRemainSeparatelyVisible() {
+        val expenses = listOf(ExpenseRecord("Labor", 900.0, "Workers"))
+        val sales = listOf(SaleRecord("Other", 1200.0, "2026-10-01"))
+        assertEquals(900.0, FarmCostingCalculator.unallocatedExpenseTotal(expenses), 0.001)
+        assertEquals(1200.0, FarmCostingCalculator.unallocatedIncomeTotal(sales), 0.001)
+    }
+}
