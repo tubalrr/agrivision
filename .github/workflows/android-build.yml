@@ -33,6 +33,16 @@ jobs:
       - name: Android lint
         run: gradle :app:lintDebug --no-daemon --stacktrace
 
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agrivision-lint-report
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+          if-no-files-found: ignore
+
       - name: Assemble debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
