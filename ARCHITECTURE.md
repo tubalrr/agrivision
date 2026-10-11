@@ -133,7 +133,7 @@ Income - Expenses = Net Income
 
 Expense records now keep a separate date and note, while income records persist their income category. The finance screen shows totals by category so the farm can see where money is earned and spent.
 
-The next costing phase can add explicit allocation links from expenses to a crop, field, or production cycle, allowing AgriVision to calculate cost per crop/field/production cycle without replacing the financial ledger.
+Sales and expenses now support optional crop/livestock source links, with a linked crop cost-and-profit summary in Finance. Records that remain unlinked are kept separate rather than guessed into a crop; future costing work can add finer allocation by field, input batch, or production cycle without replacing the financial ledger.
 
 ## Incident & DA workflow
 
@@ -274,7 +274,7 @@ The current source has completed the persistence architecture migration for the 
 6. Room-backed backup and restore
 7. Structured financial categories
 
-The next phase can add dedicated Feed Log UI and richer production records without reintroducing a second datastore.
+The Feed Logs UI and source-linked production records are part of the current offline-first data flow. Future changes should extend the existing Room/Repository layer rather than reintroducing a second datastore.
 
 ## Database versioning
 
