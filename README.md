@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.19.0** · Android version code: `23`
+
+This release hardens the Field Mapping System. Farm, field and incident boundaries are now checked for valid coordinates, duplicate adjacent points, zero-area shapes and self-crossing edges before they are saved or restored. The map editor shows validation errors directly and asks for explicit confirmation before saving a mapping. A single field location point remains supported; area boundaries require a valid 3+ point polygon. These safeguards protect the operational relationship Farm → Fields → Crops → Incidents without changing existing stored records unless the user edits or restores a map.
+
 **Version 1.18.0** · Android version code: `22`
 
 This release adds finance controls: new finance and production entries use a date picker with ISO dates; Finance filters this month, last month, this year or all time; a six-month cash-flow trend separates dated income and expenses; unpaid sales and expense balances can be marked paid without duplicate transactions; crop and livestock results use only explicitly linked saved records; livestock shows linked production and feed usage separately; exports include transaction IDs, settlement status and source links. These are recorded actuals, not forecasts. Legacy transactions migrate as Paid because earlier app versions did not track settlement, so AgriVision does not guess which historic records remain outstanding.
