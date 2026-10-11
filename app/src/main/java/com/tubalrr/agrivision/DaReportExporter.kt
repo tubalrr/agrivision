@@ -190,24 +190,8 @@ object DaReportExporter {
             canvas = null
         }
 
-        fun wrap(text: String, paint: Paint, maxWidth: Float): List<String> {
-            val clean = text.replace('\n', ' ').replace('\r', ' ').trim()
-            if (clean.isEmpty()) return listOf("")
-            val words = clean.split(Regex("\\s+"))
-            val lines = mutableListOf<String>()
-            var current = ""
-            for (word in words) {
-                val candidate = if (current.isEmpty()) word else "$current $word"
-                if (paint.measureText(candidate) <= maxWidth || current.isEmpty()) {
-                    current = candidate
-                } else {
-                    lines += current
-                    current = word
-                }
-            }
-            if (current.isNotEmpty()) lines += current
-            return lines
-        }
+        fun wrap(text: String, paint: Paint, maxWidth: Float): List<String> =
+            wrapReportText(text, maxWidth) { candidate -> paint.measureText(candidate) }
 
         fun startPage() {
             finishPage()
@@ -278,25 +262,57 @@ object DaReportExporter {
             y += 10f
         }
 
+        fun availableLineCount(lineHeight: Float): Int =
+            ((pageHeight - 34f - y - 5f).coerceAtLeast(0f) / lineHeight).toInt()
+
         fun drawRow(values: List<String>, widths: FloatArray, paint: Paint) {
             val lineHeight = 9f
             val wrapped = values.mapIndexed { i, value ->
                 wrap(value, paint, (widths.getOrElse(i) { 0f } - 4f).coerceAtLeast(12f))
             }
-            val rowHeight = (wrapped.maxOfOrNull { it.size } ?: 1) * lineHeight + 5f
-            if (y + rowHeight > pageHeight - 34f) {
+            val maxLines = wrapped.maxOfOrNull { it.size } ?: 1
+            var lineOffset = 0
+
+            // Keep normal rows together when they fit on a fresh page. Very tall rows
+            // are emitted in page-sized fragments so long notes never run through the footer.
+            if (maxLines > availableLineCount(lineHeight)) {
                 footer()
                 startPage()
                 drawTableHeader(widths)
             }
-            var x = margin
-            wrapped.forEachIndexed { i, lines ->
-                lines.forEachIndexed { lineIndex, line ->
-                    canvas!!.drawText(line, x + 2f, y + (lineIndex + 1) * lineHeight, paint)
+
+            while (lineOffset < maxLines) {
+                val capacity = availableLineCount(lineHeight)
+                if (capacity <= 0) {
+                    footer()
+                    startPage()
+                    drawTableHeader(widths)
+                    continue
                 }
-                x += widths.getOrElse(i) { 0f }
+
+                val lineCount = minOf(capacity, maxLines - lineOffset)
+                var x = margin
+                wrapped.forEachIndexed { i, lines ->
+                    val endLine = minOf(lineOffset + lineCount, lines.size)
+                    for (lineIndex in lineOffset until endLine) {
+                        canvas!!.drawText(
+                            lines[lineIndex],
+                            x + 2f,
+                            y + (lineIndex - lineOffset + 1) * lineHeight,
+                            paint
+                        )
+                    }
+                    x += widths.getOrElse(i) { 0f }
+                }
+
+                y += lineCount * lineHeight + 5f
+                lineOffset += lineCount
+                if (lineOffset < maxLines) {
+                    footer()
+                    startPage()
+                    drawTableHeader(widths)
+                }
             }
-            y += rowHeight
         }
 
         val widths = columnWidths()
@@ -351,3 +367,74 @@ internal fun escapeCsvCell(value: String): String {
  */
 internal fun csvUtf8Bytes(csvText: String): ByteArray =
     byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + csvText.toByteArray(Charsets.UTF_8)
+
+
+/**
+ * Wraps report text to the requested measured width. Long unbroken IDs and notes
+ * are split on Unicode code-point boundaries instead of overflowing their table cell.
+ * Explicit line breaks are retained.
+ */
+internal fun wrapReportText(
+    text: String,
+    maxWidth: Float,
+    measure: (String) -> Float
+): List<String> {
+    require(maxWidth > 0f) { "maxWidth must be greater than zero" }
+
+    val normalized = text.replace("\r\n", "\n").replace('\r', '\n')
+    val output = mutableListOf<String>()
+
+    normalized.split('\n').forEach { paragraph ->
+        if (paragraph.isBlank()) {
+            output += ""
+            return@forEach
+        }
+
+        var current = ""
+        for (word in paragraph.trim().split(Regex("\\s+"))) {
+            val candidate = if (current.isEmpty()) word else "$current $word"
+            if (measure(candidate) <= maxWidth) {
+                current = candidate
+                continue
+            }
+
+            if (current.isNotEmpty()) {
+                output += current
+                current = ""
+            }
+
+            if (measure(word) <= maxWidth) {
+                current = word
+                continue
+            }
+
+            var chunk = ""
+            var offset = 0
+            while (offset < word.length) {
+                val codePoint = word.codePointAt(offset)
+                val piece = String(Character.toChars(codePoint))
+                val combined = chunk + piece
+
+                if (chunk.isNotEmpty() && measure(combined) > maxWidth) {
+                    output += chunk
+                    chunk = piece
+                    if (measure(chunk) > maxWidth) {
+                        output += chunk
+                        chunk = ""
+                    }
+                } else if (chunk.isEmpty() && measure(piece) > maxWidth) {
+                    // A single glyph wider than the cell cannot be split further.
+                    output += piece
+                } else {
+                    chunk = combined
+                }
+                offset += Character.charCount(codePoint)
+            }
+            current = chunk
+        }
+
+        if (current.isNotEmpty()) output += current
+    }
+
+    return output.ifEmpty { listOf("") }
+}
