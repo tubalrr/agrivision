@@ -77,4 +77,115 @@ class DaReportExporterTest {
         assertEquals(1, lines.sumOf { line -> line.count { Character.isHighSurrogate(it) } })
         assertEquals(1, lines.sumOf { line -> line.count { Character.isLowSurrogate(it) } })
     }
+
+    private fun testSnapshot(
+        production: List<ProductionRecord> = emptyList()
+    ): com.tubalrr.agrivision.data.local.FarmSnapshot =
+        com.tubalrr.agrivision.data.local.FarmSnapshot(
+            profile = FarmerProfile(
+                farmerName = "Test Farmer",
+                farmerId = "F-001",
+                contact = "09170000000",
+                province = "North Cotabato",
+                municipality = "Antipas",
+                barangay = "Malangag",
+                farmName = "Test Farm",
+                farmSize = "1.0 ha",
+                landTenure = "Owned",
+                commodities = "Rice"
+            ),
+            livestock = emptyList(),
+            crops = emptyList(),
+            production = production,
+            expenses = emptyList(),
+            sales = emptyList(),
+            inventory = emptyList(),
+            equipment = emptyList(),
+            tasks = emptyList(),
+            assistance = emptyList(),
+            fieldIncidents = emptyList(),
+            incidentEvents = emptyList(),
+            reportSubmission = ReportSubmission(
+                status = "Draft",
+                submittedDate = "",
+                referenceNo = ""
+            )
+        )
+
+    @Test
+    fun largeCsvAndJsonExportsPreserveEveryRecord() {
+        val records = (0 until 1_200).map { index ->
+            ProductionRecord(
+                product = "Crop-$index",
+                quantity = "$index kg",
+                period = "2026-10-11"
+            )
+        }
+        val snapshot = testSnapshot(records)
+        var csvBytes = byteArrayOf()
+        var jsonBytes = byteArrayOf()
+
+        DaReportExporter.write(snapshot, "Crop Production", DaReportFormat.CSV) {
+            csvBytes = it
+        }
+        DaReportExporter.write(snapshot, "Crop Production", DaReportFormat.JSON) {
+            jsonBytes = it
+        }
+
+        val csvText = String(csvBytes, Charsets.UTF_8).removePrefix("\uFEFF")
+        val csvRowsIncludingHeader = csvText.trimEnd('\n').split('\n')
+        assertEquals(records.size + 1, csvRowsIncludingHeader.size)
+        org.junit.Assert.assertTrue(csvRowsIncludingHeader.last().contains("Crop-1199"))
+
+        val json = org.json.JSONObject(String(jsonBytes, Charsets.UTF_8))
+        assertEquals(records.size, json.getInt("recordCount"))
+        val jsonRows = json.getJSONArray("records")
+        assertEquals(records.size, jsonRows.length())
+        assertEquals("Crop-1199", jsonRows.getJSONObject(records.lastIndex).getString("Product"))
+    }
+
+    @Test
+    fun missingFarmRegistryExportsZeroDataRows() {
+        val snapshot = testSnapshot()
+        var csvBytes = byteArrayOf()
+        var jsonBytes = byteArrayOf()
+
+        DaReportExporter.write(snapshot, "Farm Registry", DaReportFormat.CSV) {
+            csvBytes = it
+        }
+        DaReportExporter.write(snapshot, "Farm Registry", DaReportFormat.JSON) {
+            jsonBytes = it
+        }
+
+        val csvLines = String(csvBytes, Charsets.UTF_8)
+            .removePrefix("\uFEFF")
+            .trimEnd('\n')
+            .split('\n')
+        assertEquals("Farm ID,Farm Name,Farmer ID,Province,Municipality,Barangay,Area,Land Tenure,Commodities,Registry Status", csvLines.single())
+
+        val json = org.json.JSONObject(String(jsonBytes, Charsets.UTF_8))
+        assertEquals(0, json.getInt("recordCount"))
+        assertEquals(0, json.getJSONArray("records").length())
+    }
+
+    @Test
+    fun emptyReportTablesAreValidButMalformedRowsAreRejected() {
+        val emptyTable = DaReportExporter.validateData(
+            DaReportExporter.Data(columns = listOf("Record ID"), rows = emptyList())
+        )
+        assertEquals(0, emptyTable.rows.size)
+
+        try {
+            DaReportExporter.validateData(
+                DaReportExporter.Data(
+                    columns = listOf("Record ID", "Name"),
+                    rows = listOf(listOf("R-1"))
+                )
+            )
+            org.junit.Assert.fail("A row with missing values should be rejected")
+        } catch (expected: IllegalArgumentException) {
+            org.junit.Assert.assertTrue(expected.message.orEmpty().contains("values for"))
+        }
+    }
+
 }
