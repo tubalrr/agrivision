@@ -618,17 +618,33 @@ internal fun AddTaskDialog(
     var showPicker by remember { mutableStateOf(false) }
 
     if (showPicker) {
-        val calendar = Calendar.getInstance()
-        try { calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) ?: calendar.time } catch (_: Exception) { }
-        DatePickerDialog(
-            context,
-            { _, year, month, day ->
-                val picked = Calendar.getInstance().apply { set(year, month, day) }
-                date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
-                showPicker = false
-            },
-            calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)
-        ).apply { setOnDismissListener { showPicker = false }; show() }
+        DisposableEffect(Unit) {
+            val calendar = Calendar.getInstance()
+            try {
+                calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) ?: calendar.time
+            } catch (_: Exception) { }
+            val dialog = DatePickerDialog(
+                context,
+                { _, year, month, day ->
+                    val picked = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, year)
+                        set(Calendar.MONTH, month)
+                        set(Calendar.DAY_OF_MONTH, day)
+                    }
+                    date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
+                    showPicker = false
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            )
+            dialog.setOnDismissListener { showPicker = false }
+            dialog.show()
+            onDispose {
+                dialog.setOnDismissListener(null)
+                if (dialog.isShowing) dialog.dismiss()
+            }
+        }
     }
 
     AlertDialog(
