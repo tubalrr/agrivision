@@ -547,6 +547,8 @@ internal fun ProductionFinanceScreen(
                     onPeriodChange = { financePeriod = it },
                     sales = periodSales,
                     expenses = periodExpenses,
+                    allSales = sales,
+                    allExpenses = expenses,
                     undatedCount = financeUndatedCount
                 )
             }
@@ -728,13 +730,16 @@ private fun FinancePeriodSummaryCard(
     onPeriodChange: (String) -> Unit,
     sales: List<SaleRecord>,
     expenses: List<ExpenseRecord>,
+    allSales: List<SaleRecord>,
+    allExpenses: List<ExpenseRecord>,
     undatedCount: Int
 ) {
+    // Period totals follow the selected date range; outstanding balances must not.
     val income = sales.sumOf { it.amount }
     val costs = expenses.sumOf { it.amount }
     val net = income - costs
-    val receivables = FarmFinanceCalculator.unpaidReceivables(sales)
-    val payables = FarmFinanceCalculator.unpaidPayables(expenses)
+    val receivables = FarmFinanceCalculator.unpaidReceivables(allSales)
+    val payables = FarmFinanceCalculator.unpaidPayables(allExpenses)
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
         Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Finance Performance", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
@@ -762,9 +767,9 @@ private fun FinancePeriodSummaryCard(
                     Text((if (net < 0.0) "−₱" else "₱") + money(kotlin.math.abs(net)), color = if (net < 0) AgriDanger else AgriGreen, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("Unpaid receivables", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                    Text("₱" + money(receivables), color = AgriGreen, fontWeight = FontWeight.Bold)
-                    Text("Unpaid payables · ₱" + money(payables), color = AgriDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text("Outstanding · all periods", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text("Receivable ₱" + money(receivables), color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text("Payable ₱" + money(payables), color = AgriDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
             }
             if (undatedCount > 0 && period != "All time") {
