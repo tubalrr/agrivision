@@ -213,6 +213,47 @@ internal object FarmBackupArchive {
         }
     }
 
+    /**
+     * Normalize a readable photo reference from a legacy JSON backup into this app's
+     * private evidence directory. This avoids retaining temporary content-provider grants.
+     */
+    fun copyLegacyEvidenceIntoPrivateStorage(context: Context, rawUri: String): Uri {
+        val source = Uri.parse(rawUri)
+        val mime = runCatching { context.contentResolver.getType(source) }.getOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?: mimeFromPath(source.path.orEmpty())
+        val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
+            ?.lowercase()
+            ?.takeIf { it.matches(Regex("[a-z0-9]{2,5}")) }
+            ?: "img"
+        val directory = File(context.filesDir, "incident-evidence")
+        check(directory.isDirectory || directory.mkdirs()) { "Unable to create private photo storage." }
+        val target = File(directory, "evidence_${UUID.randomUUID()}.$extension")
+        try {
+            var copied = 0L
+            openEvidenceInput(context, source).use { input ->
+                FileOutputStream(target).use { output ->
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        copied += count
+                        require(copied <= MAX_PHOTO_BYTES) {
+                            "A legacy incident photo is larger than 12 MB. The backup was not restored."
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                    output.fd.sync()
+                }
+            }
+            check(copied > 0L && target.length() == copied) { "Legacy incident photo is empty or incomplete." }
+            return Uri.fromFile(target)
+        } catch (error: Exception) {
+            target.delete()
+            throw error
+        }
+    }
+
     fun isEvidenceReadable(context: Context, rawUri: String): Boolean {
         if (rawUri.isBlank()) return true
         return runCatching {
@@ -381,6 +422,6 @@ internal object FarmBackupArchive {
         val mimeType: String
     )
 
-    private fun ByteArray.toHex(): String = joinToString("") { byte -> "%02x".format(byte) }
+    private fun ByteArray.toHex(): String = joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
     private fun ByteArray.toString(charset: java.nio.charset.Charset): String = String(this, charset)
 }
