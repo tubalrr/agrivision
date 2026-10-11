@@ -124,6 +124,7 @@ internal fun AgriVisionApp(
     val fieldIncidents by farmViewModel.fieldIncidents.collectAsStateWithLifecycle()
     val incidentEvents by farmViewModel.incidentEvents.collectAsStateWithLifecycle()
     val farmerProfile by farmViewModel.profile.collectAsStateWithLifecycle()
+    val farmerRegistryEntries by farmViewModel.farmerRegistryEntries.collectAsStateWithLifecycle()
     val daStaffProfile by farmViewModel.daStaffProfile.collectAsStateWithLifecycle()
     val reportSubmission by farmViewModel.reportSubmission.collectAsStateWithLifecycle()
     val backupPreview by farmViewModel.backupPreview.collectAsStateWithLifecycle()
@@ -400,6 +401,8 @@ internal fun AgriVisionApp(
                     onStaffProfileSaved = farmViewModel::saveDaStaffProfile,
                     profile = farmerProfile,
                     farmer = farmer,
+                    registryEntries = farmerRegistryEntries,
+                    onSaveRegistryEntry = farmViewModel::saveRegistryEntry,
                     farm = farm,
                     fields = fields,
                     onProfileSaved = farmViewModel::saveProfile,
