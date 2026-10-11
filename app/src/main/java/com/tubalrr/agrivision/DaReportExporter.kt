@@ -28,7 +28,7 @@ object DaReportExporter {
         "agrivision-" + type.lowercase(Locale.US).replace(Regex("[^a-z0-9]+"), "-").trim('-') + "." + format.extension
 
     fun write(snapshot: FarmSnapshot, type: String, format: DaReportFormat, sink: (ByteArray) -> Unit) {
-        val data = data(snapshot, type)
+        val data = validateData(data(snapshot, type))
         sink(
             when (format) {
                 DaReportFormat.JSON -> json(snapshot, type, data).toString(2).toByteArray(Charsets.UTF_8)
@@ -38,7 +38,22 @@ object DaReportExporter {
         )
     }
 
-    private data class Data(val columns: List<String>, val rows: List<List<String>>)
+    internal data class Data(val columns: List<String>, val rows: List<List<String>>)
+
+    /**
+     * Fail fast if a report table would silently lose or shift values during export.
+     * Empty tables are valid; they still retain their column headers.
+     */
+    internal fun validateData(data: Data): Data {
+        require(data.columns.isNotEmpty()) { "A report must define at least one column" }
+        require(data.columns.all { it.isNotBlank() }) { "Report column names cannot be blank" }
+        data.rows.forEachIndexed { index, row ->
+            require(row.size == data.columns.size) {
+                "Report row ${index + 1} has ${row.size} values for ${data.columns.size} columns"
+            }
+        }
+        return data
+    }
 
     private fun data(s: FarmSnapshot, type: String): Data = when (type) {
         "Farmer Profile" -> Data(
@@ -52,12 +67,12 @@ object DaReportExporter {
         )
         "Farm Registry" -> Data(
             listOf("Farm ID", "Farm Name", "Farmer ID", "Province", "Municipality", "Barangay", "Area", "Land Tenure", "Commodities", "Registry Status"),
-            listOf(listOf(
-                s.farm?.farmId.orEmpty(), s.farm?.farmName.orEmpty(), s.farm?.farmerId.orEmpty(),
-                s.farm?.province.orEmpty(), s.farm?.municipality.orEmpty(), s.farm?.barangay.orEmpty(),
-                s.farm?.totalArea.orEmpty(), s.farm?.landTenure.orEmpty(), s.farm?.commodities.orEmpty(),
-                s.farm?.registryStatus.orEmpty()
-            ))
+            s.farm?.let { farm ->
+                listOf(listOf(
+                    farm.farmId, farm.farmName, farm.farmerId, farm.province, farm.municipality,
+                    farm.barangay, farm.totalArea, farm.landTenure, farm.commodities, farm.registryStatus
+                ))
+            } ?: emptyList()
         )
         "Crop Production" -> Data(
             listOf("Product", "Quantity", "Period", "Source Type", "Source ID", "Field ID", "Area (ha)", "Production Type"),
@@ -140,6 +155,7 @@ object DaReportExporter {
         put("generatedAt", now())
         put("farmerId", s.profile.farmerId)
         put("farmId", s.farm?.farmId ?: "")
+        put("recordCount", d.rows.size)
         put("columns", JSONArray(d.columns))
         put("records", JSONArray().apply {
             d.rows.forEach { row ->
@@ -245,7 +261,7 @@ object DaReportExporter {
                 margin, y, metaPaint
             )
             y += 12f
-            canvas!!.drawText("Generated: " + now(), margin, y, metaPaint)
+            canvas!!.drawText("Generated: " + now() + " • Records: " + d.rows.size, margin, y, metaPaint)
             y += 16f
             canvas!!.drawLine(margin, y, pageWidth - margin, y, metaPaint)
             y += 12f
@@ -382,7 +398,11 @@ object DaReportExporter {
         startPage()
         if (d.columns.isNotEmpty()) {
             drawTableHeader(widths)
-            d.rows.forEach { row -> drawRow(row, widths, bodyPaint) }
+            if (d.rows.isEmpty()) {
+                canvas!!.drawText("No records found for this report.", margin, y + 8f, bodyPaint)
+            } else {
+                d.rows.forEach { row -> drawRow(row, widths, bodyPaint) }
+            }
         } else {
             canvas!!.drawText("No records found for this report.", margin, y, bodyPaint)
         }
