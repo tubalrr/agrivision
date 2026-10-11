@@ -29,4 +29,15 @@ class DaReportExporterTest {
         assertEquals("", escapeCsvCell(""))
         assertEquals("Regular feed", escapeCsvCell("Regular feed"))
     }
+
+    @Test
+    fun csvUtf8ExportHasBomAndPreservesFilipinoText() {
+        val csv = "Farmer,Barangay,Amount\\nJosé,Malangag,₱1,250.00\\n"
+        val bytes = csvUtf8Bytes(csv)
+
+        assertEquals(0xEF, bytes[0].toInt() and 0xFF)
+        assertEquals(0xBB, bytes[1].toInt() and 0xFF)
+        assertEquals(0xBF, bytes[2].toInt() and 0xFF)
+        assertEquals(csv, String(bytes, Charsets.UTF_8).removePrefix("\\uFEFF"))
+    }
 }
