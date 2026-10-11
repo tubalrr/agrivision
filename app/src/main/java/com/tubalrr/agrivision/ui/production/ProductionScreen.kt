@@ -929,7 +929,7 @@ internal fun AddProductionFinanceDialog(
             }
             val selectedFinanceCrop = crops.firstOrNull { it.cropId == financeSourceId }
             val savedFinanceSourceType = financeSourceType.takeIf { financeSourceExists && it != "None" }.orEmpty()
-            val savedFinanceFieldId = selectedFinanceCrop?.fieldId.orEmpty()
+            val savedFinanceFieldId = if (savedFinanceSourceType == "Crop") selectedFinanceCrop?.fieldId.orEmpty() else ""
             TextButton(
                 enabled = if (tab == "Production") {
                     name.isNotBlank() &&
