@@ -278,8 +278,16 @@ The Feed Logs UI and source-linked production records are part of the current of
 
 ## Database versioning
 
-The current Room schema is version 11. Migration 7 → 8 adds persisted incomeCategory to sales, migration 8 → 9 adds structured incident workflow metadata plus status-history fields, migration 9 → 10 adds farm/field/incident map geometry, and migration 10 → 11 adds optional source links for sales and expenses. Existing version-10 records receive blank source fields and remain unallocated instead of being guessed into a crop.
+The current Room schema is version 12. Migration 11 → 12 adds Paid/Unpaid settlement state to sales and expenses. Migration 7 → 8 adds persisted incomeCategory to sales, migration 8 → 9 adds structured incident workflow metadata plus status-history fields, migration 9 → 10 adds farm/field/incident map geometry, and migration 10 → 11 adds optional source links for sales and expenses. Existing version-10 records receive blank source fields and remain unallocated instead of being guessed into a crop.
 
+
+## Version 1.18.0 — finance tracking
+
+- Room schema 11 → 12 adds Paid/Unpaid state to sales and expenses. Legacy rows migrate to Paid because earlier versions never tracked settlement; outstanding balances are not guessed.
+- Sales and expenses preserve stable IDs through observation, JSON backup, restore and export. Payment-state changes update an existing row rather than creating a duplicate.
+- Finance supports this month, last month, this year and all time. Month/year totals include recognizable dates only; relative legacy labels such as "Today" are not treated as dates.
+- Six-month cash-flow and crop/livestock summaries use saved actuals. Feed usage is visible but does not become a peso expense until a financial record is added.
+- Finance reports include payment status and source links.
 
 ## Version 1.17.0 — backup and restore integrity
 
