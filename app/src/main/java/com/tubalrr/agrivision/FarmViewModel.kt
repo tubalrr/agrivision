@@ -665,7 +665,11 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         require(snapshot.fields.all { it.areaHectares.isFinite() && it.areaHectares >= 0.0 }) {
             "Backup contains an invalid field area."
         }
-        require(snapshot.crops.all { it.area.trim().isEmpty() || it.area.trim().toDoubleOrNull()?.let { v -> v.isFinite() && v >= 0.0 } == true }) {
+        require(snapshot.crops.all {
+            val rawArea = it.area.trim()
+            val leadingNumber = Regex("""^-?\\d+(?:\\.\\d+)?""").find(rawArea)?.value?.toDoubleOrNull()
+            rawArea.isBlank() || leadingNumber == null || (leadingNumber.isFinite() && leadingNumber >= 0.0)
+        }) {
             "Backup contains an invalid crop area."
         }
         require(snapshot.livestock.all { it.count >= 0 && it.initialPopulation >= 0 && it.currentPopulation >= 0 }) {
@@ -765,17 +769,15 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         when (sourceType.trim().lowercase(java.util.Locale.US)) {
             "", "unlinked" -> require(sourceId.isBlank()) { "Backup has an unlinked financial record with a source ID." }
-            "crop" -> {
-                require(sourceId.isNotBlank() && (cropIds.isEmpty() || sourceId in cropIds)) {
-                    "Backup has a financial record linked to a missing crop."
-                }
+            "crop" -> require(sourceId.isNotBlank() && sourceId in cropIds) {
+                "Backup has a financial record linked to a missing crop."
             }
-            "livestock" -> require(sourceId.isNotBlank() && (livestockIds.isEmpty() || sourceId in livestockIds)) {
+            "livestock" -> require(sourceId.isNotBlank() && sourceId in livestockIds) {
                 "Backup has a financial record linked to a missing livestock group."
             }
             else -> error("Backup contains an unsupported financial source type: $sourceType.")
         }
-        require(fieldId.isBlank() || fieldIds.isEmpty() || fieldId in fieldIds) {
+        require(fieldId.isBlank() || fieldId in fieldIds) {
             "Backup has a financial record linked to a missing field."
         }
     }
