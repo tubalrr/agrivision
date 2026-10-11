@@ -446,6 +446,21 @@ class FarmRepository(
     }
 
 suspend fun saveField(record: FieldRecord) {
+        require(record.fieldId.isNotBlank()) { "Field ID is required." }
+        require(record.name.isNotBlank()) { "Field name is required." }
+        require(record.areaHectares.isFinite() && record.areaHectares >= 0.0) { "Field area must be a finite non-negative number." }
+        require((record.latitude == null && record.longitude == null) || (record.latitude != null && record.longitude != null)) {
+            "Latitude and longitude must both be supplied."
+        }
+        require(record.latitude == null || (record.latitude.isFinite() && record.latitude in -90.0..90.0)) {
+            "Latitude must be between -90 and 90."
+        }
+        require(record.longitude == null || (record.longitude.isFinite() && record.longitude in -180.0..180.0)) {
+            "Longitude must be between -180 and 180."
+        }
+        require(record.boundaryPoints.all { it.latitude.isFinite() && it.latitude in -90.0..90.0 && it.longitude.isFinite() && it.longitude in -180.0..180.0 }) {
+            "Field boundary contains invalid coordinates."
+        }
         dao.upsertField(
             FieldEntity(
                 fieldId = record.fieldId,
@@ -466,6 +481,9 @@ suspend fun saveField(record: FieldRecord) {
     }
 
     suspend fun saveFarmBoundary(points: List<MapPoint>) {
+        require(points.all { it.latitude.isFinite() && it.latitude in -90.0..90.0 && it.longitude.isFinite() && it.longitude in -180.0..180.0 }) {
+            "Farm boundary contains invalid coordinates."
+        }
         val farm = dao.observeFarm(DEFAULT_FARM_ID).first()
             ?: error("Farm registry is required before mapping the farm boundary.")
         dao.upsertFarm(
@@ -980,6 +998,18 @@ suspend fun saveField(record: FieldRecord) {
     }
 
     suspend fun saveFieldIncident(record: FieldIncident) {
+        require((record.latitude == null && record.longitude == null) || (record.latitude != null && record.longitude != null)) {
+            "Incident latitude and longitude must both be supplied."
+        }
+        require(record.latitude == null || (record.latitude.isFinite() && record.latitude in -90.0..90.0)) {
+            "Incident latitude must be between -90 and 90."
+        }
+        require(record.longitude == null || (record.longitude.isFinite() && record.longitude in -180.0..180.0)) {
+            "Incident longitude must be between -180 and 180."
+        }
+        require(record.affectedAreaBoundary.all { it.latitude.isFinite() && it.latitude in -90.0..90.0 && it.longitude.isFinite() && it.longitude in -180.0..180.0 }) {
+            "Incident boundary contains invalid coordinates."
+        }
         val now = System.currentTimeMillis()
         dao.upsertFieldIncident(
             FieldIncidentEntity(
