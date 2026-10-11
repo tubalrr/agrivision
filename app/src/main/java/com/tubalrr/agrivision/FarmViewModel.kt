@@ -825,26 +825,26 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         require(snapshot.assistance.all { it.incidentId.isBlank() || it.incidentId in incidentIds }) {
             "Backup contains an assistance record linked to a missing incident."
         }
-        if (fieldIds.isNotEmpty()) {
-            require(snapshot.crops.all { it.fieldId.isBlank() || it.fieldId in fieldIds }) {
-                "Backup contains a crop linked to a field that does not exist."
-            }
-            require(snapshot.cropLifecycleEvents.all { it.fieldId.isBlank() || it.fieldId in fieldIds }) {
-                "Backup contains a crop history record linked to a missing field."
-            }
+        require(snapshot.crops.all { it.fieldId.isBlank() || it.fieldId in fieldIds }) {
+            "Backup contains a crop linked to a field that does not exist."
         }
-        if (cropIds.isNotEmpty()) {
-            require(snapshot.cropLifecycleEvents.all { it.cropId.isBlank() || it.cropId in cropIds }) {
-                "Backup contains crop history linked to a missing crop."
-            }
+        require(snapshot.cropLifecycleEvents.all { it.fieldId.isBlank() || it.fieldId in fieldIds }) {
+            "Backup contains a crop history record linked to a missing field."
         }
-        if (livestockIds.isNotEmpty()) {
-            require(snapshot.livestockLifecycleEvents.all { it.livestockId.isBlank() || it.livestockId in livestockIds }) {
-                "Backup contains livestock history linked to a missing livestock group."
-            }
-            require(snapshot.feedLogs.all { it.livestockId.isBlank() || it.livestockId in livestockIds }) {
-                "Backup contains a feed log linked to a missing livestock group."
-            }
+        require(snapshot.cropLifecycleEvents.all { it.cropId.isBlank() || it.cropId in cropIds }) {
+            "Backup contains crop history linked to a missing crop."
+        }
+        require(snapshot.livestockLifecycleEvents.all { it.livestockId.isBlank() || it.livestockId in livestockIds }) {
+            "Backup contains livestock history linked to a missing livestock group."
+        }
+        require(snapshot.feedLogs.all { it.livestockId.isBlank() || it.livestockId in livestockIds }) {
+            "Backup contains a feed log linked to a missing livestock group."
+        }
+        require(snapshot.inventoryTransactions.all { it.inventoryId.isBlank() || it.inventoryId in snapshot.inventory.map { item -> item.inventoryId }.toSet() }) {
+            "Backup contains a stock movement linked to a missing inventory item."
+        }
+        require(snapshot.fieldIncidents.all { it.fieldId.isBlank() || it.fieldId in fieldIds }) {
+            "Backup contains an incident linked to a field that does not exist."
         }
         snapshot.expenses.forEach { validateFinancialLink(it.sourceType, it.sourceId, it.fieldId, cropIds, livestockIds, fieldIds) }
         snapshot.sales.forEach { validateFinancialLink(it.sourceType, it.sourceId, it.fieldId, cropIds, livestockIds, fieldIds) }
