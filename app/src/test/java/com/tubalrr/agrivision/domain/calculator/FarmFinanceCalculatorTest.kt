@@ -29,6 +29,13 @@ class FarmFinanceCalculatorTest {
         assertNull(FarmFinanceCalculator.parseDate("2026-02-31"))
     }
 
+    @Test fun dateParsingRejectsImpossibleDatesAcrossLegacyFormats() {
+        assertNull(FarmFinanceCalculator.parseDate("31/02/2026"))
+        assertNull(FarmFinanceCalculator.parseDate("02/31/2026"))
+        assertNull(FarmFinanceCalculator.parseDate("31 Apr 2026"))
+        assertNull(FarmFinanceCalculator.parseDate("February 30, 2026"))
+    }
+
     @Test fun trendSeparatesIncomeAndExpensesByMonthAndLeavesUnknownDatesOut() {
         val sales = listOf(
             SaleRecord("Oct", 1200.0, "2026-10-03"),
