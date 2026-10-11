@@ -681,6 +681,73 @@ suspend fun saveField(record: FieldRecord) {
         }
     }
 
+    /**
+     * Records a manual movement against an existing inventory item.
+     * PURCHASE is stock in, USAGE is stock used, LOSS is waste or damage.
+     * The updated balance and transaction history are written atomically.
+     */
+    suspend fun recordInventoryMovement(
+        inventoryId: String,
+        type: String,
+        quantity: Double,
+        date: String,
+        notes: String
+    ): String? {
+        val movementType = type.trim().uppercase()
+        if (movementType !in setOf("PURCHASE", "USAGE", "LOSS")) {
+            return "Choose stock in, usage, or loss."
+        }
+        if (!quantity.isFinite() || quantity <= 0.0) {
+            return "Enter a quantity greater than zero."
+        }
+
+        return database.withTransaction {
+            val item = dao.getInventory(DEFAULT_FARM_ID, inventoryId)
+                ?: return@withTransaction "This inventory item could not be found. Refresh and try again."
+
+            val addsStock = movementType == "PURCHASE"
+            if (!addsStock && item.quantity < quantity) {
+                return@withTransaction "Not enough stock. Available: " +
+                    formatQuantity(item.quantity, item.unit) + "."
+            }
+
+            val updatedQuantity = if (addsStock) item.quantity + quantity else item.quantity - quantity
+            val updatedStatus = when {
+                updatedQuantity <= 0.0 -> "Out of Stock"
+                item.status.equals("Out of Stock", ignoreCase = true) -> "In Stock"
+                else -> item.status
+            }
+            dao.upsertInventory(
+                item.copy(
+                    quantity = updatedQuantity.coerceAtLeast(0.0),
+                    status = updatedStatus,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            dao.upsertInventoryTransaction(
+                InventoryTransactionEntity(
+                    transactionId = UUID.randomUUID().toString(),
+                    farmId = DEFAULT_FARM_ID,
+                    inventoryId = item.inventoryId,
+                    type = movementType,
+                    quantity = quantity,
+                    unit = item.unit,
+                    date = date,
+                    sourceType = "Manual",
+                    sourceId = item.inventoryId,
+                    notes = notes.trim().ifBlank {
+                        when (movementType) {
+                            "PURCHASE" -> "Manual stock received"
+                            "USAGE" -> "Manual farm usage"
+                            else -> "Manual stock loss or waste"
+                        }
+                    }
+                )
+            )
+            null
+        }
+    }
+
     private fun normalizeInventoryUnit(unit: String): String =
         unit.trim().lowercase().let {
             when (it) {

@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.12.0** · Android version code: `14`
+
+This release adds manual inventory stock movements for Stock In, Usage, and Loss/Waste. Every movement updates the current balance and is saved to the existing inventory transaction history in the same database transaction. The app blocks usage/loss entries that exceed available stock and shows recent manual movements, including their dates and notes. No new database table or sample data is introduced.
+
 **Version 1.11.1** · Android version code: `13`
 
 This patch makes overdue task metrics actionable. Tapping Overdue in Tasks filters to unfinished past-due tasks across all dates, and the Dashboard's overdue count opens the same filtered view. The filter is also available alongside All, Open, and Completed. The count and list are computed from saved task dates and completion state.

@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -43,9 +45,12 @@ private val InventoryUnits = listOf(
 internal fun InventorySection(
     inventory: List<InventoryItem>,
     transactions: List<InventoryTransaction>,
-    onAdd: (InventoryItem) -> Unit
+    onAdd: (InventoryItem) -> Unit,
+    onRecordMovement: (String, String, Double, String, String, (String?) -> Unit) -> Unit
 ) {
     var showDialog by remember { mutableStateOf(false) }
+    var movementItem by remember { mutableStateOf<InventoryItem?>(null) }
+    var movementMessage by remember { mutableStateOf<String?>(null) }
 
     if (showDialog) {
         AddInventoryItemDialog(
@@ -53,6 +58,19 @@ internal fun InventorySection(
             onSave = {
                 onAdd(it)
                 showDialog = false
+            }
+        )
+    }
+
+    movementItem?.let { selectedItem ->
+        RecordInventoryMovementDialog(
+            item = selectedItem,
+            onDismiss = { movementItem = null },
+            onSave = { type, quantity, date, notes ->
+                onRecordMovement(selectedItem.inventoryId, type, quantity, date, notes) { error ->
+                    movementMessage = error ?: "Stock movement saved."
+                }
+                movementItem = null
             }
         )
     }
@@ -83,6 +101,14 @@ internal fun InventorySection(
                 }
             }
 
+            movementMessage?.let { message ->
+                Text(
+                    message,
+                    color = if (message.startsWith("Stock movement saved")) AgriGreen else MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
             if (inventory.isEmpty()) {
                 Text(
                     "Register fertilizer, seeds, feed, medicine, pesticides, tools or fuel.",
@@ -98,12 +124,13 @@ internal fun InventorySection(
                     InventoryItemCard(
                         item = item,
                         used = used,
-                        transactions = transactions.count { it.inventoryId == item.inventoryId }
+                        transactions = transactions.count { it.inventoryId == item.inventoryId },
+                        onRecordMovement = { movementMessage = null; movementItem = item }
                     )
                 }
             }
 
-            val recentUsage = transactions.filter { it.type == "USAGE" }.take(8)
+            val recentUsage = transactions.filter { it.type == "USAGE" && it.sourceType != "Manual" }.take(8)
             if (recentUsage.isNotEmpty()) {
                 Text("Recent Usage", color = AgriGreen, fontWeight = FontWeight.Bold)
                 recentUsage.forEach { transaction ->
@@ -118,6 +145,29 @@ internal fun InventorySection(
                     )
                 }
             }
+
+            val manualMovements = transactions.filter { it.sourceType == "Manual" }.take(8)
+            if (manualMovements.isNotEmpty()) {
+                Text("Recent Stock Movements", color = AgriGreen, fontWeight = FontWeight.Bold)
+                manualMovements.forEach { transaction ->
+                    val item = inventory.firstOrNull { it.inventoryId == transaction.inventoryId }
+                    val label = when (transaction.type) {
+                        "PURCHASE" -> "Stock in"
+                        "USAGE" -> "Used"
+                        "LOSS" -> "Loss / waste"
+                        else -> transaction.type
+                    }
+                    val sign = if (transaction.type == "PURCHASE") "+" else "−"
+                    Text(
+                        transaction.date + " · " + (item?.name ?: "Inventory") + " · " +
+                            sign + formatInventoryNumber(transaction.quantity) + " " + transaction.unit +
+                            " · " + label +
+                            (transaction.notes.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
         }
     }
 }
@@ -126,7 +176,8 @@ internal fun InventorySection(
 private fun InventoryItemCard(
     item: InventoryItem,
     used: Double,
-    transactions: Int
+    transactions: Int,
+    onRecordMovement: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -192,6 +243,13 @@ private fun InventoryItemCard(
                 color = AgriMuted,
                 style = MaterialTheme.typography.labelSmall
             )
+            OutlinedButton(
+                onClick = onRecordMovement,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(13.dp)
+            ) {
+                Text("Record stock movement")
+            }
         }
     }
 }
@@ -212,6 +270,122 @@ private fun InventoryMetric(
             Text(value, color = AgriText, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
         }
     }
+}
+
+@Composable
+private fun RecordInventoryMovementDialog(
+    item: InventoryItem,
+    onDismiss: () -> Unit,
+    onSave: (String, Double, String, String) -> Unit
+) {
+    val context = LocalContext.current
+    val today = remember {
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)
+    }
+    var type by remember { mutableStateOf("USAGE") }
+    var quantity by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf(today) }
+    var notes by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val calendar = Calendar.getInstance()
+        runCatching {
+            calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) ?: calendar.time
+        }
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(
+                    Calendar.getInstance().apply { set(year, month, day) }.time
+                )
+                showDatePicker = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            setOnDismissListener { showDatePicker = false }
+            show()
+        }
+    }
+
+    val amount = quantity.toDoubleOrNull()
+    val addsStock = type == "PURCHASE"
+    val amountValid = amount != null && amount.isFinite() && amount > 0.0 &&
+        (addsStock || amount <= item.stock)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Record stock movement", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(item.name, fontWeight = FontWeight.Bold, color = AgriGreen)
+                Text(
+                    "Available: " + formatInventoryNumber(item.stock) + " " + item.unit,
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        "PURCHASE" to "Stock in",
+                        "USAGE" to "Use",
+                        "LOSS" to "Loss / waste"
+                    ).forEach { (value, label) ->
+                        FilterChip(
+                            selected = type == value,
+                            onClick = { type = value },
+                            label = { Text(label) }
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = { quantity = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Quantity (${item.unit})") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    isError = quantity.isNotBlank() && !amountValid,
+                    supportingText = {
+                        if (type != "PURCHASE") {
+                            Text("Cannot record more than the available stock.")
+                        }
+                    },
+                    singleLine = true
+                )
+                OutlinedButton(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Movement date: $date")
+                }
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Notes (optional)") },
+                    placeholder = { Text("e.g. used for field 2") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = amountValid,
+                onClick = { onSave(type, amount!!, date, notes.trim()) }
+            ) {
+                Text(when (type) {
+                    "PURCHASE" -> "Add to stock"
+                    "USAGE" -> "Record usage"
+                    else -> "Record loss"
+                })
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable

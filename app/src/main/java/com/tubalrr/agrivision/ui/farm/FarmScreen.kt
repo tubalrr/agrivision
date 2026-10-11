@@ -58,6 +58,7 @@ internal fun FarmScreen(
     onAddLivestockLifecycleEvent: (LivestockLifecycleEvent) -> Unit,
     onAddCrop: (CropRecord) -> Unit,
     onAddInventory: (InventoryItem) -> Unit,
+    onRecordInventoryMovement: (String, String, Double, String, String, (String?) -> Unit) -> Unit,
     onAddEquipment: (EquipmentRecord) -> Unit,
     onAddCropLifecycleEvent: (CropLifecycleEvent) -> Unit
 ) {
@@ -384,7 +385,8 @@ internal fun FarmScreen(
                     InventorySection(
                         inventory = inventory,
                         transactions = inventoryTransactions,
-                        onAdd = onAddInventory
+                        onAdd = onAddInventory,
+                        onRecordMovement = onRecordInventoryMovement
                     )
                 }
             }

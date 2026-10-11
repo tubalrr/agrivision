@@ -122,6 +122,9 @@ interface FarmDao {
     @Query("SELECT * FROM inventory WHERE farmId = :farmId ORDER BY updatedAt DESC")
     fun observeInventory(farmId: String): Flow<List<InventoryEntity>>
 
+    @Query("SELECT * FROM inventory WHERE farmId = :farmId AND inventoryId = :inventoryId LIMIT 1")
+    suspend fun getInventory(farmId: String, inventoryId: String): InventoryEntity?
+
     @Query("SELECT * FROM inventory WHERE farmId = :farmId AND lower(name) = lower(:name) LIMIT 1")
     suspend fun findInventoryByName(farmId: String, name: String): InventoryEntity?
 

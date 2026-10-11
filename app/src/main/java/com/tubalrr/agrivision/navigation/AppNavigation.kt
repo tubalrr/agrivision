@@ -228,6 +228,9 @@ internal fun AgriVisionApp(
                     onAddLivestockLifecycleEvent = farmViewModel::addLivestockLifecycleEvent,
                     onAddCrop = farmViewModel::addCrop,
                     onAddInventory = farmViewModel::addInventory,
+                    onRecordInventoryMovement = { id, type, quantity, date, notes, onResult ->
+                        farmViewModel.recordInventoryMovement(id, type, quantity, date, notes, onResult)
+                    },
                     onAddEquipment = farmViewModel::addEquipment,
                     onAddCropLifecycleEvent = farmViewModel::addCropLifecycleEvent
                 )

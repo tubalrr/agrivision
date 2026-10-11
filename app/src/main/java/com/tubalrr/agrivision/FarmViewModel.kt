@@ -176,6 +176,18 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         repository.saveCropLifecycleEvent(value)
     }
     fun addInventory(value: InventoryItem) = launch { repository.saveInventoryWithPurchase(value) }
+
+    fun recordInventoryMovement(
+        inventoryId: String,
+        type: String,
+        quantity: Double,
+        date: String,
+        notes: String,
+        onResult: (String?) -> Unit = {}
+    ) = launch {
+        onResult(repository.recordInventoryMovement(inventoryId, type, quantity, date, notes))
+    }
+
     fun addFeedLog(value: FeedLogRecord) = launch { repository.saveFeedLog(value) }
     fun addEquipment(value: EquipmentRecord) = launch { repository.saveEquipment(value) }
 
