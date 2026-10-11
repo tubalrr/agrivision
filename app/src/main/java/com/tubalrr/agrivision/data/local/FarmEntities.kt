@@ -1,5 +1,6 @@
 package com.tubalrr.agrivision.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 
@@ -204,7 +205,10 @@ data class ProductionEntity(
 @Entity(
     tableName = "expenses",
     primaryKeys = ["expenseId"],
-    indices = [Index(value = ["farmId", "date"])]
+    indices = [
+        Index(value = ["farmId", "date"]),
+        Index(value = ["farmId", "sourceType", "sourceId"])
+    ]
 )
 data class ExpenseEntity(
     val expenseId: String,
@@ -213,13 +217,19 @@ data class ExpenseEntity(
     val category: String,
     val amount: Double,
     val note: String = "",
+    @ColumnInfo(defaultValue = "''") val sourceType: String = "",
+    @ColumnInfo(defaultValue = "''") val sourceId: String = "",
+    @ColumnInfo(defaultValue = "''") val fieldId: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(
     tableName = "sales",
     primaryKeys = ["saleId"],
-    indices = [Index(value = ["farmId", "date"])]
+    indices = [
+        Index(value = ["farmId", "date"]),
+        Index(value = ["farmId", "sourceType", "sourceId"])
+    ]
 )
 data class SaleEntity(
     val saleId: String,
@@ -229,6 +239,9 @@ data class SaleEntity(
     val amount: Double,
     val incomeCategory: String = "Other Income",
     val notes: String = "",
+    @ColumnInfo(defaultValue = "''") val sourceType: String = "",
+    @ColumnInfo(defaultValue = "''") val sourceId: String = "",
+    @ColumnInfo(defaultValue = "''") val fieldId: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 
