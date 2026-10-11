@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.15.1** · Android version code: `19`
+
+This patch prevents accidental app exits from Android edge-swipe/back gestures. Back from any non-Dashboard tab returns to Dashboard; back while on Dashboard opens an explicit Exit AgriVision confirmation with Stay in app and Exit app actions.
+
 **Version 1.15.0** · Android version code: `18`
 
 This release reorganizes the dashboard around farmer priorities: Farm Action Center and financial/health snapshots appear before incident history and analytics. Duplicate action-queue/report prompts are removed, recent incident previews are capped at three, spacing and card proportions are tightened, and dashboard accent colors better respect the selected light/dark palette. Existing records, task shortcuts, inventory actions, case triage, and analytics remain connected to saved farm data.

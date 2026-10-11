@@ -1,6 +1,10 @@
 package com.tubalrr.agrivision
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -65,6 +69,7 @@ internal fun AgriVisionApp(
         )
     }
     var showSettings by remember { mutableStateOf(false) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
     var pendingTaskFilter by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(selected, rememberLastTab) {
@@ -142,6 +147,41 @@ internal fun AgriVisionApp(
     }
 
     MaterialTheme(colorScheme = scheme) {
+        // Android edge-swipe/back should navigate inside the app instead of closing it.
+        // Only show the exit confirmation when the user is already on Dashboard.
+        BackHandler(enabled = !showSettings && !showExitConfirmation) {
+            if (selected != 0) {
+                selected = 0
+                pendingTaskFilter = null
+            } else {
+                showExitConfirmation = true
+            }
+        }
+
+        if (showExitConfirmation) {
+            AlertDialog(
+                onDismissRequest = { showExitConfirmation = false },
+                title = { Text("Exit AgriVision?") },
+                text = { Text("Do you want to close the app? Choose Stay in app to keep working on your farm records.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showExitConfirmation = false
+                            context.findActivity()?.finish()
+                        }
+                    ) {
+                        Text("Exit app")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExitConfirmation = false }) {
+                        Text("Stay in app")
+                    }
+                },
+                containerColor = AgriCard
+            )
+        }
+
         if (showSettings) {
             AppSettingsDialog(
                 rememberLastTab = rememberLastTab,
@@ -389,4 +429,11 @@ internal fun AgriBottomBar(
             )
         }
     }
+}
+
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
