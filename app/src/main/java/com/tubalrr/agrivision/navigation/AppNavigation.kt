@@ -124,6 +124,7 @@ internal fun AgriVisionApp(
     val fieldIncidents by farmViewModel.fieldIncidents.collectAsStateWithLifecycle()
     val incidentEvents by farmViewModel.incidentEvents.collectAsStateWithLifecycle()
     val farmerProfile by farmViewModel.profile.collectAsStateWithLifecycle()
+    val daStaffProfile by farmViewModel.daStaffProfile.collectAsStateWithLifecycle()
     val reportSubmission by farmViewModel.reportSubmission.collectAsStateWithLifecycle()
     val backupPreview by farmViewModel.backupPreview.collectAsStateWithLifecycle()
     val backupRestoreInProgress by farmViewModel.backupRestoreInProgress.collectAsStateWithLifecycle()
@@ -395,6 +396,8 @@ internal fun AgriVisionApp(
                 )
                 else -> ProfileScreen(
                     padding = padding,
+                    staffProfile = daStaffProfile,
+                    onStaffProfileSaved = farmViewModel::saveDaStaffProfile,
                     profile = farmerProfile,
                     farmer = farmer,
                     farm = farm,
