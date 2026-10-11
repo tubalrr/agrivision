@@ -165,19 +165,43 @@ object DaReportExporter {
         val contentWidth = pageWidth - (margin * 2)
         val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = 18f
+            color = android.graphics.Color.rgb(31, 78, 54)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         val reportPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = 13f
+            color = android.graphics.Color.rgb(31, 78, 54)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
-        val metaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f }
+        val metaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 9f
+            color = android.graphics.Color.rgb(84, 94, 88)
+        }
         val headPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = 7.5f
+            color = android.graphics.Color.WHITE
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
-        val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 7f }
-        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 7f }
+        val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 7f
+            color = android.graphics.Color.rgb(38, 44, 40)
+        }
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 7f
+            color = android.graphics.Color.rgb(92, 101, 95)
+        }
+        val tableHeaderFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(31, 78, 54)
+            style = Paint.Style.FILL
+        }
+        val alternateRowFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(244, 248, 245)
+            style = Paint.Style.FILL
+        }
+        val tableGridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(200, 210, 202)
+            strokeWidth = 0.6f
+        }
 
         var pageNo = 0
         var page: PdfDocument.Page? = null
@@ -238,10 +262,15 @@ object DaReportExporter {
             if (d.columns.isEmpty()) return floatArrayOf()
             val weights = d.columns.map { column ->
                 when {
-                    column.contains("Description", true) || column.contains("Notes", true) -> 2.4f
+                    column.contains("Description", true) -> 2.8f
+                    column.contains("Notes", true) || column.contains("Outcome", true) -> 2.2f
                     column.contains("Name", true) || column.contains("Commodity", true) ||
-                        column.contains("Program", true) || column.contains("Location", true) -> 1.6f
-                    column.length > 14 -> 1.25f
+                        column.contains("Program", true) || column.contains("Location", true) ||
+                        column.contains("Product", true) -> 1.5f
+                    column.contains("Amount", true) || column.contains("Quantity", true) ||
+                        column.contains("Population", true) || column.contains("Latitude", true) ||
+                        column.contains("Longitude", true) -> 0.9f
+                    column.length > 14 -> 1.2f
                     else -> 1f
                 }
             }
@@ -251,30 +280,47 @@ object DaReportExporter {
 
         fun drawTableHeader(widths: FloatArray) {
             val c = canvas ?: return
-            var x = margin
-            d.columns.forEachIndexed { i, column ->
-                val header = wrap(column, headPaint, (widths[i] - 4f).coerceAtLeast(12f)).firstOrNull().orEmpty()
-                c.drawText(header, x + 2f, y, headPaint)
-                x += widths[i]
+            val headerLineHeight = 8.5f
+            val wrappedHeaders = d.columns.mapIndexed { i, column ->
+                wrap(column, headPaint, (widths.getOrElse(i) { 0f } - 6f).coerceAtLeast(12f))
             }
-            y += 12f
-            c.drawLine(margin, y, pageWidth - margin, y, headPaint)
-            y += 10f
+            val lineCount = wrappedHeaders.maxOfOrNull { it.size } ?: 1
+            val headerHeight = (10f + lineCount * headerLineHeight + 6f).coerceAtLeast(22f)
+            val top = y - 4f
+            val right = pageWidth - margin
+
+            // A dark green band and wrapped labels keep full column names readable.
+            c.drawRect(margin, top, right, top + headerHeight, tableHeaderFillPaint)
+            var x = margin
+            wrappedHeaders.forEachIndexed { i, lines ->
+                c.drawLine(x, top, x, top + headerHeight, tableGridPaint)
+                lines.forEachIndexed { lineIndex, line ->
+                    c.drawText(line, x + 3f, top + 11f + lineIndex * headerLineHeight, headPaint)
+                }
+                x += widths.getOrElse(i) { 0f }
+            }
+            c.drawLine(right, top, right, top + headerHeight, tableGridPaint)
+            y = top + headerHeight
+            c.drawLine(margin, y, right, y, tableGridPaint)
+            y += 8f
         }
 
         fun availableLineCount(lineHeight: Float): Int =
             ((pageHeight - 34f - y - 5f).coerceAtLeast(0f) / lineHeight).toInt()
 
+        var bodyRowIndex = 0
+
         fun drawRow(values: List<String>, widths: FloatArray, paint: Paint) {
             val lineHeight = 9f
             val wrapped = values.mapIndexed { i, value ->
-                wrap(value, paint, (widths.getOrElse(i) { 0f } - 4f).coerceAtLeast(12f))
+                wrap(value, paint, (widths.getOrElse(i) { 0f } - 6f).coerceAtLeast(12f))
             }
             val maxLines = wrapped.maxOfOrNull { it.size } ?: 1
+            val useAlternateFill = bodyRowIndex++ % 2 == 1
             var lineOffset = 0
 
-            // Keep normal rows together when they fit on a fresh page. Very tall rows
-            // are emitted in page-sized fragments so long notes never run through the footer.
+            // Keep normal rows together when they fit on a fresh page. Extra-tall rows
+            // split into page-sized fragments, while row shading and borders stay aligned.
             if (maxLines > availableLineCount(lineHeight)) {
                 footer()
                 startPage()
@@ -291,13 +337,30 @@ object DaReportExporter {
                 }
 
                 val lineCount = minOf(capacity, maxLines - lineOffset)
+                val segmentTop = y - 5f
+                val segmentBottom = y + lineCount * lineHeight + 1f
+                val right = pageWidth - margin
+                val c = canvas!!
+
+                if (useAlternateFill) {
+                    c.drawRect(margin, segmentTop, right, segmentBottom, alternateRowFillPaint)
+                }
+
+                var gridX = margin
+                widths.forEach { width ->
+                    c.drawLine(gridX, segmentTop, gridX, segmentBottom, tableGridPaint)
+                    gridX += width
+                }
+                c.drawLine(right, segmentTop, right, segmentBottom, tableGridPaint)
+                c.drawLine(margin, segmentBottom, right, segmentBottom, tableGridPaint)
+
                 var x = margin
                 wrapped.forEachIndexed { i, lines ->
                     val endLine = minOf(lineOffset + lineCount, lines.size)
                     for (lineIndex in lineOffset until endLine) {
-                        canvas!!.drawText(
+                        c.drawText(
                             lines[lineIndex],
-                            x + 2f,
+                            x + 3f,
                             y + (lineIndex - lineOffset + 1) * lineHeight,
                             paint
                         )
