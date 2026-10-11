@@ -281,6 +281,14 @@ The Feed Logs UI and source-linked production records are part of the current of
 The current Room schema is version 12. Migration 11 → 12 adds Paid/Unpaid settlement state to sales and expenses. Migration 7 → 8 adds persisted incomeCategory to sales, migration 8 → 9 adds structured incident workflow metadata plus status-history fields, migration 9 → 10 adds farm/field/incident map geometry, and migration 10 → 11 adds optional source links for sales and expenses. Existing version-10 records receive blank source fields and remain unallocated instead of being guessed into a crop.
 
 
+## Version 1.19.0 — field mapping integrity
+
+- Farm, field and incident boundaries use MapGeometryValidator before write/restore. Coordinate range checks remain in place, and polygon validation additionally rejects duplicate adjacent points, repeated closing points, zero-area shapes and self-crossing edges.
+- A field may still be represented by one saved location point. Area boundaries require at least three valid points.
+- The map editor validates the draft before opening a save confirmation, and repository/ViewModel validation repeats the guard so invalid geometry cannot be persisted through another caller.
+- Restore validation applies the same geometry checks to saved field and incident boundary lists before the database replacement begins.
+- The spatial relationship remains Farm → Fields → Crops → Incidents, with geometry stored in Room and included in the backup workflow.
+
 ## Version 1.18.0 — finance tracking
 
 - Room schema 11 → 12 adds Paid/Unpaid state to sales and expenses. Legacy rows migrate to Paid because earlier versions never tracked settlement; outstanding balances are not guessed.
