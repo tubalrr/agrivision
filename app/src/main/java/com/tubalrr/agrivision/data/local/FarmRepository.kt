@@ -908,7 +908,6 @@ suspend fun saveField(record: FieldRecord) {
     suspend fun saveExpense(record: ExpenseRecord, expenseId: String = UUID.randomUUID().toString()) {
         require(record.category.isNotBlank()) { "Expense category is required." }
         require(record.amount.isFinite() && record.amount > 0.0) { "Expense amount must be a finite positive number." }
-        require(record.note.isNotBlank()) { "Expense description is required." }
         validateFinancialSource(record.sourceType, record.sourceId, record.fieldId)
         val date = record.date.ifBlank { "Today" }
 
