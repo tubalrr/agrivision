@@ -64,7 +64,10 @@ data class ExpenseRecord(
     val category: String,
     val amount: Double,
     val note: String,
-    val date: String = ""
+    val date: String = "",
+    val sourceType: String = "",
+    val sourceId: String = "",
+    val fieldId: String = ""
 )
 data class InventoryItem(
     val name: String,
@@ -98,7 +101,10 @@ data class SaleRecord(
     val product: String,
     val amount: Double,
     val date: String,
-    val incomeCategory: String = "Other Income"
+    val incomeCategory: String = "Other Income",
+    val sourceType: String = "",
+    val sourceId: String = "",
+    val fieldId: String = ""
 )
 data class AssistanceRecord(
     val program: String,
