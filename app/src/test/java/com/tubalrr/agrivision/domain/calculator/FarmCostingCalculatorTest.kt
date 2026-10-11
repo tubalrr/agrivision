@@ -47,4 +47,37 @@ class FarmCostingCalculatorTest {
         assertEquals(900.0, FarmCostingCalculator.unallocatedExpenseTotal(expenses), 0.001)
         assertEquals(1200.0, FarmCostingCalculator.unallocatedIncomeTotal(sales), 0.001)
     }
+
+    @Test fun livestockProfitUsesOnlyLinkedFinanceAndReportsFeedUsageSeparately() {
+        val group = com.tubalrr.agrivision.Livestock(
+            name = "Layer flock", kind = "Chicken", count = 100, status = "Active",
+            groupId = "L1", initialPopulation = 100, currentPopulation = 80
+        )
+        val result = FarmCostingCalculator.summarizeLivestock(
+            livestock = listOf(group),
+            expenses = listOf(
+                ExpenseRecord("Feed", 2500.0, "Layer crumble", "2026-10-02", "Livestock", "L1"),
+                ExpenseRecord("Labor", 600.0, "Worker", "2026-10-03")
+            ),
+            sales = listOf(
+                SaleRecord("Eggs", 4200.0, "2026-10-05", "Livestock Sales", "Livestock", "L1"),
+                SaleRecord("Other", 999.0, "2026-10-06")
+            ),
+            production = listOf(
+                ProductionRecord("Eggs", "24 trays", "2026-10-06", sourceType = "Livestock", sourceId = "L1")
+            ),
+            feedLogs = listOf(
+                com.tubalrr.agrivision.data.local.FeedLogRecord(
+                    livestockId = "L1", date = "2026-10-01", feedName = "Layer crumble", quantityKg = 30.0, unit = "kg"
+                )
+            )
+        ).single()
+        assertEquals(4200.0, result.income, 0.001)
+        assertEquals(2500.0, result.expenses, 0.001)
+        assertEquals(1700.0, result.netProfit, 0.001)
+        assertEquals(31.25, result.costPerHead!!, 0.001)
+        assertEquals(24.0, result.productionByUnit["trays"] ?: 0.0, 0.001)
+        assertEquals(30.0, result.feedUsageByUnit["kg"] ?: 0.0, 0.001)
+    }
+
 }
