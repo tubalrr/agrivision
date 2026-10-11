@@ -62,3 +62,49 @@ object FarmCostingCalculator {
     fun unallocatedIncomeTotal(sales: List<SaleRecord>): Double =
         sales.filter { it.sourceType.isBlank() || it.sourceId.isBlank() }.sumOf { it.amount.coerceAtLeast(0.0) }
 }
+
+data class LivestockProfitability(
+    val groupId: String,
+    val livestockLabel: String,
+    val currentHeads: Int,
+    val income: Double,
+    val expenses: Double,
+    val netProfit: Double,
+    val costPerHead: Double?,
+    val productionByUnit: Map<String, Double>,
+    val feedUsageByUnit: Map<String, Double>
+)
+
+fun FarmCostingCalculator.summarizeLivestock(
+    livestock: List<com.tubalrr.agrivision.Livestock>,
+    expenses: List<ExpenseRecord>,
+    sales: List<SaleRecord>,
+    production: List<ProductionRecord>,
+    feedLogs: List<com.tubalrr.agrivision.data.local.FeedLogRecord>
+): List<LivestockProfitability> = livestock.map { group ->
+    val linkedExpenses = expenses.filter { it.sourceType.equals("Livestock", true) && it.sourceId == group.groupId }
+    val linkedSales = sales.filter { it.sourceType.equals("Livestock", true) && it.sourceId == group.groupId }
+    val linkedProduction = production.filter { it.sourceType.equals("Livestock", true) && it.sourceId == group.groupId }
+    val outputByUnit = linkedProduction.mapNotNull { record ->
+        val match = Regex("""^\s*(\d+(?:\.\d+)?)\s*(.*)$""").find(record.quantity) ?: return@mapNotNull null
+        val amount = match.groupValues[1].toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: return@mapNotNull null
+        val unit = match.groupValues[2].trim().ifBlank { "unit" }
+        unit.lowercase(Locale.US) to amount
+    }.groupBy { it.first }.mapValues { (_, values) -> values.sumOf { it.second } }
+    val feedByUnit = feedLogs.filter { it.livestockId == group.groupId }
+        .groupBy { it.unit.trim().ifBlank { "unit" } }
+        .mapValues { (_, rows) -> rows.sumOf { it.quantityKg.coerceAtLeast(0.0) } }
+    val cost = linkedExpenses.sumOf { it.amount.coerceAtLeast(0.0) }
+    val income = linkedSales.sumOf { it.amount.coerceAtLeast(0.0) }
+    LivestockProfitability(
+        group.groupId,
+        listOf(group.name, group.kind).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Livestock group" },
+        group.currentPopulation.coerceAtLeast(0),
+        income,
+        cost,
+        income - cost,
+        group.currentPopulation.takeIf { it > 0 }?.let { cost / it },
+        outputByUnit,
+        feedByUnit
+    )
+}
