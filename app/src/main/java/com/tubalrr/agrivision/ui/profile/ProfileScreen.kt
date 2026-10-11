@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -46,7 +47,11 @@ internal fun ProfileScreen(
     onAddAssistance: (AssistanceRecord) -> Unit,
     onUpdateAssistance: (AssistanceRecord) -> Unit,
     onAddField: (FieldRecord) -> Unit,
-    onUpdateField: (FieldRecord) -> Unit
+    onUpdateField: (FieldRecord) -> Unit,
+    backupPreview: BackupRestorePreview? = null,
+    backupRestoreInProgress: Boolean = false,
+    onConfirmBackupRestore: () -> Unit = {},
+    onCancelBackupRestore: () -> Unit = {}
 ) {
     var showEdit by remember { mutableStateOf(false) }
     var showImportConfirmation by remember { mutableStateOf(false) }
@@ -71,6 +76,83 @@ internal fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showImportConfirmation = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    backupPreview?.let { preview ->
+        val financeRecords = preview.saleCount + preview.expenseCount
+        AlertDialog(
+            onDismissRequest = {
+                if (!backupRestoreInProgress) onCancelBackupRestore()
+            },
+            icon = { Icon(Icons.Outlined.Backup, contentDescription = null, tint = AgriGreen) },
+            title = { Text("Review backup before restore", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(
+                    Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    Text(
+                        "Farm: " + preview.farmName.ifBlank { "Unnamed farm" },
+                        color = AgriGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Farmer: " + preview.farmerName.ifBlank { "Not registered" },
+                        color = AgriText
+                    )
+                    HorizontalDivider(color = AgriLine)
+                    Text("Records to restore", fontWeight = FontWeight.ExtraBold, color = AgriText)
+                    Text("Fields: ${preview.fieldCount} · Crops: ${preview.cropCount}")
+                    Text("Livestock groups: ${preview.livestockCount}")
+                    Text("Sales + expenses: ${financeRecords}")
+                    Text("Inventory items: ${preview.inventoryCount} · Tasks: ${preview.taskCount}")
+                    Text("Field incidents: ${preview.incidentCount} · Assistance records: ${preview.assistanceCount}")
+                    Text("Incident photos available: ${preview.photoCount}")
+                    if (preview.unavailablePhotoCount > 0) {
+                        Text(
+                            "Warning: ${preview.unavailablePhotoCount} photo reference(s) in this older backup are not available on this device. They will be detached from the restored incidents.",
+                            color = AgriDanger,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Text(
+                        if (preview.isLegacyJson)
+                            "This is an older JSON backup. It does not bundle photo files, so only photo files already readable on this device can be kept."
+                        else
+                            "The ZIP archive was validated, and bundled photo files passed their size and integrity checks.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (AgriIsDark) Color(0xFF39261B) else Color(0xFFFFF0D8)
+                    ) {
+                        Text(
+                            "Important: restoring replaces the farm records currently on this phone. It does not merge records. The database update is transactional; invalid data will be rejected.",
+                            Modifier.padding(12.dp),
+                            color = if (AgriIsDark) Color(0xFFFFD7A0) else Color(0xFF805018),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    if (backupRestoreInProgress) {
+                        Text("Restoring and verifying files…", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !backupRestoreInProgress,
+                    onClick = onConfirmBackupRestore
+                ) { Text(if (backupRestoreInProgress) "Restoring…" else "Replace & Restore") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !backupRestoreInProgress,
+                    onClick = onCancelBackupRestore
+                ) { Text("Cancel") }
             }
         )
     }
@@ -466,7 +548,7 @@ internal fun ProfileScreen(
         item {
             ProfileSectionHeading(
                 title = "Backup & restore",
-                subtitle = "Export a safety copy or restore a saved AgriVision backup."
+                subtitle = "Export a photo-inclusive safety copy or preview a backup before restoring it."
             )
         }
 
@@ -497,7 +579,7 @@ internal fun ProfileScreen(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text("Protect your farm records", fontWeight = FontWeight.Bold)
                             Text(
-                                "Your backup includes the local farm data snapshot. Store exported files somewhere safe.",
+                                "The .zip backup includes local farm records and attached incident photos. Store it somewhere safe; restore shows a preview before replacing current data.",
                                 color = AgriMuted,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -519,11 +601,17 @@ internal fun ProfileScreen(
                     ) {
                         Icon(Icons.Outlined.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Import Existing Backup")
+                        Text("Review & Restore Backup")
                     }
                     if (backupStatus.isNotBlank()) {
+                        val backupError = backupStatus.startsWith("Backup export failed") ||
+                            backupStatus.startsWith("Backup validation failed") ||
+                            backupStatus.startsWith("Restore failed") ||
+                            backupStatus.startsWith("No validated backup")
                         Surface(
-                            color = AgriGreenSoft,
+                            color = if (backupError) {
+                                if (AgriIsDark) Color(0xFF3B211F) else Color(0xFFFFE8E5)
+                            } else AgriGreenSoft,
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Row(
@@ -531,10 +619,14 @@ internal fun ProfileScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Outlined.Info, contentDescription = null, tint = AgriGreen)
+                                Icon(
+                                    Icons.Outlined.Info,
+                                    contentDescription = null,
+                                    tint = if (backupError) AgriDanger else AgriGreen
+                                )
                                 Text(
                                     backupStatus,
-                                    color = AgriGreen,
+                                    color = if (backupError) AgriDanger else AgriGreen,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold
                                 )
