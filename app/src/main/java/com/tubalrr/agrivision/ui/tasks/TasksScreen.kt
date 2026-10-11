@@ -570,11 +570,29 @@ private fun FarmTaskCard(task: FarmTask, onToggle: () -> Unit) {
     }
 }
 
-private fun isTaskOverdue(date: String, todayKey: String): Boolean {
-    if (date.isBlank() || date.equals("Today", ignoreCase = true) || date.equals("Tomorrow", ignoreCase = true)) return false
-    val taskDate = runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(date) }.getOrNull() ?: return false
-    val today = runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(todayKey) }.getOrNull() ?: return false
-    return taskDate.before(today)
+private val taskDateFormatters = listOf(
+    java.time.format.DateTimeFormatter.ISO_LOCAL_DATE,
+    java.time.format.DateTimeFormatter.ofPattern("d/M/uuuu", Locale.US).withResolverStyle(java.time.format.ResolverStyle.STRICT),
+    java.time.format.DateTimeFormatter.ofPattern("M/d/uuuu", Locale.US).withResolverStyle(java.time.format.ResolverStyle.STRICT),
+    java.time.format.DateTimeFormatter.ofPattern("d MMM uuuu", Locale.US).withResolverStyle(java.time.format.ResolverStyle.STRICT),
+    java.time.format.DateTimeFormatter.ofPattern("MMM d, uuuu", Locale.US).withResolverStyle(java.time.format.ResolverStyle.STRICT),
+    java.time.format.DateTimeFormatter.ofPattern("MMMM d, uuuu", Locale.US).withResolverStyle(java.time.format.ResolverStyle.STRICT)
+)
+
+/** Parses dates used by current records and supported legacy/imported task records. */
+internal fun parseFarmTaskDate(raw: String): java.time.LocalDate? {
+    val value = raw.trim()
+    if (value.isBlank() || value.equals("today", true) || value.equals("tomorrow", true)) return null
+    return taskDateFormatters.firstNotNullOfOrNull { formatter ->
+        runCatching { java.time.LocalDate.parse(value, formatter) }.getOrNull()
+    }
+}
+
+/** Relative labels and invalid/unknown dates are never silently treated as overdue. */
+internal fun isTaskOverdue(date: String, todayKey: String): Boolean {
+    val taskDate = parseFarmTaskDate(date) ?: return false
+    val today = parseFarmTaskDate(todayKey) ?: return false
+    return taskDate.isBefore(today)
 }
 
 private fun taskDueLabel(date: String): String {
