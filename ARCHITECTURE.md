@@ -278,7 +278,18 @@ The next phase can add dedicated Feed Log UI and richer production records witho
 
 ## Database versioning
 
-The current Room schema is version 10. Migration 7 → 8 adds persisted incomeCategory to sales, migration 8 → 9 adds structured incident workflow metadata plus status-history fields, and migration 9 → 10 adds farm/field/incident map geometry.
+The current Room schema is version 11. Migration 7 → 8 adds persisted incomeCategory to sales, migration 8 → 9 adds structured incident workflow metadata plus status-history fields, migration 9 → 10 adds farm/field/incident map geometry, and migration 10 → 11 adds optional source links for sales and expenses. Existing version-10 records receive blank source fields and remain unallocated instead of being guessed into a crop.
+
+
+## Version 1.16.0 — reliability and operating boundaries
+
+- Financial costing links a sale or expense explicitly to a crop/livestock source. Crop profit and cost-per-hectare use only explicitly linked transactions; unlinked amounts stay separately visible.
+- A non-destructive Room migration adds the new source columns and indexes. Backup JSON reads missing source keys as blank for backward compatibility.
+- Daily reminder work reads saved Room task, crop and inventory records. It is opt-in and requires Android notification permission. WorkManager may defer execution according to Android battery/background scheduling.
+- GPS capture is optional and requests location access only after the user taps the capture button. Manually entered coordinates are checked against valid latitude/longitude ranges.
+- Incident photo selection copies the photo into app-private storage instead of keeping a temporary document-picker URI. These local files are not embedded in the JSON backup, so cross-device restores do not restore the photo bytes.
+- CI runs JUnit tests, Android lint, debug assembly, unsigned release assembly and uploads APK artifacts. Unsigned release assembly does not mean an installable signed release is ready; release signing requires a separately managed keystore and secrets.
+- Accounts/cloud sync and official Department of Agriculture transmission are not configured. They require a hosted backend or selected provider, authentication/authorization, deployment configuration, and authorized DA integration specifications/credentials. No live DA submission is claimed.
 
 ## Government integration
 
