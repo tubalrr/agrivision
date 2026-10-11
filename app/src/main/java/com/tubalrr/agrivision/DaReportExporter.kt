@@ -151,8 +151,10 @@ object DaReportExporter {
     }
 
     private fun csv(d: Data) = buildString {
-        append(d.columns.joinToString(",") { cell(it) }).append('\n')
-        d.rows.forEach { row -> append(d.columns.indices.joinToString(",") { cell(row.getOrElse(it) { "" }) }).append('\n') }
+        append(d.columns.joinToString(",") { escapeCsvCell(it) }).append('\n')
+        d.rows.forEach { row ->
+            append(d.columns.indices.joinToString(",") { escapeCsvCell(row.getOrElse(it) { "" }) }).append('\n')
+        }
     }
 
     private fun pdf(s: FarmSnapshot, type: String, d: Data): ByteArray {
@@ -315,12 +317,28 @@ object DaReportExporter {
         return out.toByteArray()
     }
 
-    private fun cell(v: String): String {
-        val x = v.replace("\"", "\"\"")
-        return if (x.contains(',') || x.contains('"') || x.contains('\n') || x.contains('\r')) "\"" + x + "\"" else x
-    }
     private fun short(v: String) = v.replace('\n', ' ').replace('\r', ' ').let { if (it.length > 24) it.take(21) + "..." else it }
     private fun number(v: Double) = if (v % 1.0 == 0.0) v.toInt().toString() else String.format(Locale.US, "%.2f", v)
     private fun money(v: Double) = String.format(Locale.US, "%.2f", v)
     private fun now() = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+}
+
+
+/**
+ * Escapes a CSV field for spreadsheet applications.
+ *
+ * Quoting protects CSV structure; the apostrophe additionally keeps user-controlled
+ * values beginning with spreadsheet formula operators from being evaluated as formulas.
+ */
+internal fun escapeCsvCell(value: String): String {
+    val firstSignificant = value.firstOrNull { !it.isWhitespace() }
+    val numericLiteral = value.trim().matches(Regex("-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)"))
+    val formulaLike = firstSignificant in setOf('=', '+', '-', '@', '＝', '＋', '－', '＠', '\\t', '\\r', '\\n')
+    val safeValue = if (formulaLike && !numericLiteral) "'$value" else value
+    val escaped = safeValue.replace("\"", "\"\"")
+    return if (escaped.contains(',') || escaped.contains('"') || escaped.contains('\\n') || escaped.contains('\\r')) {
+        "\"" + escaped + "\""
+    } else {
+        escaped
+    }
 }
