@@ -1,5 +1,6 @@
 package com.tubalrr.agrivision
 
+import android.app.DatePickerDialog
 import androidx.compose.ui.unit.sp
 
 import androidx.compose.ui.graphics.Brush
@@ -23,9 +24,12 @@ import androidx.compose.foundation.rememberScrollState
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.time.format.DateTimeFormatter
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import com.tubalrr.agrivision.domain.calculator.FarmCostingCalculator
+import com.tubalrr.agrivision.domain.calculator.FarmFinanceCalculator
+import com.tubalrr.agrivision.domain.calculator.MonthlyFinanceSummary
 
 
 @Composable
@@ -54,9 +58,16 @@ internal fun ProductionFinanceScreen(
     onFeedLog: (com.tubalrr.agrivision.data.local.FeedLogRecord) -> Unit,
     onExpense: (ExpenseRecord) -> Unit,
     onSale: (SaleRecord) -> Unit,
-    onSubmissionSaved: (ReportSubmission) -> Unit
+    onSubmissionSaved: (ReportSubmission) -> Unit,
+    onExpensePaymentStatus: (ExpenseRecord, String) -> Unit = { _, _ -> },
+    onSalePaymentStatus: (SaleRecord, String) -> Unit = { _, _ -> }
 ) {
     var tab by remember { mutableStateOf("Production") }
+    var financePeriod by remember { mutableStateOf("This month") }
+    val periodSales = remember(sales, financePeriod) { FarmFinanceCalculator.filterSales(sales, financePeriod) }
+    val periodExpenses = remember(expenses, financePeriod) { FarmFinanceCalculator.filterExpenses(expenses, financePeriod) }
+    val financeUndatedCount = remember(sales, expenses) { FarmFinanceCalculator.undatedCount(sales, expenses) }
+    val financeTrend = remember(sales, expenses) { FarmFinanceCalculator.monthlyTrend(sales, expenses) }
     var showDialog by remember { mutableStateOf(false) }
     var showFeedDialog by remember { mutableStateOf(false) }
     var selectedDaReport by remember { mutableStateOf(DaReportExporter.reportTypes.first()) }
@@ -530,13 +541,20 @@ internal fun ProductionFinanceScreen(
             }
         } else {
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SummaryCard("Income", "₱" + money(totalSales), "Crop, livestock and other income.")
-                    SummaryCard("Expenses", "₱" + money(totalExpenses), "Operating farm costs.")
-                }
+                FinancePeriodSummaryCard(
+                    period = financePeriod,
+                    onPeriodChange = { financePeriod = it },
+                    sales = periodSales,
+                    expenses = periodExpenses,
+                    undatedCount = financeUndatedCount
+                )
             }
+            item { FinanceTrendCard(months = financeTrend) }
+            item { CropProfitabilityCard(crops = crops, expenses = expenses, sales = sales, production = production) }
             item {
-                CropProfitabilityCard(crops = crops, expenses = expenses, sales = sales, production = production)
+                LivestockProfitabilityCard(
+                    livestock = livestock, expenses = expenses, sales = sales, production = production, feedLogs = feedLogs
+                )
             }
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -548,7 +566,7 @@ internal fun ProductionFinanceScreen(
             item {
                 FinanceCategorySummary(
                     FinancialCategories.incomeCategories.map { category ->
-                        category to sales.filter { it.incomeCategory.equals(category, ignoreCase = true) }.sumOf { it.amount }
+                        category to periodSales.filter { it.incomeCategory.equals(category, ignoreCase = true) }.sumOf { it.amount }
                     }
                 )
             }
@@ -556,31 +574,32 @@ internal fun ProductionFinanceScreen(
             item {
                 FinanceCategorySummary(
                     FinancialCategories.expenseCategories.map { category ->
-                        category to expenses.filter { it.category.equals(category, ignoreCase = true) }.sumOf { it.amount }
+                        category to periodExpenses.filter { it.category.equals(category, ignoreCase = true) }.sumOf { it.amount }
                     }
                 )
             }
             item { Text("Expense records", fontWeight = FontWeight.SemiBold) }
-            items(expenses) { expense ->
+            items(periodExpenses) { expense ->
                 val sourceLabel = when (expense.sourceType) {
                     "Crop" -> "Crop " + expense.sourceId
                     "Livestock" -> "Livestock " + expense.sourceId
                     else -> "Unallocated"
                 }
                 val detail = listOf(expense.date, expense.note, sourceLabel).filter { it.isNotBlank() }.joinToString(" · ")
-                FarmRecordCard(expense.category, "₱" + money(expense.amount), detail, Icons.Outlined.ReceiptLong)
+                FinanceTransactionCard(title = expense.category, amount = "₱" + money(expense.amount), detail = detail, paymentStatus = expense.paymentStatus, onTogglePayment = { onExpensePaymentStatus(expense, if (expense.paymentStatus.equals("Paid", true)) "Unpaid" else "Paid") })
             }
             item { Text("Income records", fontWeight = FontWeight.SemiBold) }
-            items(sales) { sale ->
-                FarmRecordCard(
-                    sale.product,
-                    "₱" + money(sale.amount),
-                    sale.incomeCategory + " · " + sale.date + " · " + when (sale.sourceType) {
+            items(periodSales) { sale ->
+                FinanceTransactionCard(
+                    title = sale.product,
+                    amount = "₱" + money(sale.amount),
+                    detail = sale.incomeCategory + " · " + sale.date + " · " + when (sale.sourceType) {
                         "Crop" -> "Crop " + sale.sourceId
                         "Livestock" -> "Livestock " + sale.sourceId
                         else -> "Unallocated"
                     },
-                    Icons.Outlined.MonetizationOn
+                    paymentStatus = sale.paymentStatus,
+                    onTogglePayment = { onSalePaymentStatus(sale, if (sale.paymentStatus.equals("Paid", true)) "Unpaid" else "Paid") }
                 )
             }
         }
@@ -601,8 +620,8 @@ private fun CropProfitabilityCard(
     val unallocatedIncome = remember(sales) { FarmCostingCalculator.unallocatedIncomeTotal(sales) }
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
         Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Crop Cost & Profit", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
-            Text("Figures include only transactions explicitly linked to a crop.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            Text("Recorded Crop Cost & Profit", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+            Text("Uses actual saved sales and expenses linked to each crop. No future yields or prices are estimated.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
             if (rows.isEmpty()) {
                 Text("Register a crop cycle first, then link expenses, income and harvest records to calculate crop-level results.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
             } else rows.forEach { row ->
@@ -651,6 +670,167 @@ private fun CropProfitabilityCard(
     }
 }
 
+
+@Composable
+private fun LivestockProfitabilityCard(
+    livestock: List<Livestock>,
+    expenses: List<ExpenseRecord>,
+    sales: List<SaleRecord>,
+    production: List<ProductionRecord>,
+    feedLogs: List<com.tubalrr.agrivision.data.local.FeedLogRecord>
+) {
+    val rows = remember(livestock, expenses, sales, production, feedLogs) {
+        FarmCostingCalculator.summarizeLivestock(livestock, expenses, sales, production, feedLogs)
+    }
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Recorded Livestock Cost & Return", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+            Text("Income and costs include only saved transactions linked to each group. Feed logs show usage; they are not converted into peso cost automatically.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            if (rows.isEmpty()) {
+                Text("Register a livestock group first, then link income and expenses to calculate its recorded result.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            } else rows.forEach { row ->
+                HorizontalDivider(color = AgriLine)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(row.livestockLabel, fontWeight = FontWeight.Bold, color = AgriText)
+                            Text(row.currentHeads.toString() + " head(s)", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Text((if (row.netProfit < 0.0) "−₱" else "₱") + money(kotlin.math.abs(row.netProfit)), color = if (row.netProfit >= 0.0) AgriGreen else AgriDanger, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f).background(AgriGreenSoft, RoundedCornerShape(12.dp)).padding(10.dp)) {
+                            Text("Linked income", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                            Text("₱" + money(row.income), color = AgriText, fontWeight = FontWeight.Bold)
+                        }
+                        Column(Modifier.weight(1f).background(AgriGoldSoft, RoundedCornerShape(12.dp)).padding(10.dp)) {
+                            Text("Linked costs", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                            Text("₱" + money(row.expenses), color = AgriText, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Text(row.costPerHead?.let { "Recorded cost/head: ₱" + money(it) } ?: "Cost/head: no current heads", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    if (row.productionByUnit.isNotEmpty()) {
+                        Text("Linked output: " + row.productionByUnit.entries.joinToString { String.format(Locale.US, "%.2f", it.value) + " " + it.key }, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (row.feedUsageByUnit.isNotEmpty()) {
+                        Text("Recorded feed usage: " + row.feedUsageByUnit.entries.joinToString { String.format(Locale.US, "%.2f", it.value) + " " + it.key }, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinancePeriodSummaryCard(
+    period: String,
+    onPeriodChange: (String) -> Unit,
+    sales: List<SaleRecord>,
+    expenses: List<ExpenseRecord>,
+    undatedCount: Int
+) {
+    val income = sales.sumOf { it.amount }
+    val costs = expenses.sumOf { it.amount }
+    val net = income - costs
+    val receivables = FarmFinanceCalculator.unpaidReceivables(sales)
+    val payables = FarmFinanceCalculator.unpaidPayables(expenses)
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Finance Performance", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+            Text("Filter by month or year. Date-based totals include only records with a recognized date.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FarmFinanceCalculator.periods.forEach { option ->
+                    FilterChip(selected = period == option, onClick = { onPeriodChange(option) }, label = { Text(option, style = MaterialTheme.typography.labelSmall) })
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f).background(AgriGreenSoft, RoundedCornerShape(14.dp)).padding(12.dp)) {
+                    Text("Income", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text("₱" + money(income), color = AgriText, fontWeight = FontWeight.ExtraBold)
+                    Text(sales.size.toString() + " record(s)", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                }
+                Column(Modifier.weight(1f).background(AgriGoldSoft, RoundedCornerShape(14.dp)).padding(12.dp)) {
+                    Text("Expenses", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text("₱" + money(costs), color = AgriText, fontWeight = FontWeight.ExtraBold)
+                    Text(expenses.size.toString() + " record(s)", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Recorded net result", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                    Text((if (net < 0.0) "−₱" else "₱") + money(kotlin.math.abs(net)), color = if (net < 0) AgriDanger else AgriGreen, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Unpaid receivables", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text("₱" + money(receivables), color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text("Unpaid payables · ₱" + money(payables), color = AgriDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+            if (undatedCount > 0 && period != "All time") {
+                Text(undatedCount.toString() + " legacy / undated finance record(s) are excluded because their original date cannot be verified.", color = AgriWarning, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinanceTrendCard(months: List<MonthlyFinanceSummary>) {
+    val maxValue = months.maxOfOrNull { maxOf(it.income, it.expenses) }?.takeIf { it > 0.0 } ?: 1.0
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Monthly Cash Flow · Last 6 Months", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+            Text("Recorded income and expenses; monthly net is not a forecast.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            if (months.none { it.salesCount > 0 || it.expenseCount > 0 }) {
+                Text("No dated finance records found in the last six months. Choose a date when adding new records.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            } else months.forEach { row ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(row.month.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)), fontWeight = FontWeight.SemiBold, color = AgriText)
+                        Text((if (row.net < 0) "−₱" else "₱") + money(kotlin.math.abs(row.net)), color = if (row.net < 0) AgriDanger else AgriGreen, fontWeight = FontWeight.Bold)
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text("Income", color = AgriMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(48.dp))
+                        LinearProgressIndicator(progress = { (row.income / maxValue).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.weight(1f).height(7.dp), color = AgriGreen, trackColor = AgriGreenSoft)
+                        Text(money(row.income), style = MaterialTheme.typography.labelSmall, color = AgriText)
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text("Costs", color = AgriMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(48.dp))
+                        LinearProgressIndicator(progress = { (row.expenses / maxValue).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.weight(1f).height(7.dp), color = AgriDanger, trackColor = AgriGoldSoft)
+                        Text(money(row.expenses), style = MaterialTheme.typography.labelSmall, color = AgriText)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinanceTransactionCard(
+    title: String,
+    amount: String,
+    detail: String,
+    paymentStatus: String,
+    onTogglePayment: () -> Unit
+) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.weight(1f)) { Text(title, color = AgriText, fontWeight = FontWeight.Bold) }
+                Text(amount, color = AgriText, fontWeight = FontWeight.ExtraBold)
+            }
+            Text(detail, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(8.dp), color = if (paymentStatus.equals("Paid", true)) AgriGreenSoft else if (AgriIsDark) Color(0xFF3B211F) else Color(0xFFFFE8E5)) {
+                    Text(paymentStatus.uppercase(Locale.US), Modifier.padding(horizontal = 9.dp, vertical = 5.dp), color = if (paymentStatus.equals("Paid", true)) AgriGreen else AgriDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onTogglePayment) { Text(if (paymentStatus.equals("Paid", true)) "Mark unpaid" else "Mark paid") }
+            }
+        }
+    }
+}
+
+
 @Composable
 private fun FinanceCategorySummary(rows: List<Pair<String, Double>>) {
     Card(
@@ -682,9 +862,12 @@ internal fun AddProductionFinanceDialog(
     var name by remember { mutableStateOf("") }
     var quantity by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
-    var period by remember { mutableStateOf("Today") }
+    var period by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
     var note by remember { mutableStateOf("") }
     var financeType by remember { mutableStateOf("Expense") }
+    var paymentStatus by remember { mutableStateOf("Paid") }
+    var showPeriodDatePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     var incomeCategory by remember { mutableStateOf(FinancialCategories.incomeCategories.first()) }
     var expenseCategory by remember { mutableStateOf(FinancialCategories.expenseCategories.first()) }
     var financeSourceType by remember { mutableStateOf("None") }
@@ -692,6 +875,19 @@ internal fun AddProductionFinanceDialog(
     var productionType by remember { mutableStateOf("Harvest") }
     var sourceType by remember { mutableStateOf("Crop") }
     var sourceId by remember { mutableStateOf("") }
+
+    if (showPeriodDatePicker) {
+        val calendar = Calendar.getInstance()
+        runCatching { calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(period) ?: calendar.time }
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                period = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().apply { set(year, month, day) }.time)
+                showPeriodDatePicker = false
+            },
+            calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply { setOnDismissListener { showPeriodDatePicker = false }; show() }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -898,20 +1094,24 @@ internal fun AddProductionFinanceDialog(
                     }
                     OutlinedTextField(
                         value = amount,
-                        onValueChange = { amount = it },
+                        onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Amount (₱)") },
                         singleLine = true
                     )
+                    Text("Payment status", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("Paid", "Unpaid").forEach { option ->
+                            FilterChip(selected = paymentStatus == option, onClick = { paymentStatus = option }, label = { Text(option) })
+                        }
+                    }
                 }
 
-                OutlinedTextField(
-                    value = period,
-                    onValueChange = { period = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(if (tab == "Production") "Production date / period" else "Date") },
-                    singleLine = true
-                )
+                OutlinedButton(onClick = { showPeriodDatePicker = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Outlined.Event, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text((if (tab == "Production") "Date" else "Transaction date") + " · " + period)
+                }
             }
         },
         confirmButton = {
@@ -972,7 +1172,8 @@ internal fun AddProductionFinanceDialog(
                                     incomeCategory = incomeCategory,
                                     sourceType = savedFinanceSourceType,
                                     sourceId = if (savedFinanceSourceType.isBlank()) "" else financeSourceId,
-                                    fieldId = if (savedFinanceSourceType.isBlank()) "" else savedFinanceFieldId
+                                    fieldId = if (savedFinanceSourceType.isBlank()) "" else savedFinanceFieldId,
+                                    paymentStatus = paymentStatus
                                 )
                             )
                         } else {
@@ -984,7 +1185,8 @@ internal fun AddProductionFinanceDialog(
                                     date = period.trim(),
                                     sourceType = savedFinanceSourceType,
                                     sourceId = if (savedFinanceSourceType.isBlank()) "" else financeSourceId,
-                                    fieldId = if (savedFinanceSourceType.isBlank()) "" else savedFinanceFieldId
+                                    fieldId = if (savedFinanceSourceType.isBlank()) "" else savedFinanceFieldId,
+                                    paymentStatus = paymentStatus
                                 )
                             )
                         }
