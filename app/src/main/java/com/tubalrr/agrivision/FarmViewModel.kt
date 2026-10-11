@@ -20,8 +20,40 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+
+data class BackupRestorePreview(
+    val farmerName: String,
+    val farmName: String,
+    val fieldCount: Int,
+    val cropCount: Int,
+    val livestockCount: Int,
+    val saleCount: Int,
+    val expenseCount: Int,
+    val inventoryCount: Int,
+    val taskCount: Int,
+    val incidentCount: Int,
+    val assistanceCount: Int,
+    val photoCount: Int,
+    val unavailablePhotoCount: Int,
+    val isLegacyJson: Boolean,
+    val exportedAt: Long?
+)
+
+private data class PendingRestorePhoto(
+    val entry: StagedArchiveEvidence,
+    val mimeType: String
+)
+
+private data class PendingBackupRestore(
+    val snapshot: FarmSnapshot,
+    val archive: ReadFarmBackup,
+    val photosByIncidentId: Map<String, PendingRestorePhoto>,
+    val preview: BackupRestorePreview
+)
 
 class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -32,6 +64,11 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _backupStatus = MutableStateFlow("")
     val backupStatus: StateFlow<String> = _backupStatus
+    private val _backupPreview = MutableStateFlow<BackupRestorePreview?>(null)
+    val backupPreview: StateFlow<BackupRestorePreview?> = _backupPreview
+    private val _backupRestoreInProgress = MutableStateFlow(false)
+    val backupRestoreInProgress: StateFlow<Boolean> = _backupRestoreInProgress
+    private var pendingBackupRestore: PendingBackupRestore? = null
 
 
     private val database = AgriDatabase.getInstance(application)
@@ -266,14 +303,179 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         runCatching {
             val snapshot = currentSnapshot()
             val json = snapshotToJson(snapshot)
-            require(json.optString("app") == "AgriVision") { "Invalid backup payload." }
-            val output = getApplication<Application>().contentResolver.openOutputStream(uri)
-                ?: error("Unable to open the selected backup destination.")
-            output.use { it.write(json.toString(2).toByteArray(Charsets.UTF_8)) }
-        }.onSuccess {
-            _backupStatus.value = "Backup exported successfully."
+            val summary = withContext(Dispatchers.IO) {
+                FarmBackupArchive.export(
+                    context = getApplication<Application>(),
+                    destination = uri,
+                    json = json,
+                    incidents = snapshot.fieldIncidents
+                )
+            }
+            _backupStatus.value = "Backup exported successfully with ${summary.incidentPhotosIncluded} incident photo(s)."
         }.onFailure {
             _backupStatus.value = "Backup export failed: " + (it.message ?: "Unknown error")
+        }
+    }
+
+    /**
+     * Read and validate first, then ask the user to review a summary before touching Room.
+     * JSON files from older app versions remain importable; new .zip archives also carry photos.
+     */
+    fun previewBackup(uri: Uri) = launch {
+        var readBackup: ReadFarmBackup? = null
+        try {
+            val parsed = withContext(Dispatchers.IO) {
+                FarmBackupArchive.read(getApplication<Application>(), uri)
+            }
+            readBackup = parsed
+            validateBackup(parsed.json)
+            require(parsed.isArchive || parsed.json.optInt("archiveVersion", 0) == 0) {
+                "This backup manifest is missing its photo archive. Select the original .zip backup."
+            }
+
+            val snapshot = jsonToSnapshot(parsed.json)
+            validateSnapshot(snapshot)
+            val photos = validateArchiveEvidence(parsed, snapshot)
+            val context = getApplication<Application>()
+            val unavailableLegacyPhotos = if (parsed.isArchive) 0 else {
+                snapshot.fieldIncidents.count { incident ->
+                    incident.evidenceUri.isNotBlank() &&
+                        !FarmBackupArchive.isEvidenceReadable(context, incident.evidenceUri)
+                }
+            }
+            val availableLegacyPhotos = if (parsed.isArchive) 0 else {
+                snapshot.fieldIncidents.count { incident ->
+                    incident.evidenceUri.isNotBlank() &&
+                        FarmBackupArchive.isEvidenceReadable(context, incident.evidenceUri)
+                }
+            }
+            val preview = BackupRestorePreview(
+                farmerName = snapshot.profile.farmerName,
+                farmName = snapshot.farm?.farmName ?: snapshot.profile.farmName,
+                fieldCount = snapshot.fields.size,
+                cropCount = snapshot.crops.size,
+                livestockCount = snapshot.livestock.size,
+                saleCount = snapshot.sales.size,
+                expenseCount = snapshot.expenses.size,
+                inventoryCount = snapshot.inventory.size,
+                taskCount = snapshot.tasks.size,
+                incidentCount = snapshot.fieldIncidents.size,
+                assistanceCount = snapshot.assistance.size,
+                photoCount = photos.size + availableLegacyPhotos,
+                unavailablePhotoCount = unavailableLegacyPhotos,
+                isLegacyJson = !parsed.isArchive,
+                exportedAt = parsed.json.optLong("exportedAt").takeIf { it > 0L }
+            )
+
+            val previous = pendingBackupRestore
+            pendingBackupRestore = PendingBackupRestore(snapshot, parsed, photos, preview)
+            _backupPreview.value = preview
+            _backupStatus.value = "Backup validated. Review the restore summary before continuing."
+            if (previous != null && previous.archive !== parsed) {
+                withContext(Dispatchers.IO) { FarmBackupArchive.cleanupStaging(previous.archive) }
+            }
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            withContext(Dispatchers.IO) { FarmBackupArchive.cleanupStaging(readBackup) }
+            _backupStatus.value = "Backup validation failed: " + (error.message ?: "Invalid backup file.")
+            _backupPreview.value = null
+            pendingBackupRestore = null
+        }
+    }
+
+    fun cancelBackupRestore() {
+        if (_backupRestoreInProgress.value) return
+        val pending = pendingBackupRestore
+        pendingBackupRestore = null
+        _backupPreview.value = null
+        if (pending != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                FarmBackupArchive.cleanupStaging(pending.archive)
+            }
+        }
+        _backupStatus.value = "Restore cancelled. Your current farm records were not changed."
+    }
+
+    fun confirmBackupRestore() = launch {
+        if (_backupRestoreInProgress.value) return@launch
+        val pending = pendingBackupRestore
+        if (pending == null) {
+            _backupStatus.value = "No validated backup is waiting to be restored."
+            _backupPreview.value = null
+            return@launch
+        }
+
+        _backupRestoreInProgress.value = true
+        val context = getApplication<Application>()
+        var copiedEvidenceUris = emptyList<String>()
+        var databaseCommitted = false
+        try {
+            val prepared = withContext(Dispatchers.IO) {
+                val copied = mutableListOf<String>()
+                try {
+                    val incidents = pending.snapshot.fieldIncidents.map { incident ->
+                        val photo = pending.photosByIncidentId[incident.id]
+                        when {
+                            photo != null -> {
+                                val newUri = FarmBackupArchive.copyEvidenceIntoPrivateStorage(
+                                    context,
+                                    photo.entry,
+                                    photo.mimeType
+                                ).toString()
+                                copied += newUri
+                                incident.copy(evidenceUri = newUri)
+                            }
+                            incident.evidenceUri.isNotBlank() &&
+                                !FarmBackupArchive.isEvidenceReadable(context, incident.evidenceUri) ->
+                                incident.copy(evidenceUri = "")
+                            else -> incident
+                        }
+                    }
+                    incidents to copied.toList()
+                } catch (error: Exception) {
+                    copied.forEach { FarmBackupArchive.deletePrivateEvidence(context, it) }
+                    throw error
+                }
+            }
+            copiedEvidenceUris = prepared.second
+            val restoredSnapshot = pending.snapshot.copy(fieldIncidents = prepared.first)
+            validateSnapshot(restoredSnapshot)
+            repository.replaceAll(restoredSnapshot)
+            databaseCommitted = true
+
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    FarmBackupArchive.cleanupUnreferencedEvidence(
+                        context,
+                        restoredSnapshot.fieldIncidents.map { it.evidenceUri }.filter { it.isNotBlank() }.toSet()
+                    )
+                }
+                FarmBackupArchive.cleanupStaging(pending.archive)
+            }
+            val droppedPhotos = pending.preview.unavailablePhotoCount
+            _backupStatus.value = buildString {
+                append("Backup restored successfully. ")
+                append("Replaced records atomically; ")
+                append(pending.preview.fieldCount).append(" field(s), ")
+                append(pending.preview.cropCount).append(" crop(s), ")
+                append(pending.preview.livestockCount).append(" livestock group(s), and ")
+                append(pending.preview.incidentCount).append(" incident(s) restored.")
+                if (droppedPhotos > 0) append(" ").append(droppedPhotos).append(" unavailable legacy photo(s) were detached.")
+            }
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            if (!databaseCommitted) {
+                withContext(Dispatchers.IO) {
+                    copiedEvidenceUris.forEach { FarmBackupArchive.deletePrivateEvidence(context, it) }
+                }
+            }
+            _backupStatus.value = "Restore failed: " + (error.message ?: "Backup could not be restored.") +
+                if (databaseCommitted) "" else " Existing database records were preserved."
+        } finally {
+            withContext(Dispatchers.IO) { FarmBackupArchive.cleanupStaging(pending.archive) }
+            pendingBackupRestore = null
+            _backupPreview.value = null
+            _backupRestoreInProgress.value = false
         }
     }
 
@@ -322,23 +524,6 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun importBackup(uri: Uri) = launch {
-        runCatching {
-            val input = getApplication<Application>().contentResolver.openInputStream(uri)
-                ?: error("Unable to open the selected backup file.")
-            val text = input.bufferedReader().use { it.readText() }
-            require(text.isNotBlank()) { "Backup file is empty." }
-            val json = JSONObject(text)
-            validateBackup(json)
-            val snapshot = jsonToSnapshot(json)
-            repository.replaceAll(snapshot)
-        }.onSuccess {
-            _backupStatus.value = "Backup imported successfully. Room data restored."
-        }.onFailure {
-            _backupStatus.value = "Backup import failed: " + (it.message ?: "Invalid backup file.")
-        }
-    }
-
     private fun validateBackup(json: JSONObject) {
         require(json.optString("app") == "AgriVision") { "This is not an AgriVision backup." }
         val backupVersion = json.optInt("backupVersion", 0)
@@ -347,12 +532,252 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         require(effectiveBackupVersion == BACKUP_FORMAT_VERSION) {
             "Unsupported backup format version: " + effectiveBackupVersion
         }
-        val schemaVersion = json.optInt("schemaVersion", legacyVersion)
+        val schemaVersion = json.optInt("schemaVersion", json.optInt("version", effectiveBackupVersion))
         require(schemaVersion in 1..ROOM_SCHEMA_VERSION) {
             "Unsupported Room schema version: " + schemaVersion
         }
         require(json.optJSONObject("farmerProfile") != null) { "Backup is missing farmerProfile." }
         require(json.optJSONObject("farm") != null) { "Backup is missing farm data." }
+
+        val rootArrays = listOf(
+            "fields", "livestock", "livestockLifecycleEvents", "crops", "cropLifecycleEvents",
+            "production", "expenses", "sales", "inventory", "inventoryTransactions", "feedLogs",
+            "equipment", "tasks", "assistance", "fieldIncidents", "incidentEvents"
+        )
+        rootArrays.forEach { key ->
+            if (json.has(key)) {
+                val value = json.opt(key)
+                require(value is JSONArray) { "Backup section '$key' is not a valid list." }
+                requireJsonObjectEntries(key, value)
+            }
+        }
+        if (json.has("reportSubmission")) {
+            require(json.optJSONObject("reportSubmission") != null) { "Backup reportSubmission section is invalid." }
+        }
+        if (json.has("operationalRecords")) {
+            val operational = json.optJSONObject("operationalRecords")
+                ?: error("Backup operationalRecords section is invalid.")
+            listOf("livestock", "livestockLifecycleEvents", "crops", "production", "expenses", "sales", "inventory", "inventoryTransactions", "feedLogs")
+                .forEach { key ->
+                    if (operational.has(key)) {
+                        val value = operational.opt(key)
+                        require(value is JSONArray) { "Backup operational section '$key' is not a valid list." }
+                        requireJsonObjectEntries("operationalRecords.$key", value)
+                    }
+                }
+        }
+        if (json.has("incidentEvidence")) {
+            val value = json.opt("incidentEvidence")
+            require(value is JSONArray) { "Backup incidentEvidence section is invalid." }
+            requireJsonObjectEntries("incidentEvidence", value)
+        }
+    }
+
+    private fun requireJsonObjectEntries(section: String, array: JSONArray) {
+        for (index in 0 until array.length()) {
+            require(array.optJSONObject(index) != null) {
+                "Backup section '$section' has an invalid record at position ${index + 1}."
+            }
+        }
+    }
+
+    private fun validateArchiveEvidence(
+        archive: ReadFarmBackup,
+        snapshot: FarmSnapshot
+    ): Map<String, PendingRestorePhoto> {
+        if (!archive.isArchive) {
+            require(archive.entries.isEmpty()) { "Invalid legacy backup state." }
+            require(archive.json.optInt("archiveVersion", 0) == 0) {
+                "This backup manifest requires its original .zip archive to restore incident photos."
+            }
+            return emptyMap()
+        }
+
+        require(archive.json.optInt("archiveVersion", 0) == FarmBackupArchive.ARCHIVE_VERSION) {
+            "Unsupported backup archive version."
+        }
+        val manifest = archive.json.optJSONArray("incidentEvidence")
+            ?: error("Backup archive is missing incident photo metadata.")
+        val incidentIds = snapshot.fieldIncidents.map { it.id }.toSet()
+        val photosByIncident = linkedMapOf<String, PendingRestorePhoto>()
+        val referencedPaths = linkedSetOf<String>()
+
+        for (index in 0 until manifest.length()) {
+            val row = manifest.getJSONObject(index)
+            val incidentId = row.optString("incidentId").trim()
+            val entryPath = row.optString("entryPath")
+            val expectedHash = row.optString("sha256").lowercase()
+            val expectedSize = row.optLong("sizeBytes", -1L)
+            val mimeType = row.optString("mimeType").ifBlank { "application/octet-stream" }
+            require(incidentId.isNotBlank() && incidentId in incidentIds) {
+                "Backup photo points to an incident that is not in the backup."
+            }
+            require(!photosByIncident.containsKey(incidentId)) {
+                "Backup contains multiple photos for incident $incidentId."
+            }
+            require(entryPath.startsWith("photos/") && !entryPath.contains("..")) {
+                "Backup contains an invalid photo path."
+            }
+            val staged = archive.entries[entryPath]
+                ?: error("Backup photo file is missing for incident $incidentId.")
+            require(expectedSize > 0L && staged.sizeBytes == expectedSize && staged.sha256 == expectedHash) {
+                "Photo integrity check failed for incident $incidentId. The backup may be damaged."
+            }
+            require(mimeType.startsWith("image/") || mimeType == "application/octet-stream") {
+                "Backup includes an unsupported incident attachment type."
+            }
+            require(referencedPaths.add(entryPath)) { "Backup reuses a photo file more than once." }
+            photosByIncident[incidentId] = PendingRestorePhoto(staged, mimeType)
+        }
+
+        require(referencedPaths == archive.entries.keys) {
+            "Backup includes missing or unreferenced photo files. Nothing has been restored."
+        }
+        val incidentsWithEvidence = snapshot.fieldIncidents.filter { it.evidenceUri.isNotBlank() }.map { it.id }.toSet()
+        require(incidentsWithEvidence == photosByIncident.keys) {
+            "Backup incident photo metadata does not match the incident records."
+        }
+        return photosByIncident
+    }
+
+    private fun validateSnapshot(snapshot: FarmSnapshot) {
+        fun uniqueIds(label: String, ids: List<String>, required: Boolean = false): Set<String> {
+            if (required) require(ids.all { it.isNotBlank() }) { "Backup contains a record with a missing $label ID." }
+            val nonBlank = ids.filter { it.isNotBlank() }
+            val duplicates = nonBlank.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+            require(duplicates.isEmpty()) {
+                "Backup contains duplicate $label IDs: " + duplicates.take(3).joinToString(", ")
+            }
+            return nonBlank.toSet()
+        }
+
+        val fieldIds = uniqueIds("field", snapshot.fields.map { it.fieldId }, required = snapshot.fields.isNotEmpty())
+        val cropIds = uniqueIds("crop", snapshot.crops.map { it.cropId })
+        val livestockIds = uniqueIds("livestock group", snapshot.livestock.map { it.groupId })
+        val incidentIds = uniqueIds("incident", snapshot.fieldIncidents.map { it.id }, required = snapshot.fieldIncidents.isNotEmpty())
+        uniqueIds("crop lifecycle event", snapshot.cropLifecycleEvents.map { it.eventId })
+        uniqueIds("livestock lifecycle event", snapshot.livestockLifecycleEvents.map { it.eventId })
+        uniqueIds("inventory item", snapshot.inventory.map { it.inventoryId })
+        uniqueIds("inventory transaction", snapshot.inventoryTransactions.map { it.transactionId })
+        uniqueIds("feed log", snapshot.feedLogs.map { it.feedLogId })
+        uniqueIds("incident event", snapshot.incidentEvents.map { it.eventId })
+
+        require(snapshot.fields.all { it.areaHectares.isFinite() && it.areaHectares >= 0.0 }) {
+            "Backup contains an invalid field area."
+        }
+        require(snapshot.crops.all { it.area.trim().isEmpty() || it.area.trim().toDoubleOrNull()?.let { v -> v.isFinite() && v >= 0.0 } == true }) {
+            "Backup contains an invalid crop area."
+        }
+        require(snapshot.livestock.all { it.count >= 0 && it.initialPopulation >= 0 && it.currentPopulation >= 0 }) {
+            "Backup contains an invalid livestock count."
+        }
+        require(snapshot.production.all { it.areaHectares.isFinite() && it.areaHectares >= 0.0 }) {
+            "Backup contains an invalid production area."
+        }
+        require(snapshot.expenses.all { it.amount.isFinite() && it.amount > 0.0 }) {
+            "Backup contains an invalid expense amount."
+        }
+        require(snapshot.sales.all { it.amount.isFinite() && it.amount > 0.0 }) {
+            "Backup contains an invalid sale amount."
+        }
+        require(snapshot.inventory.all {
+            it.stock.isFinite() && it.stock >= 0.0 && it.purchasePrice.isFinite() && it.purchasePrice >= 0.0
+        }) { "Backup contains invalid inventory values." }
+        require(snapshot.inventoryTransactions.all { it.quantity.isFinite() && it.quantity >= 0.0 }) {
+            "Backup contains an invalid inventory transaction quantity."
+        }
+        require(snapshot.feedLogs.all { it.quantityKg.isFinite() && it.quantityKg >= 0.0 }) {
+            "Backup contains an invalid feed log quantity."
+        }
+        require(snapshot.cropLifecycleEvents.all { it.quantity.isBlank() || it.quantity.trim().toDoubleOrNull()?.let { v -> v.isFinite() && v >= 0.0 } == true }) {
+            "Backup contains an invalid crop lifecycle quantity."
+        }
+        require(snapshot.livestockLifecycleEvents.all {
+            it.quantity.isFinite() && it.quantity >= 0.0 && it.amount.isFinite() && it.amount >= 0.0
+        }) { "Backup contains invalid livestock lifecycle values." }
+
+        snapshot.fields.forEach { field ->
+            require((field.latitude == null && field.longitude == null) || (field.latitude != null && field.longitude != null)) {
+                "Field ${field.name} has incomplete GPS coordinates."
+            }
+            require(field.latitude == null || (field.latitude.isFinite() && field.latitude in -90.0..90.0)) {
+                "Field ${field.name} has invalid latitude."
+            }
+            require(field.longitude == null || (field.longitude.isFinite() && field.longitude in -180.0..180.0)) {
+                "Field ${field.name} has invalid longitude."
+            }
+            require(field.boundaryPoints.all { it.latitude.isFinite() && it.latitude in -90.0..90.0 && it.longitude.isFinite() && it.longitude in -180.0..180.0 }) {
+                "Field ${field.name} has invalid boundary coordinates."
+            }
+        }
+        snapshot.fieldIncidents.forEach { incident ->
+            require((incident.latitude == null && incident.longitude == null) || (incident.latitude != null && incident.longitude != null)) {
+                "Incident ${incident.id} has incomplete GPS coordinates."
+            }
+            require(incident.latitude == null || (incident.latitude.isFinite() && incident.latitude in -90.0..90.0)) {
+                "Incident ${incident.id} has invalid latitude."
+            }
+            require(incident.longitude == null || (incident.longitude.isFinite() && incident.longitude in -180.0..180.0)) {
+                "Incident ${incident.id} has invalid longitude."
+            }
+            require(incident.affectedAreaBoundary.all { it.latitude.isFinite() && it.latitude in -90.0..90.0 && it.longitude.isFinite() && it.longitude in -180.0..180.0 }) {
+                "Incident ${incident.id} has invalid boundary coordinates."
+            }
+        }
+        require(snapshot.incidentEvents.all { it.incidentId.isBlank() || it.incidentId in incidentIds }) {
+            "Backup contains an incident event linked to a missing incident."
+        }
+        require(snapshot.assistance.all { it.incidentId.isBlank() || it.incidentId in incidentIds }) {
+            "Backup contains an assistance record linked to a missing incident."
+        }
+        if (fieldIds.isNotEmpty()) {
+            require(snapshot.crops.all { it.fieldId.isBlank() || it.fieldId in fieldIds }) {
+                "Backup contains a crop linked to a field that does not exist."
+            }
+            require(snapshot.cropLifecycleEvents.all { it.fieldId.isBlank() || it.fieldId in fieldIds }) {
+                "Backup contains a crop history record linked to a missing field."
+            }
+        }
+        if (cropIds.isNotEmpty()) {
+            require(snapshot.cropLifecycleEvents.all { it.cropId.isBlank() || it.cropId in cropIds }) {
+                "Backup contains crop history linked to a missing crop."
+            }
+        }
+        if (livestockIds.isNotEmpty()) {
+            require(snapshot.livestockLifecycleEvents.all { it.livestockId.isBlank() || it.livestockId in livestockIds }) {
+                "Backup contains livestock history linked to a missing livestock group."
+            }
+            require(snapshot.feedLogs.all { it.livestockId.isBlank() || it.livestockId in livestockIds }) {
+                "Backup contains a feed log linked to a missing livestock group."
+            }
+        }
+        snapshot.expenses.forEach { validateFinancialLink(it.sourceType, it.sourceId, it.fieldId, cropIds, livestockIds, fieldIds) }
+        snapshot.sales.forEach { validateFinancialLink(it.sourceType, it.sourceId, it.fieldId, cropIds, livestockIds, fieldIds) }
+    }
+
+    private fun validateFinancialLink(
+        sourceType: String,
+        sourceId: String,
+        fieldId: String,
+        cropIds: Set<String>,
+        livestockIds: Set<String>,
+        fieldIds: Set<String>
+    ) {
+        when (sourceType.trim().lowercase(java.util.Locale.US)) {
+            "", "unlinked" -> require(sourceId.isBlank()) { "Backup has an unlinked financial record with a source ID." }
+            "crop" -> {
+                require(sourceId.isNotBlank() && (cropIds.isEmpty() || sourceId in cropIds)) {
+                    "Backup has a financial record linked to a missing crop."
+                }
+            }
+            "livestock" -> require(sourceId.isNotBlank() && (livestockIds.isEmpty() || sourceId in livestockIds)) {
+                "Backup has a financial record linked to a missing livestock group."
+            }
+            else -> error("Backup contains an unsupported financial source type: $sourceType.")
+        }
+        require(fieldId.isBlank() || fieldIds.isEmpty() || fieldId in fieldIds) {
+            "Backup has a financial record linked to a missing field."
+        }
     }
 
     private suspend fun currentSnapshot(): FarmSnapshot {
