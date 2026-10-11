@@ -66,7 +66,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         const val BACKUP_FORMAT_VERSION = 1
-        const val ROOM_SCHEMA_VERSION = 11
+        const val ROOM_SCHEMA_VERSION = 12
     }
 
     private val _backupStatus = MutableStateFlow("")
@@ -238,6 +238,12 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     fun addProduction(value: ProductionRecord) = launch { repository.saveProduction(value) }
     fun addExpense(value: ExpenseRecord) = launch { repository.saveExpense(value) }
     fun addSale(value: SaleRecord) = launch { repository.saveSale(value) }
+    fun setExpensePaymentStatus(value: ExpenseRecord, status: String) = launch {
+        repository.updateExpensePaymentStatus(value, status)
+    }
+    fun setSalePaymentStatus(value: SaleRecord, status: String) = launch {
+        repository.updateSalePaymentStatus(value, status)
+    }
 
     fun addTask(value: FarmTask) = launch { repository.saveTask(value) }
 
@@ -749,6 +755,8 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         uniqueIds("crop lifecycle event", snapshot.cropLifecycleEvents.map { it.eventId })
         uniqueIds("livestock lifecycle event", snapshot.livestockLifecycleEvents.map { it.eventId })
         uniqueIds("inventory item", snapshot.inventory.map { it.inventoryId })
+        uniqueIds("expense", snapshot.expenses.map { it.expenseId })
+        uniqueIds("sale", snapshot.sales.map { it.saleId })
         uniqueIds("inventory transaction", snapshot.inventoryTransactions.map { it.transactionId })
         uniqueIds("feed log", snapshot.feedLogs.map { it.feedLogId })
         uniqueIds("incident event", snapshot.incidentEvents.map { it.eventId })
@@ -769,11 +777,11 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         require(snapshot.production.all { it.areaHectares.isFinite() && it.areaHectares >= 0.0 }) {
             "Backup contains an invalid production area."
         }
-        require(snapshot.expenses.all { it.amount.isFinite() && it.amount > 0.0 }) {
-            "Backup contains an invalid expense amount."
+        require(snapshot.expenses.all { it.amount.isFinite() && it.amount > 0.0 && it.paymentStatus in setOf("Paid", "Unpaid") }) {
+            "Backup contains an invalid expense amount or payment status."
         }
-        require(snapshot.sales.all { it.amount.isFinite() && it.amount > 0.0 }) {
-            "Backup contains an invalid sale amount."
+        require(snapshot.sales.all { it.amount.isFinite() && it.amount > 0.0 && it.paymentStatus in setOf("Paid", "Unpaid") }) {
+            "Backup contains an invalid sale amount or payment status."
         }
         require(snapshot.inventory.all {
             it.stock.isFinite() && it.stock >= 0.0 && it.purchasePrice.isFinite() && it.purchasePrice >= 0.0
@@ -1068,6 +1076,7 @@ private fun ProductionRecord.toJson() = JSONObject().apply {
     put("productionType", productionType)
 }
 private fun ExpenseRecord.toJson() = JSONObject().apply {
+    put("expenseId", expenseId)
     put("category", category)
     put("amount", amount)
     put("note", note)
@@ -1075,8 +1084,10 @@ private fun ExpenseRecord.toJson() = JSONObject().apply {
     put("sourceType", sourceType)
     put("sourceId", sourceId)
     put("fieldId", fieldId)
+    put("paymentStatus", paymentStatus)
 }
 private fun SaleRecord.toJson() = JSONObject().apply {
+    put("saleId", saleId)
     put("product", product)
     put("amount", amount)
     put("date", date)
@@ -1084,6 +1095,7 @@ private fun SaleRecord.toJson() = JSONObject().apply {
     put("sourceType", sourceType)
     put("sourceId", sourceId)
     put("fieldId", fieldId)
+    put("paymentStatus", paymentStatus)
 }
 private fun InventoryItem.toJson() = JSONObject().apply {
     put("name", name)
@@ -1321,7 +1333,9 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             date = o.optString("date"),
             sourceType = o.optString("sourceType"),
             sourceId = o.optString("sourceId"),
-            fieldId = o.optString("fieldId")
+            fieldId = o.optString("fieldId"),
+            expenseId = o.optString("expenseId"),
+            paymentStatus = o.optString("paymentStatus", "Paid")
         ) }
     val sales = mutableListOf<SaleRecord>()
     parseList(salesArray) { o, _ -> sales += SaleRecord(
@@ -1331,7 +1345,9 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             incomeCategory = o.optString("incomeCategory", "Other Income"),
             sourceType = o.optString("sourceType"),
             sourceId = o.optString("sourceId"),
-            fieldId = o.optString("fieldId")
+            fieldId = o.optString("fieldId"),
+            saleId = o.optString("saleId"),
+            paymentStatus = o.optString("paymentStatus", "Paid")
         ) }
     val inventory = mutableListOf<InventoryItem>()
     parseList(inventoryArray) { o, _ ->

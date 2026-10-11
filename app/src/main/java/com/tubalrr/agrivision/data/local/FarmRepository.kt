@@ -240,7 +240,9 @@ class FarmRepository(
                     date = it.date,
                     sourceType = it.sourceType,
                     sourceId = it.sourceId,
-                    fieldId = it.fieldId
+                    fieldId = it.fieldId,
+                    expenseId = it.expenseId,
+                    paymentStatus = it.paymentStatus
                 )
             }
         }
@@ -255,7 +257,9 @@ class FarmRepository(
                     incomeCategory = it.incomeCategory,
                     sourceType = it.sourceType,
                     sourceId = it.sourceId,
-                    fieldId = it.fieldId
+                    fieldId = it.fieldId,
+                    saleId = it.saleId,
+                    paymentStatus = it.paymentStatus
                 )
             }
         }
@@ -906,9 +910,13 @@ suspend fun saveField(record: FieldRecord) {
         }
     }
 
-    suspend fun saveExpense(record: ExpenseRecord, expenseId: String = UUID.randomUUID().toString()) {
+    suspend fun saveExpense(
+        record: ExpenseRecord,
+        expenseId: String = record.expenseId.ifBlank { UUID.randomUUID().toString() }
+    ) {
         require(record.category.isNotBlank()) { "Expense category is required." }
         require(record.amount.isFinite() && record.amount > 0.0) { "Expense amount must be a finite positive number." }
+        require(record.paymentStatus in setOf("Paid", "Unpaid")) { "Expense payment status must be Paid or Unpaid." }
         validateFinancialSource(record.sourceType, record.sourceId, record.fieldId)
         val date = record.date.ifBlank { "Today" }
 
@@ -922,15 +930,20 @@ suspend fun saveField(record: FieldRecord) {
                 note = record.note,
                 sourceType = record.sourceType,
                 sourceId = record.sourceId,
-                fieldId = record.fieldId
+                fieldId = record.fieldId,
+                paymentStatus = record.paymentStatus
             )
         )
     }
 
-    suspend fun saveSale(record: SaleRecord, saleId: String = UUID.randomUUID().toString()) {
+    suspend fun saveSale(
+        record: SaleRecord,
+        saleId: String = record.saleId.ifBlank { UUID.randomUUID().toString() }
+    ) {
         require(record.product.isNotBlank()) { "Income source is required." }
         require(record.incomeCategory.isNotBlank()) { "Income category is required." }
         require(record.amount.isFinite() && record.amount > 0.0) { "Income amount must be a finite positive number." }
+        require(record.paymentStatus in setOf("Paid", "Unpaid")) { "Income payment status must be Paid or Unpaid." }
         validateFinancialSource(record.sourceType, record.sourceId, record.fieldId)
 
         dao.upsertSale(
@@ -943,9 +956,26 @@ suspend fun saveField(record: FieldRecord) {
                 incomeCategory = record.incomeCategory,
                 sourceType = record.sourceType,
                 sourceId = record.sourceId,
-                fieldId = record.fieldId
+                fieldId = record.fieldId,
+                paymentStatus = record.paymentStatus
             )
         )
+    }
+
+    suspend fun updateExpensePaymentStatus(record: ExpenseRecord, nextStatus: String) {
+        require(nextStatus in setOf("Paid", "Unpaid")) { "Payment status must be Paid or Unpaid." }
+        require(record.expenseId.isNotBlank()) { "Expense ID missing. Reopen Finance and try again." }
+        val entity = dao.observeExpenses(DEFAULT_FARM_ID).first().firstOrNull { it.expenseId == record.expenseId }
+            ?: error("Expense record not found.")
+        dao.upsertExpense(entity.copy(paymentStatus = nextStatus))
+    }
+
+    suspend fun updateSalePaymentStatus(record: SaleRecord, nextStatus: String) {
+        require(nextStatus in setOf("Paid", "Unpaid")) { "Payment status must be Paid or Unpaid." }
+        require(record.saleId.isNotBlank()) { "Sale ID missing. Reopen Finance and try again." }
+        val entity = dao.observeSales(DEFAULT_FARM_ID).first().firstOrNull { it.saleId == record.saleId }
+            ?: error("Sales record not found.")
+        dao.upsertSale(entity.copy(paymentStatus = nextStatus))
     }
 
     suspend fun saveTask(record: FarmTask, taskId: String = UUID.randomUUID().toString()) {

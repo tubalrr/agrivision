@@ -220,7 +220,8 @@ data class ExpenseEntity(
     @ColumnInfo(defaultValue = "''") val sourceType: String = "",
     @ColumnInfo(defaultValue = "''") val sourceId: String = "",
     @ColumnInfo(defaultValue = "''") val fieldId: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "'Paid'") val paymentStatus: String = "Paid"
 )
 
 @Entity(
@@ -242,7 +243,8 @@ data class SaleEntity(
     @ColumnInfo(defaultValue = "''") val sourceType: String = "",
     @ColumnInfo(defaultValue = "''") val sourceId: String = "",
     @ColumnInfo(defaultValue = "''") val fieldId: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "'Paid'") val paymentStatus: String = "Paid"
 )
 
 @Entity(

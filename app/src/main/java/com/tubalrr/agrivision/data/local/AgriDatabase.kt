@@ -28,7 +28,7 @@ import androidx.room.RoomDatabase
         IncidentEventEntity::class,
         ReportSubmissionEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -46,7 +46,7 @@ abstract class AgriDatabase : RoomDatabase() {
                     AgriDatabase::class.java,
                     "agrivision.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -336,6 +336,14 @@ abstract class AgriDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE sales ADD COLUMN fieldId TEXT NOT NULL DEFAULT ''")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_expenses_farmId_sourceType_sourceId ON expenses(farmId, sourceType, sourceId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_sales_farmId_sourceType_sourceId ON sales(farmId, sourceType, sourceId)")
+            }
+        }
+
+        private val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Previous versions did not track settlement; legacy transactions remain classified as paid.
+                db.execSQL("ALTER TABLE expenses ADD COLUMN paymentStatus TEXT NOT NULL DEFAULT 'Paid'")
+                db.execSQL("ALTER TABLE sales ADD COLUMN paymentStatus TEXT NOT NULL DEFAULT 'Paid'")
             }
         }
 
