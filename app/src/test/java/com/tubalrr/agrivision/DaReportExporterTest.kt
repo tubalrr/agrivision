@@ -57,7 +57,7 @@ class DaReportExporterTest {
         )
         assertEquals(
             listOf("first line", "second"),
-            wrapReportText("first line\\nsecond", 11f) { it.length.toFloat() }
+            wrapReportText("first line\nsecond", 11f) { it.length.toFloat() }
         )
     }
 
@@ -66,6 +66,7 @@ class DaReportExporterTest {
         val lines = wrapReportText("ab😀cd", 2f) { it.length.toFloat() }
 
         assertEquals(listOf("ab", "😀", "cd"), lines)
-        org.junit.Assert.assertTrue(lines.none { it.any { char -> Character.isHighSurrogate(char) } && it.none { char -> Character.isLowSurrogate(char) } })
+        assertEquals(1, lines.sumOf { line -> line.count { Character.isHighSurrogate(it) } })
+        assertEquals(1, lines.sumOf { line -> line.count { Character.isLowSurrogate(it) } })
     }
 }
