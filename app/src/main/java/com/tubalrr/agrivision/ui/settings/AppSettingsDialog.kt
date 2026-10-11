@@ -43,6 +43,8 @@ internal fun AppSettingsDialog(
     onConfirmBackupImportChange: (Boolean) -> Unit,
     compactNavigation: Boolean,
     onCompactNavigationChange: (Boolean) -> Unit,
+    farmRemindersEnabled: Boolean,
+    onFarmRemindersChange: (Boolean) -> Unit,
     themeMode: String,
     onThemeModeChange: (String) -> Unit,
     onReset: () -> Unit,
@@ -64,7 +66,7 @@ internal fun AppSettingsDialog(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("App Preferences", fontWeight = FontWeight.ExtraBold)
-                Text("AgriVision · Version 1.15.1", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                Text("AgriVision · Version 1.16.0", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
             }
         },
         text = {
@@ -144,6 +146,15 @@ internal fun AppSettingsDialog(
                         icon = Icons.Outlined.BookmarkBorder,
                         checked = rememberLastTab,
                         onCheckedChange = onRememberLastTabChange
+                    )
+                }
+                item {
+                    SettingsOption(
+                        title = "Daily farm reminders",
+                        description = "Notify about due tasks, harvest dates within 3 days, and low or expiring stock. Android may delay background delivery.",
+                        icon = Icons.Outlined.NotificationsActive,
+                        checked = farmRemindersEnabled,
+                        onCheckedChange = onFarmRemindersChange
                     )
                 }
                 item {
