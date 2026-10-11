@@ -281,6 +281,15 @@ The Feed Logs UI and source-linked production records are part of the current of
 The current Room schema is version 11. Migration 7 → 8 adds persisted incomeCategory to sales, migration 8 → 9 adds structured incident workflow metadata plus status-history fields, migration 9 → 10 adds farm/field/incident map geometry, and migration 10 → 11 adds optional source links for sales and expenses. Existing version-10 records receive blank source fields and remain unallocated instead of being guessed into a crop.
 
 
+## Version 1.17.0 — backup and restore integrity
+
+- A new ZIP backup stores the JSON data manifest and the original incident photo bytes together. Every bundled photo carries a safe archive entry path, byte count, MIME type, and SHA-256 checksum.
+- Export streams photo files into a temporary archive, validates each source, and only copies the completed archive to the selected destination. Per-photo size is capped at 12 MiB; aggregate photo bytes are capped at 250 MiB; the manifest is capped at 64 MiB on import.
+- Restore first stages archive entries into a private cache directory and rejects unsafe paths, unsupported entries, duplicate photo paths, missing photo files, checksum/size mismatches, malformed JSON sections, duplicate stable IDs, invalid numeric/GPS values, and dangling required relationships.
+- A user-facing preview summarizes the records and photos to be restored. The restore action is explicit and replaces records instead of merging. The existing Room replacement uses a database transaction, so a failed restore rolls back the database update. New photo files are removed if the database transaction fails.
+- Older JSON-only backups remain supported. Since they do not bundle photo bytes, an unavailable legacy photo reference is detached during restore and shown in the preview instead of being stored as a broken path.
+- Only files in the private incident-evidence directory that are not referenced after a successful restore are cleaned up. Data remains on-device; this feature does not introduce cloud sync.
+
 ## Version 1.16.0 — reliability and operating boundaries
 
 - Financial costing links a sale or expense explicitly to a crop/livestock source. Crop profit and cost-per-hectare use only explicitly linked transactions; unlinked amounts stay separately visible.
