@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.13.0** · Android version code: `15`
+
+This release refreshes the global Field & Harvest visual system with a clearer forest-green, soft-sage and harvest-gold palette, more complete Material 3 semantic colors for surfaces, outlines and error states, and a refined rounded bottom-navigation dock with stronger active-tab contrast. Existing screens, records and navigation behavior are retained.
+
 **Version 1.12.0** · Android version code: `14`
 
 This release adds manual inventory stock movements for Stock In, Usage, and Loss/Waste. Every movement updates the current balance and is saved to the existing inventory transaction history in the same database transaction. The app blocks usage/loss entries that exceed available stock and shows recent manual movements, including their dates and notes. No new database table or sample data is introduced.

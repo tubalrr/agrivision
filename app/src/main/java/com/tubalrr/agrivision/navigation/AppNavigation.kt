@@ -103,12 +103,33 @@ internal fun AgriVisionApp(
     val scheme = lightColorScheme(
         primary = AgriGreen,
         onPrimary = Color.White,
-        background = AgriCream,
-        surface = AgriCard,
-        onBackground = AgriText,
-        onSurface = AgriText,
+        primaryContainer = AgriGreenSoft,
+        onPrimaryContainer = AgriGreenDeep,
         secondary = AgriGold,
-        outline = AgriLine
+        onSecondary = AgriText,
+        secondaryContainer = AgriGoldSoft,
+        onSecondaryContainer = AgriText,
+        tertiary = AgriSage,
+        onTertiary = AgriGreenDeep,
+        tertiaryContainer = Color(0xFFEAF2E8),
+        onTertiaryContainer = AgriGreenDeep,
+        error = AgriDanger,
+        onError = Color.White,
+        errorContainer = Color(0xFFFCE8E5),
+        onErrorContainer = Color(0xFF761F1A),
+        background = AgriCream,
+        onBackground = AgriText,
+        surface = AgriCard,
+        onSurface = AgriText,
+        surfaceVariant = Color(0xFFEDF2EB),
+        onSurfaceVariant = AgriMuted,
+        surfaceTint = AgriGreen,
+        outline = AgriLine,
+        outlineVariant = Color(0xFFE8EDE5),
+        inverseSurface = AgriGreenDeep,
+        inverseOnSurface = Color(0xFFF1F5EF),
+        inversePrimary = Color(0xFF9DD6AD),
+        scrim = Color(0x990B1D12)
     )
 
     MaterialTheme(colorScheme = scheme) {
@@ -307,14 +328,14 @@ internal fun AgriBottomBar(
         "Tasks" to Icons.Outlined.Checklist,
         "Profile" to Icons.Outlined.Person
     )
-    val barShape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+    val barShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
     NavigationBar(
         containerColor = AgriCard,
         tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (compact) 70.dp else 82.dp)
+            .height(if (compact) 70.dp else 84.dp)
             .clip(barShape)
             .border(1.dp, AgriLine, barShape),
         windowInsets = NavigationBarDefaults.windowInsets
@@ -327,15 +348,16 @@ internal fun AgriBottomBar(
                     Icon(
                         item.second,
                         contentDescription = item.first,
-                        tint = if (selected == index) AgriGreen else AgriMuted,
-                        modifier = Modifier.size(if (selected == index) 22.dp else 20.dp)
+                        tint = if (selected == index) AgriGreenDeep else AgriMuted,
+                        modifier = Modifier.size(if (selected == index) 23.dp else 20.dp)
                     )
                 },
                 label = {
                     Text(
                         item.first,
+                        color = if (selected == index) AgriGreenDeep else AgriMuted,
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (selected == index) FontWeight.Bold else FontWeight.Medium,
+                        fontWeight = if (selected == index) FontWeight.ExtraBold else FontWeight.Medium,
                         maxLines = 1
                     )
                 },
@@ -344,7 +366,7 @@ internal fun AgriBottomBar(
                     selectedTextColor = AgriGreen,
                     unselectedIconColor = AgriMuted,
                     unselectedTextColor = AgriMuted,
-                    indicatorColor = AgriGreenSoft
+                    indicatorColor = Color(0xFFD8EDDE)
                 )
             )
         }
