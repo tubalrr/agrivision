@@ -29,6 +29,12 @@ Built with:
 
 ## Latest Version
 
+**Version 1.16.0** · Android version code: `20`
+
+This release adds optional source links for financial income/expenses, a crop cost-and-profit summary using only explicitly linked transactions, Room migration 10 → 11, and backup support for the new links. It also adds opt-in local reminders based on saved due tasks, near-term harvest dates, and low/expiring stock; optional GPS coordinate capture for fields/incidents; private local copying of attached incident photos; coordinate range validation; JUnit tests for crop lifecycle/cost calculations; and CI checks for tests, lint, debug APK, and an unsigned release APK artifact. Build status does not replace on-device validation. The release APK is unsigned until release-signing credentials are configured.
+
+Production-readiness boundaries: data remains on-device/offline-first; cloud account sync and official DA API transmission are not configured. Incident photo files are stored privately on the current device and are not embedded into cross-device JSON backup, so restore to another phone may require attaching the photos again. Daily notification delivery requires the user to enable reminders and allow notifications; Android may defer background work.
+
 **Version 1.15.1** · Android version code: `19`
 
 This patch prevents accidental app exits from Android edge-swipe/back gestures. Back from any non-Dashboard tab returns to Dashboard; back while on Dashboard opens an explicit Exit AgriVision confirmation with Stay in app and Exit app actions.
