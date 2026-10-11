@@ -29,11 +29,15 @@ Built with:
 
 ## Latest Version
 
+**Version 1.17.0** · Android version code: `21`
+
+This release hardens backup and restore. The exported `.zip` archive contains the full local JSON data snapshot and attached incident photos, with size checks and SHA-256 integrity verification for every bundled photo. Restore now validates the archive and record relationships, checks duplicate stable IDs and numeric/GPS values, stages photo files privately, and presents a record-count preview plus a final Replace & Restore confirmation before touching the database. The database replacement remains transactional; failed validation or restoration preserves existing Room data, and restore replaces rather than merges records. Older JSON backups remain supported, with inaccessible photo references clearly flagged and detached rather than silently left broken. Guardrails cap each photo at 12 MB, aggregate photos at 250 MB, and the manifest at 64 MB.
+
 **Version 1.16.0** · Android version code: `20`
 
 This release adds optional source links for financial income/expenses, a crop cost-and-profit summary using only explicitly linked transactions, Room migration 10 → 11, and backup support for the new links. It also adds opt-in local reminders based on saved due tasks, near-term harvest dates, low/expired stock, and active high-priority/review-pending cases; optional GPS coordinate capture for fields/incidents; private local copying of attached incident photos; coordinate range validation; JUnit tests for crop lifecycle/cost calculations; and CI checks for tests, lint, debug APK, and an unsigned release APK artifact. Build status does not replace on-device validation. The release APK is unsigned until release-signing credentials are configured.
 
-Production-readiness boundaries: data remains on-device/offline-first; cloud account sync and official DA API transmission are not configured. Incident photo files are stored privately on the current device and are not embedded into cross-device JSON backup, so restore to another phone may require attaching the photos again. Daily notification delivery requires the user to enable reminders and allow notifications; Android may defer background work.
+Production-readiness boundaries: data remains on-device/offline-first; cloud account sync and official DA API transmission are not configured. New ZIP backups include incident photo files for cross-device restore. Older JSON-only backups do not contain photo bytes, so photos can only be kept if their files are still readable on the restoring device. Daily notification delivery requires the user to enable reminders and allow notifications; Android may defer background work.
 
 **Version 1.15.1** · Android version code: `19`
 
