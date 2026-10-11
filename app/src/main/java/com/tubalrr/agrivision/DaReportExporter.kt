@@ -91,8 +91,14 @@ object DaReportExporter {
             listOf("Transaction ID", "Inventory ID", "Type", "Quantity", "Unit", "Date", "Source Type", "Source ID", "Notes"),
             s.inventoryTransactions.map { listOf(it.transactionId, it.inventoryId, it.type, number(it.quantity), it.unit, it.date, it.sourceType, it.sourceId, it.notes) }
         )
-        "Expenses" -> Data(listOf("Date", "Category", "Amount", "Note"), s.expenses.map { listOf(it.date, it.category, money(it.amount), it.note) })
-        "Sales" -> Data(listOf("Date", "Product", "Amount", "Income Category"), s.sales.map { listOf(it.date, it.product, money(it.amount), it.incomeCategory) })
+        "Expenses" -> Data(
+            listOf("Expense ID", "Date", "Category", "Amount", "Payment Status", "Source Type", "Source ID", "Field ID", "Note"),
+            s.expenses.map { listOf(it.expenseId, it.date, it.category, money(it.amount), it.paymentStatus, it.sourceType, it.sourceId, it.fieldId, it.note) }
+        )
+        "Sales" -> Data(
+            listOf("Sale ID", "Date", "Product", "Amount", "Income Category", "Payment Status", "Source Type", "Source ID", "Field ID"),
+            s.sales.map { listOf(it.saleId, it.date, it.product, money(it.amount), it.incomeCategory, it.paymentStatus, it.sourceType, it.sourceId, it.fieldId) }
+        )
         "Incidents" -> Data(
             listOf("Incident ID", "Date", "Type", "Commodity", "Field ID", "Severity", "Status", "Affected Area", "Description", "Reviewer"),
             s.fieldIncidents.map { listOf(it.id, it.date, it.type, it.commodity, it.fieldId, it.severity, it.status, it.affectedArea, it.description, it.reviewer) }
