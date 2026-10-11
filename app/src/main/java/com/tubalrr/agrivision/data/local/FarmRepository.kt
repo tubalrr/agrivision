@@ -857,10 +857,42 @@ suspend fun saveField(record: FieldRecord) {
         )
     }
 
+    private suspend fun validateFinancialSource(sourceType: String, sourceId: String, fieldId: String) {
+        val type = sourceType.trim()
+        if (type.isBlank()) {
+            require(sourceId.isBlank() && fieldId.isBlank()) {
+                "An unlinked financial record cannot keep a source ID or field ID."
+            }
+            return
+        }
+        require(sourceId.isNotBlank()) { "Choose a source record before saving." }
+        when (type.lowercase(Locale.US)) {
+            "crop" -> {
+                val crop = dao.getCrop(sourceId)
+                require(crop != null && crop.farmId == DEFAULT_FARM_ID) {
+                    "The selected crop no longer exists in this farm."
+                }
+                require(fieldId.isBlank() || crop.fieldId.isBlank() || crop.fieldId == fieldId) {
+                    "The selected field does not match the chosen crop."
+                }
+            }
+            "livestock" -> {
+                val group = dao.getLivestock(sourceId)
+                require(group != null && group.farmId == DEFAULT_FARM_ID) {
+                    "The selected livestock group no longer exists in this farm."
+                }
+                require(fieldId.isBlank()) { "Livestock financial records cannot be linked to a crop field." }
+            }
+            else -> throw IllegalArgumentException("Unsupported financial source type: " + type)
+        }
+    }
+
     suspend fun saveExpense(record: ExpenseRecord, expenseId: String = UUID.randomUUID().toString()) {
         require(record.category.isNotBlank()) { "Expense category is required." }
-        require(record.amount > 0.0) { "Expense amount must be greater than zero." }
-        val date = record.date.ifBlank { record.note }.ifBlank { "Today" }
+        require(record.amount.isFinite() && record.amount > 0.0) { "Expense amount must be a finite positive number." }
+        require(record.note.isNotBlank()) { "Expense description is required." }
+        validateFinancialSource(record.sourceType, record.sourceId, record.fieldId)
+        val date = record.date.ifBlank { "Today" }
 
         dao.upsertExpense(
             ExpenseEntity(
@@ -878,8 +910,10 @@ suspend fun saveField(record: FieldRecord) {
     }
 
     suspend fun saveSale(record: SaleRecord, saleId: String = UUID.randomUUID().toString()) {
+        require(record.product.isNotBlank()) { "Income source is required." }
         require(record.incomeCategory.isNotBlank()) { "Income category is required." }
-        require(record.amount > 0.0) { "Income amount must be greater than zero." }
+        require(record.amount.isFinite() && record.amount > 0.0) { "Income amount must be a finite positive number." }
+        validateFinancialSource(record.sourceType, record.sourceId, record.fieldId)
 
         dao.upsertSale(
             SaleEntity(
