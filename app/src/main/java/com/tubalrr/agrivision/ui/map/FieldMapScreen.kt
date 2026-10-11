@@ -43,6 +43,8 @@ import com.google.maps.android.compose.rememberUpdatedMarkerState
 import com.tubalrr.agrivision.domain.model.FarmRecord
 import com.tubalrr.agrivision.domain.model.FieldRecord
 import com.tubalrr.agrivision.domain.model.MapPoint
+import com.tubalrr.agrivision.domain.validation.MapGeometryValidation
+import com.tubalrr.agrivision.domain.validation.MapGeometryValidator
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -76,6 +78,8 @@ internal fun FieldMapScreen(
     var selectedFieldId by remember { mutableStateOf("") }
     var selectedIncidentId by remember { mutableStateOf("") }
     val draftPoints = remember { mutableStateListOf<MapPoint>() }
+    var mapValidationMessage by remember { mutableStateOf("") }
+    var showMapSaveConfirmation by remember { mutableStateOf(false) }
 
     LaunchedEffect(fields) {
         if (selectedFieldId.isBlank() && fields.isNotEmpty()) {
@@ -629,52 +633,110 @@ internal fun FieldMapScreen(
                     onTargetChange = {
                         editTarget = it
                         draftPoints.clear()
+                        mapValidationMessage = ""
                     },
                     fields = fields,
                     selectedFieldId = selectedFieldId,
                     onFieldChange = {
                         selectedFieldId = it
                         draftPoints.clear()
+                        mapValidationMessage = ""
                     },
                     incidents = incidents,
                     selectedIncidentId = selectedIncidentId,
                     onIncidentChange = {
                         selectedIncidentId = it
                         draftPoints.clear()
+                        mapValidationMessage = ""
                     },
                     draftPoints = draftPoints,
                     selectedField = selectedField,
                     selectedIncident = selectedIncident,
-                    onClear = { draftPoints.clear() },
+                    onClear = {
+                        draftPoints.clear()
+                        mapValidationMessage = ""
+                    },
                     onUndo = { if (draftPoints.isNotEmpty()) draftPoints.removeAt(draftPoints.lastIndex) },
                     onSave = {
-                        when (editTarget) {
-                            MapEditTarget.FARM -> {
-                                if (draftPoints.size >= 3) {
-                                    farmViewModel.saveFarmBoundary(draftPoints.toList())
-                                }
+                        val validation: MapGeometryValidation = when (editTarget) {
+                            MapEditTarget.FARM -> MapGeometryValidator.validatePolygon(draftPoints, "Farm")
+                            MapEditTarget.FIELD -> if (draftPoints.size == 1) {
+                                MapGeometryValidation(valid = true)
+                            } else {
+                                MapGeometryValidator.validatePolygon(draftPoints, "Field")
                             }
-                            MapEditTarget.FIELD -> {
-                                selectedField?.let { field ->
-                                    if (draftPoints.size == 1 || draftPoints.size >= 3) {
-                                        farmViewModel.saveFieldMapping(field, draftPoints.toList())
-                                    }
-                                }
-                            }
-                            MapEditTarget.INCIDENT -> {
-                                selectedIncident?.let { incident ->
-                                    if (draftPoints.size >= 3) {
-                                        farmViewModel.saveIncidentMapping(incident, draftPoints.toList())
-                                    }
-                                }
-                            }
+                            MapEditTarget.INCIDENT -> MapGeometryValidator.validatePolygon(draftPoints, "Incident")
+                        }
+                        if (validation.valid) {
+                            mapValidationMessage = ""
+                            showMapSaveConfirmation = true
+                        } else {
+                            mapValidationMessage = validation.message
                         }
                     }
                 )
             }
         }
 
-        item {
+        if (showMapSaveConfirmation) {
+            item {
+                AlertDialog(
+                    onDismissRequest = { showMapSaveConfirmation = false },
+                    title = { Text("Save map changes?", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            when (editTarget) {
+                                MapEditTarget.FARM -> "Save this farm boundary to the local farm record?"
+                                MapEditTarget.FIELD -> "Save this field mapping to the selected field?"
+                                MapEditTarget.INCIDENT -> "Save this affected area to the selected incident?"
+                            }
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showMapSaveConfirmation = false
+                                when (editTarget) {
+                                    MapEditTarget.FARM -> farmViewModel.saveFarmBoundary(draftPoints.toList())
+                                    MapEditTarget.FIELD -> selectedField?.let { farmViewModel.saveFieldMapping(it, draftPoints.toList()) }
+                                    MapEditTarget.INCIDENT -> selectedIncident?.let { farmViewModel.saveIncidentMapping(it, draftPoints.toList()) }
+                                }
+                            }
+                        ) { Text("Save mapping") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showMapSaveConfirmation = false }) { Text("Cancel") }
+                    }
+                )
+            }
+        }
+
+        if (mapValidationMessage.isNotBlank()) {
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (AgriIsDark) Color(0xFF3B211F) else Color(0xFFFFE8E5)
+                    )
+                ) {
+                    Row(
+                        Modifier.padding(13.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = AgriDanger)
+                        Text(
+                            mapValidationMessage,
+                            color = AgriDanger,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+
+                item {
             Text(
                 "Spatial relationship",
                 color = AgriGreen,
