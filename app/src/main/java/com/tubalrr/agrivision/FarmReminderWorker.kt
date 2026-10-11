@@ -29,6 +29,7 @@ internal class FarmReminderWorker(context: Context, params: WorkerParameters) : 
             val tasks = dao.observeTasks(FarmRepository.DEFAULT_FARM_ID).first()
             val crops = dao.observeCrops(FarmRepository.DEFAULT_FARM_ID).first()
             val inventory = dao.observeInventory(FarmRepository.DEFAULT_FARM_ID).first()
+            val incidents = dao.observeFieldIncidents(FarmRepository.DEFAULT_FARM_ID).first()
 
             val dueTasks = tasks.count { !it.done && parseDate(it.date)?.let { d -> !d.isAfter(today) } == true }
             val harvestSoon = crops.count { parseDate(it.expectedHarvest)?.let { d -> !d.isBefore(today) && !d.isAfter(today.plusDays(3)) } == true }
@@ -37,10 +38,18 @@ internal class FarmReminderWorker(context: Context, params: WorkerParameters) : 
                     parseDate(it.expiryDate)?.let { d -> !d.isAfter(today.plusDays(30)) } == true
             }
 
+            val caseAlerts = incidents.count { incident ->
+                incident.status != "Completed" && incident.status != "Draft" &&
+                    (incident.severity.equals("Critical", true) ||
+                        incident.severity.equals("High", true) ||
+                        incident.status.equals("Submitted", true) ||
+                        incident.status.equals("Under Review", true))
+            }
             val parts = buildList {
                 if (dueTasks > 0) add("$dueTasks task(s) due/overdue")
                 if (harvestSoon > 0) add("$harvestSoon harvest(s) within 3 days")
                 if (stockAlerts > 0) add("$stockAlerts stock/expiry alert(s)")
+                if (caseAlerts > 0) add("$caseAlerts active case(s) need review")
             }
             if (parts.isEmpty()) {
                 NotificationManagerCompat.from(applicationContext).cancel(1601)
