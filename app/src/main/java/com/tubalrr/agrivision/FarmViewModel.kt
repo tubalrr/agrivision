@@ -1,6 +1,7 @@
 package com.tubalrr.agrivision
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -79,8 +80,53 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
     private var pendingBackupRestore: PendingBackupRestore? = null
 
 
+    private val staffProfilePreferences = application.getSharedPreferences(
+        "agrivision_da_staff_profile",
+        Context.MODE_PRIVATE
+    )
+    private val _daStaffProfile = MutableStateFlow(readDaStaffProfile())
+    val daStaffProfile: StateFlow<DaStaffProfile> = _daStaffProfile
+
     private val database = AgriDatabase.getInstance(application)
     private val repository = FarmRepository(database)
+
+    private fun readDaStaffProfile(): DaStaffProfile = DaStaffProfile(
+        fullName = staffProfilePreferences.getString("full_name", "").orEmpty(),
+        staffId = staffProfilePreferences.getString("staff_id", "").orEmpty(),
+        designation = staffProfilePreferences.getString("designation", "DA Staff").orEmpty(),
+        office = staffProfilePreferences.getString("office", "").orEmpty(),
+        region = staffProfilePreferences.getString("region", "").orEmpty(),
+        province = staffProfilePreferences.getString("province", "").orEmpty(),
+        municipality = staffProfilePreferences.getString("municipality", "").orEmpty(),
+        contactNumber = staffProfilePreferences.getString("contact_number", "").orEmpty(),
+        officialEmail = staffProfilePreferences.getString("official_email", "").orEmpty()
+    )
+
+    fun saveDaStaffProfile(value: DaStaffProfile) {
+        val saved = value.copy(
+            fullName = value.fullName.trim(),
+            staffId = value.staffId.trim(),
+            designation = value.designation.trim().ifBlank { "DA Staff" },
+            office = value.office.trim(),
+            region = value.region.trim(),
+            province = value.province.trim(),
+            municipality = value.municipality.trim(),
+            contactNumber = value.contactNumber.trim(),
+            officialEmail = value.officialEmail.trim()
+        )
+        staffProfilePreferences.edit()
+            .putString("full_name", saved.fullName)
+            .putString("staff_id", saved.staffId)
+            .putString("designation", saved.designation)
+            .putString("office", saved.office)
+            .putString("region", saved.region)
+            .putString("province", saved.province)
+            .putString("municipality", saved.municipality)
+            .putString("contact_number", saved.contactNumber)
+            .putString("official_email", saved.officialEmail)
+            .apply()
+        _daStaffProfile.value = saved
+    }
 
     val profile: StateFlow<FarmerProfile> = repository.observeProfile().stateIn(
         viewModelScope,
