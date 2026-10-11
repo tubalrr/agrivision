@@ -47,6 +47,7 @@ internal fun ProductionFinanceScreen(
     totalAnimals: Int,
     openTasks: Int,
     farmerProfile: FarmerProfile,
+    registryEntries: List<FarmerFarmRegistryEntry>,
     assistance: List<AssistanceRecord>,
     fieldIncidents: List<FieldIncident>,
     incidentEvents: List<IncidentEvent>,
@@ -77,7 +78,7 @@ internal fun ProductionFinanceScreen(
     var reportMenuExpanded by remember { mutableStateOf(false) }
     val reportGroups = listOf(
         "All reports" to DaReportExporter.reportTypes,
-        "Registry" to listOf("Farmer Profile", "Farm Registry", "Field Summary"),
+        "Registry" to listOf("Farmer Profile", "Farm Registry", "Farmer Applications", "Field Summary"),
         "Production" to listOf("Crop Production", "Harvest", "Crop Lifecycle", "Livestock Inventory", "Livestock Lifecycle", "Feed Logs"),
         "Finance & Inputs" to listOf("Farm Inputs", "Inventory Transactions", "Expenses", "Sales"),
         "Incidents & DA" to listOf("Incidents", "Incident Audit", "Assistance")
@@ -269,6 +270,152 @@ internal fun ProductionFinanceScreen(
                     "Location" to listOf(farmerProfile.barangay, farmerProfile.municipality, farmerProfile.province).filter { it.isNotBlank() }.joinToString(", ").ifBlank { "—" },
                     "Commodities" to farmerProfile.commodities.ifBlank { "—" }
                 ))
+            }
+            item { SectionTitle("Farmer Registration Applications") }
+            item {
+                val awaitingReview = registryEntries.count {
+                    val status = it.profile.registryStatus
+                    status.isBlank() ||
+                        status.contains("review", ignoreCase = true) ||
+                        status.contains("pending", ignoreCase = true) ||
+                        status.contains("incomplete", ignoreCase = true)
+                }
+                val completed = registryEntries.count {
+                    val status = it.profile.registryStatus
+                    status.contains("approved", ignoreCase = true) ||
+                        status.contains("registered", ignoreCase = true) ||
+                        status.contains("complete", ignoreCase = true)
+                }
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = AgriCard),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(AgriGreenSoft),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.AssignmentInd, contentDescription = null, tint = AgriGreen)
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text("Farmer application register", color = AgriText, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "All farmer/farm applications saved on this device",
+                                    color = AgriMuted,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(11.dp),
+                                color = AgriGreenSoft
+                            ) {
+                                Text(
+                                    registryEntries.size.toString(),
+                                    Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                                    color = AgriGreen,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(
+                                Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(AgriCream).padding(11.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text("For review", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                                Text(awaitingReview.toString(), color = AgriWarning, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                            }
+                            Column(
+                                Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(AgriCream).padding(11.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text("Approved / complete", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                                Text(completed.toString(), color = AgriGreen, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                        if (registryEntries.isEmpty()) {
+                            Text(
+                                "No farmer applications saved yet. Register one in Profile → Farmer & Farm Registry.",
+                                color = AgriMuted,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            registryEntries.take(5).forEach { entry ->
+                                HorizontalDivider(color = AgriLine)
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                                ) {
+                                    Surface(
+                                        Modifier.size(34.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = AgriGreenSoft
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                entry.profile.farmerName.trim().split(Regex("\\s+"))
+                                                    .filter { it.isNotBlank() }.take(2)
+                                                    .map { it.first().uppercaseChar() }.joinToString("")
+                                                    .ifBlank { "F" },
+                                                color = AgriGreen,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            entry.profile.farmerName.ifBlank { "Unnamed farmer" },
+                                            color = AgriText,
+                                            fontWeight = FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            listOf(entry.profile.farmName, entry.profile.farmerId)
+                                                .filter { it.isNotBlank() }.joinToString(" · ")
+                                                .ifBlank { entry.farmId },
+                                            color = AgriMuted,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Text(
+                                        entry.profile.registryStatus.ifBlank { "For Review" },
+                                        color = if (
+                                            entry.profile.registryStatus.contains("approved", true) ||
+                                            entry.profile.registryStatus.contains("registered", true) ||
+                                            entry.profile.registryStatus.contains("complete", true)
+                                        ) AgriGreen else AgriWarning,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            if (registryEntries.size > 5) {
+                                Text(
+                                    "Showing 5 of ${registryEntries.size}. Export Farmer Applications to get the full register.",
+                                    color = AgriMuted,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
             }
             item { SectionTitle("Agricultural Records") }
             item {
