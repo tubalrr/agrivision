@@ -370,6 +370,7 @@ internal fun AgriVisionApp(
                     totalAnimals = totalLivestock,
                     openTasks = openTasks,
                     farmerProfile = farmerProfile,
+                    registryEntries = farmerRegistryEntries,
                     assistance = assistance,
                     fieldIncidents = fieldIncidents,
                     incidentEvents = incidentEvents,
