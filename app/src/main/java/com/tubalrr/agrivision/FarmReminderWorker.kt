@@ -64,7 +64,6 @@ internal class FarmReminderWorker(context: Context, params: WorkerParameters) : 
     }
 
     @SuppressLint("MissingPermission")
-    @SuppressLint("MissingPermission")
     private fun cancelReminder() {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -76,6 +75,7 @@ internal class FarmReminderWorker(context: Context, params: WorkerParameters) : 
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun showReminder(text: String) {
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
