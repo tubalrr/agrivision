@@ -62,6 +62,14 @@ class DaReportExporterTest {
     }
 
     @Test
+    fun longColumnHeadingsKeepAllWordsWhenWrapped() {
+        assertEquals(
+            listOf("Current", "Population"),
+            wrapReportText("Current Population", 10f) { it.length.toFloat() }
+        )
+    }
+
+    @Test
     fun reportTextWrappingDoesNotSplitSurrogatePairs() {
         val lines = wrapReportText("ab😀cd", 2f) { it.length.toFloat() }
 
