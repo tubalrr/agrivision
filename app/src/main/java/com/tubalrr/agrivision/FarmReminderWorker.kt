@@ -34,7 +34,7 @@ internal class FarmReminderWorker(context: Context, params: WorkerParameters) : 
             val harvestSoon = crops.count { parseDate(it.expectedHarvest)?.let { d -> !d.isBefore(today) && !d.isAfter(today.plusDays(3)) } == true }
             val stockAlerts = inventory.count {
                 it.quantity <= 0.0 || it.status.contains("low", true) || it.status.contains("out of stock", true) ||
-                    parseDate(it.expiryDate)?.let { d -> !d.isBefore(today) && !d.isAfter(today.plusDays(30)) } == true
+                    parseDate(it.expiryDate)?.let { d -> !d.isAfter(today.plusDays(30)) } == true
             }
 
             val parts = buildList {
