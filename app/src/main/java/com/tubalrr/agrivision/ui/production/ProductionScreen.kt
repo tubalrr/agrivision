@@ -25,6 +25,7 @@ import java.util.Calendar
 import java.util.Locale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
+import com.tubalrr.agrivision.domain.calculator.FarmCostingCalculator
 
 
 @Composable
@@ -535,6 +536,9 @@ internal fun ProductionFinanceScreen(
                 }
             }
             item {
+                CropProfitabilityCard(crops = crops, expenses = expenses, sales = sales, production = production)
+            }
+            item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     SectionTitle("Finance Records")
                     TextButton(onClick = { showDialog = true }) { Text("+ Add") }
@@ -558,7 +562,12 @@ internal fun ProductionFinanceScreen(
             }
             item { Text("Expense records", fontWeight = FontWeight.SemiBold) }
             items(expenses) { expense ->
-                val detail = listOf(expense.date, expense.note).filter { it.isNotBlank() }.joinToString(" · ")
+                val sourceLabel = when (expense.sourceType) {
+                    "Crop" -> "Crop " + expense.sourceId
+                    "Livestock" -> "Livestock " + expense.sourceId
+                    else -> "Unallocated"
+                }
+                val detail = listOf(expense.date, expense.note, sourceLabel).filter { it.isNotBlank() }.joinToString(" · ")
                 FarmRecordCard(expense.category, "₱" + money(expense.amount), detail, Icons.Outlined.ReceiptLong)
             }
             item { Text("Income records", fontWeight = FontWeight.SemiBold) }
@@ -566,10 +575,78 @@ internal fun ProductionFinanceScreen(
                 FarmRecordCard(
                     sale.product,
                     "₱" + money(sale.amount),
-                    sale.incomeCategory + " · " + sale.date,
+                    sale.incomeCategory + " · " + sale.date + " · " + when (sale.sourceType) {
+                        "Crop" -> "Crop " + sale.sourceId
+                        "Livestock" -> "Livestock " + sale.sourceId
+                        else -> "Unallocated"
+                    },
                     Icons.Outlined.MonetizationOn
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CropProfitabilityCard(
+    crops: List<CropRecord>,
+    expenses: List<ExpenseRecord>,
+    sales: List<SaleRecord>,
+    production: List<ProductionRecord>
+) {
+    val rows = remember(crops, expenses, sales, production) {
+        FarmCostingCalculator.summarize(crops, expenses, sales, production)
+    }
+    val unallocatedExpenses = remember(expenses) { FarmCostingCalculator.unallocatedExpenseTotal(expenses) }
+    val unallocatedIncome = remember(sales) { FarmCostingCalculator.unallocatedIncomeTotal(sales) }
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
+        Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Crop Cost & Profit", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
+            Text("Figures include only transactions explicitly linked to a crop.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            if (rows.isEmpty()) {
+                Text("Register a crop cycle first, then link expenses, income and harvest records to calculate crop-level results.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            } else rows.forEach { row ->
+                HorizontalDivider(color = AgriLine)
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(row.cropLabel, fontWeight = FontWeight.Bold, color = AgriText)
+                            Text(
+                                listOf(row.fieldId.takeIf { it.isNotBlank() }?.let { "Field $it" }, if (row.areaHectares > 0.0) String.format(Locale.US, "%.2f ha", row.areaHectares) else "Area not set").filterNotNull().joinToString(" · "),
+                                color = AgriMuted, style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        Text((if (row.netProfit < 0.0) "−₱" else "₱") + money(kotlin.math.abs(row.netProfit)), color = if (row.netProfit >= 0.0) AgriGreen else AgriDanger, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f).background(AgriGreenSoft, RoundedCornerShape(12.dp)).padding(10.dp)) {
+                            Text("Linked income", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                            Text("₱" + money(row.income), color = AgriText, fontWeight = FontWeight.Bold)
+                        }
+                        Column(Modifier.weight(1f).background(AgriGoldSoft, RoundedCornerShape(12.dp)).padding(10.dp)) {
+                            Text("Linked costs", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                            Text("₱" + money(row.expenses), color = AgriText, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(row.costPerHectare?.let { "Cost/ha: ₱" + money(it) } ?: "Cost/ha: set area", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                        Text(if (row.harvestUnit.isBlank()) "No linked harvest" else "Harvest: " + String.format(Locale.US, "%.2f %s", row.harvestQuantity, row.harvestUnit), color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+            HorizontalDivider(color = AgriLine)
+            Text("Unallocated records", fontWeight = FontWeight.Bold, color = AgriText)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Income", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text("₱" + money(unallocatedIncome), fontWeight = FontWeight.Bold)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("Expenses", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text("₱" + money(unallocatedExpenses), fontWeight = FontWeight.Bold)
+                }
+            }
+            Text("Unlinked transactions are never guessed into a crop; use the Finance form to link them.", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -610,6 +687,8 @@ internal fun AddProductionFinanceDialog(
     var financeType by remember { mutableStateOf("Expense") }
     var incomeCategory by remember { mutableStateOf(FinancialCategories.incomeCategories.first()) }
     var expenseCategory by remember { mutableStateOf(FinancialCategories.expenseCategories.first()) }
+    var financeSourceType by remember { mutableStateOf("None") }
+    var financeSourceId by remember { mutableStateOf("") }
     var productionType by remember { mutableStateOf("Harvest") }
     var sourceType by remember { mutableStateOf("Crop") }
     var sourceId by remember { mutableStateOf("") }
@@ -791,6 +870,32 @@ internal fun AddProductionFinanceDialog(
                             singleLine = true
                         )
                     }
+                    Text("Link to a farm source (optional)", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(selected = financeSourceType == "None", onClick = { financeSourceType = "None"; financeSourceId = "" }, label = { Text("Unlinked") })
+                        FilterChip(selected = financeSourceType == "Crop", onClick = { financeSourceType = "Crop"; financeSourceId = crops.firstOrNull()?.cropId.orEmpty() }, label = { Text("Crop") })
+                        FilterChip(selected = financeSourceType == "Livestock", onClick = { financeSourceType = "Livestock"; financeSourceId = livestock.firstOrNull()?.groupId.orEmpty() }, label = { Text("Livestock") })
+                    }
+                    when (financeSourceType) {
+                        "Crop" -> if (crops.isEmpty()) {
+                            Text("Register a crop cycle first, or choose Unlinked.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                crops.forEach { crop ->
+                                    FilterChip(selected = financeSourceId == crop.cropId, onClick = { financeSourceId = crop.cropId }, label = { Text(crop.name + " · " + crop.crop, style = MaterialTheme.typography.labelSmall) })
+                                }
+                            }
+                        }
+                        "Livestock" -> if (livestock.isEmpty()) {
+                            Text("Register a livestock group first, or choose Unlinked.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                livestock.forEach { group ->
+                                    FilterChip(selected = financeSourceId == group.groupId, onClick = { financeSourceId = group.groupId }, label = { Text(group.name + " · " + group.kind, style = MaterialTheme.typography.labelSmall) })
+                                }
+                            }
+                        }
+                    }
                     OutlinedTextField(
                         value = amount,
                         onValueChange = { amount = it },
@@ -816,7 +921,15 @@ internal fun AddProductionFinanceDialog(
                 livestock.any { it.groupId == sourceId }
             }
             val financialAmount = amount.toDoubleOrNull()
-            val financeValid = financialAmount != null && financialAmount > 0.0
+            val financeValid = financialAmount != null && financialAmount.isFinite() && financialAmount > 0.0
+            val financeSourceExists = when (financeSourceType) {
+                "Crop" -> crops.any { it.cropId == financeSourceId }
+                "Livestock" -> livestock.any { it.groupId == financeSourceId }
+                else -> true
+            }
+            val selectedFinanceCrop = crops.firstOrNull { it.cropId == financeSourceId }
+            val savedFinanceSourceType = financeSourceType.takeIf { financeSourceExists && it != "None" }.orEmpty()
+            val savedFinanceFieldId = selectedFinanceCrop?.fieldId.orEmpty()
             TextButton(
                 enabled = if (tab == "Production") {
                     name.isNotBlank() &&
@@ -824,7 +937,8 @@ internal fun AddProductionFinanceDialog(
                             quantity.contains(" ") &&
                             sourceExists
                 } else {
-                    financeValid && if (financeType == "Income") name.isNotBlank() else note.isNotBlank()
+                    financeValid && financeSourceExists &&
+                            if (financeType == "Income") name.isNotBlank() else note.isNotBlank()
                 },
                 onClick = {
                     if (tab == "Production") {
@@ -855,7 +969,10 @@ internal fun AddProductionFinanceDialog(
                                     product = name.trim(),
                                     amount = value,
                                     date = period.trim(),
-                                    incomeCategory = incomeCategory
+                                    incomeCategory = incomeCategory,
+                                    sourceType = savedFinanceSourceType,
+                                    sourceId = if (savedFinanceSourceType.isBlank()) "" else financeSourceId,
+                                    fieldId = if (savedFinanceSourceType.isBlank()) "" else savedFinanceFieldId
                                 )
                             )
                         } else {
@@ -864,7 +981,10 @@ internal fun AddProductionFinanceDialog(
                                     category = expenseCategory,
                                     amount = value,
                                     note = note.trim(),
-                                    date = period.trim()
+                                    date = period.trim(),
+                                    sourceType = savedFinanceSourceType,
+                                    sourceId = if (savedFinanceSourceType.isBlank()) "" else financeSourceId,
+                                    fieldId = if (savedFinanceSourceType.isBlank()) "" else savedFinanceFieldId
                                 )
                             )
                         }
