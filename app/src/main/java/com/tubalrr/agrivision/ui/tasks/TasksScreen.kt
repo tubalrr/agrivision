@@ -89,20 +89,35 @@ internal fun TasksScreen(
     }
 
     if (showDatePicker) {
-        val calendar = Calendar.getInstance()
-        try {
-            calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedDate) ?: calendar.time
-        } catch (_: Exception) { }
-        DatePickerDialog(
-            LocalContext.current,
-            { _, year, month, day ->
-                val picked = Calendar.getInstance().apply { set(year, month, day) }
-                selectedDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
-                selectedFilter = "All"
-                showDatePicker = false
-            },
-            calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)
-        ).apply { setOnDismissListener { showDatePicker = false }; show() }
+        val context = LocalContext.current
+        DisposableEffect(Unit) {
+            val calendar = Calendar.getInstance()
+            try {
+                calendar.time = SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedDate) ?: calendar.time
+            } catch (_: Exception) { }
+            val dialog = DatePickerDialog(
+                context,
+                { _, year, month, day ->
+                    val picked = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, year)
+                        set(Calendar.MONTH, month)
+                        set(Calendar.DAY_OF_MONTH, day)
+                    }
+                    selectedDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(picked.time)
+                    selectedFilter = "All"
+                    showDatePicker = false
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            )
+            dialog.setOnDismissListener { showDatePicker = false }
+            dialog.show()
+            onDispose {
+                dialog.setOnDismissListener(null)
+                if (dialog.isShowing) dialog.dismiss()
+            }
+        }
     }
 
     val formattedSelectedDate = if (selectedFilter == "Overdue") {
