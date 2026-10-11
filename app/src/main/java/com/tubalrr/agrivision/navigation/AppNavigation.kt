@@ -125,6 +125,8 @@ internal fun AgriVisionApp(
     val incidentEvents by farmViewModel.incidentEvents.collectAsStateWithLifecycle()
     val farmerProfile by farmViewModel.profile.collectAsStateWithLifecycle()
     val reportSubmission by farmViewModel.reportSubmission.collectAsStateWithLifecycle()
+    val backupPreview by farmViewModel.backupPreview.collectAsStateWithLifecycle()
+    val backupRestoreInProgress by farmViewModel.backupRestoreInProgress.collectAsStateWithLifecycle()
     val totalSales by farmViewModel.totalSales.collectAsStateWithLifecycle()
     val totalExpenses by farmViewModel.totalExpenses.collectAsStateWithLifecycle()
     val productionCount by farmViewModel.productionCount.collectAsStateWithLifecycle()
@@ -401,6 +403,10 @@ internal fun AgriVisionApp(
                     confirmBeforeImport = confirmBackupImport,
                     onOpenSettings = { showSettings = true },
                     backupStatus = farmViewModel.backupStatus.collectAsStateWithLifecycle().value,
+                    backupPreview = backupPreview,
+                    backupRestoreInProgress = backupRestoreInProgress,
+                    onConfirmBackupRestore = farmViewModel::confirmBackupRestore,
+                    onCancelBackupRestore = farmViewModel::cancelBackupRestore,
                     assistance = assistance,
                     onAddAssistance = farmViewModel::addAssistance,
                     onUpdateAssistance = farmViewModel::updateAssistance,
