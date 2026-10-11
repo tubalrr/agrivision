@@ -163,7 +163,7 @@ internal object FarmBackupArchive {
         val looksLikeZip = readCount >= 2 &&
             signature[0] == 0x50.toByte() && signature[1] == 0x4B.toByte()
 
-        return if (looksLikeZip) readArchive(buffered) else {
+        return if (looksLikeZip) readArchive(context, buffered) else {
             val bytes = buffered.use { readLimited(it, MAX_MANIFEST_BYTES) }
             ReadFarmBackup(
                 json = JSONObject(bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")),
@@ -242,7 +242,7 @@ internal object FarmBackupArchive {
         if (target.parentFile == evidenceDirectory) target.delete()
     }
 
-    private fun readArchive(input: InputStream): ReadFarmBackup {
+    private fun readArchive(context: Context, input: InputStream): ReadFarmBackup {
         val staging = File(context.cacheDir, "agrivision-restore-${UUID.randomUUID()}")
         check(staging.isDirectory || staging.mkdirs()) { "Unable to prepare a private restore workspace." }
         val extracted = linkedMapOf<String, StagedArchiveEvidence>()
