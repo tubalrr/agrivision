@@ -202,7 +202,7 @@ class DaReportExporterTest {
         org.junit.Assert.assertTrue(csvText.contains("Ana Dela Cruz"))
         org.junit.Assert.assertTrue(csvText.contains("Ben Santos"))
         org.junit.Assert.assertTrue(csvText.contains("farm-002"))
-        assertEquals(3, csvText.trimEnd('\\n').split('\\n').size)
+        assertEquals(3, csvText.trimEnd('\n').split('\n').size)
 
         val json = org.json.JSONObject(String(jsonBytes, Charsets.UTF_8))
         assertEquals("all_saved_farmer_applications", json.getString("scope"))
