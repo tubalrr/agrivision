@@ -381,6 +381,7 @@ internal fun AgriVisionApp(
                     reportSubmission = reportSubmission,
                     onProduction = farmViewModel::addProduction,
                     feedLogs = feedLogs,
+                    inventory = inventory,
                     onFeedLog = farmViewModel::addFeedLog,
                     onExpense = farmViewModel::addExpense,
                     onSale = farmViewModel::addSale,

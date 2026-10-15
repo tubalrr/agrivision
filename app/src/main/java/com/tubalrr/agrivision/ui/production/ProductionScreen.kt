@@ -57,6 +57,7 @@ internal fun ProductionFinanceScreen(
     reportSubmission: ReportSubmission,
     onProduction: (ProductionRecord) -> Unit,
     feedLogs: List<com.tubalrr.agrivision.data.local.FeedLogRecord>,
+    inventory: List<InventoryItem>,
     onFeedLog: (com.tubalrr.agrivision.data.local.FeedLogRecord) -> Unit,
     onExpense: (ExpenseRecord) -> Unit,
     onSale: (SaleRecord) -> Unit,
@@ -636,10 +637,12 @@ internal fun ProductionFinanceScreen(
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("FEED MANAGEMENT", color = AgriGold, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                         Text("Track livestock feed consumption.", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                        Text("Matching feed logs automatically deduct inventory when feed name and unit match. Mismatches or shortages are saved as a note instead.", color = Color.White.copy(alpha = .82f))
                         Text("Room-backed records are included in backup and DA reports.", color = Color.White.copy(alpha = .78f))
                     }
                 }
             }
+            item { FeedStockSummaryCard(inventory = inventory, feedLogs = feedLogs) }
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
@@ -1351,6 +1354,91 @@ internal fun AddProductionFinanceDialog(
     )
 }
 
+
+@Composable
+private fun FeedStockSummaryCard(
+    inventory: List<InventoryItem>,
+    feedLogs: List<com.tubalrr.agrivision.data.local.FeedLogRecord>
+) {
+    val feedItems = remember(inventory, feedLogs) {
+        inventory.filter { item ->
+            item.category.contains("feed", ignoreCase = true) ||
+                feedLogs.any { log -> log.feedName.trim().equals(item.name.trim(), ignoreCase = true) }
+        }.sortedBy { it.name.lowercase(Locale.US) }
+    }
+    val needsAttention = feedItems.count {
+        it.stock <= 0.0 || it.status.contains("low", ignoreCase = true)
+    }
+
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = AgriCard)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Feed stock snapshot", fontWeight = FontWeight.ExtraBold, color = AgriText)
+                    Text(
+                        if (feedItems.isEmpty()) "No feed inventory matched yet"
+                        else "${feedItems.size} matched feed item(s) · ${needsAttention} need attention",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Icon(Icons.Outlined.Inventory2, contentDescription = null, tint = AgriGreen)
+            }
+            if (feedItems.isEmpty()) {
+                Text(
+                    "Add feed under Farm → Inventory. Automatic deduction requires the inventory item name and unit to match the feed log.",
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                feedItems.take(6).forEach { item ->
+                    HorizontalDivider(color = AgriLine)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(item.name, color = AgriText, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                item.category + if (item.supplier.isBlank()) "" else " · " + item.supplier,
+                                color = AgriMuted,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                String.format(Locale.US, "%.2f %s", item.stock, item.unit.ifBlank { "unit" }),
+                                color = AgriText,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                if (item.stock <= 0.0) "OUT OF STOCK"
+                                else if (item.status.contains("low", ignoreCase = true)) "LOW STOCK"
+                                else "AVAILABLE",
+                                color = if (item.stock <= 0.0 || item.status.contains("low", ignoreCase = true)) AgriDanger else AgriGreen,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                if (feedItems.size > 6) {
+                    Text("Showing 6 of ${feedItems.size} feed items.", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Text(
+                "Feed usage value is not added automatically to expenses, to avoid double-counting purchased feed.",
+                color = AgriMuted,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+    }
+}
 
 @Composable
 private fun FeedLogDialog(

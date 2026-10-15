@@ -384,20 +384,89 @@ class FarmRepository(
             }
         }
 
+    /**
+     * Persists feed usage and, when the feed can be matched safely, deducts inventory
+     * in the same Room transaction. Re-saving a feedLogId does not deduct stock twice.
+     * Name or unit mismatches and insufficient stock are logged for the user instead
+     * of silently changing the inventory balance.
+     */
     suspend fun saveFeedLog(record: FeedLogRecord) {
-        dao.upsertFeedLog(
-            FeedLogEntity(
-                feedLogId = record.feedLogId.ifBlank { UUID.randomUUID().toString() },
-                farmId = DEFAULT_FARM_ID,
-                livestockId = record.livestockId.ifBlank { null },
-                date = record.date,
-                feedName = record.feedName.trim(),
-                quantityKg = record.quantityKg.coerceAtLeast(0.0),
-                unit = record.unit.ifBlank { "kg" },
-                notes = record.notes.trim(),
-                createdAt = record.createdAt
+        val feedLogId = record.feedLogId.ifBlank { UUID.randomUUID().toString() }
+        val feedName = record.feedName.trim()
+        val quantity = record.quantityKg
+        require(feedName.isNotBlank()) { "Feed name is required." }
+        require(quantity.isFinite() && quantity > 0.0) { "Feed quantity must be greater than zero." }
+
+        database.withTransaction {
+            val existingLog = dao.getFeedLog(DEFAULT_FARM_ID, feedLogId)
+            var notes = record.notes.trim()
+
+            if (existingLog == null) {
+                val existingMovement = dao.getInventoryTransactionForSource(
+                    DEFAULT_FARM_ID,
+                    "FeedLog",
+                    feedLogId
+                )
+                if (existingMovement != null) {
+                    notes = appendInventoryNote(notes, "Inventory already reconciled for this feed record.")
+                } else {
+                    val item = dao.findInventoryByName(DEFAULT_FARM_ID, feedName)
+                    val inventoryNote = when {
+                        item == null ->
+                            "Inventory not deducted: no inventory item named $feedName was found."
+
+                        normalizeInventoryUnit(item.unit) != normalizeInventoryUnit(record.unit.ifBlank { "kg" }) ->
+                            "Inventory not deducted: unit mismatch (inventory ${item.unit}, feed log ${record.unit.ifBlank { "kg" }})."
+
+                        item.quantity < quantity ->
+                            "Inventory not deducted: insufficient ${item.name} stock (${formatQuantity(item.quantity, item.unit)} available)."
+
+                        else -> {
+                            val updatedQuantity = (item.quantity - quantity).coerceAtLeast(0.0)
+                            dao.upsertInventory(
+                                item.copy(
+                                    quantity = updatedQuantity,
+                                    status = if (updatedQuantity <= 0.0) "Out of Stock"
+                                        else if (item.status.equals("Out of Stock", ignoreCase = true)) "In Stock"
+                                        else item.status,
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                            )
+                            dao.upsertInventoryTransaction(
+                                InventoryTransactionEntity(
+                                    transactionId = UUID.randomUUID().toString(),
+                                    farmId = DEFAULT_FARM_ID,
+                                    inventoryId = item.inventoryId,
+                                    type = "USAGE",
+                                    quantity = quantity,
+                                    unit = item.unit,
+                                    date = record.date,
+                                    sourceType = "FeedLog",
+                                    sourceId = feedLogId,
+                                    notes = "Automatic stock deduction from feed log"
+                                )
+                            )
+                            "Inventory deducted: ${formatQuantity(quantity, item.unit)} from ${item.name}."
+                        }
+                    }
+                    notes = appendInventoryNote(notes, inventoryNote)
+                }
+            }
+
+            dao.upsertFeedLog(
+                FeedLogEntity(
+                    feedLogId = feedLogId,
+                    farmId = DEFAULT_FARM_ID,
+                    livestockId = record.livestockId.ifBlank { null },
+                    date = record.date.trim(),
+                    feedName = feedName,
+                    quantityKg = quantity,
+                    unit = record.unit.trim().ifBlank { "kg" },
+                    notes = notes,
+                    createdAt = if (record.createdAt > 0L) record.createdAt else System.currentTimeMillis()
+                )
             )
-        )
+        }
     }
 
     fun observeInventoryTransactions(): Flow<List<InventoryTransaction>> =

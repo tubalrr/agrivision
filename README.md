@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.21.0** · Android version code: `25`
+
+This release connects Feed Logs to Inventory with an atomic Room transaction. Saving a new feed log deducts matching stock only when the inventory name and unit match and sufficient quantity is available. The movement ledger points back to the feed-log ID to prevent duplicate deduction on retries. Missing feed stock, unit mismatches, and shortages are saved as visible notes instead of silently adjusting quantities. Feed Management also shows a stock snapshot. Feed consumption is not automatically booked as an expense, avoiding accidental double-counting of feed purchases.
+
 **Version 1.20.0** · Android version code: `24`
 
 This release adds an optional Farm Weather card using Open-Meteo. It requests current conditions only after the user taps Get farm weather, uses saved field GPS coordinates or the saved farm boundary, shows temperature, feels-like temperature, humidity, precipitation and wind, and supports manual refresh. Weather errors are shown without blocking offline farm workflows. It also hardens the Field Mapping System. Farm, field and incident boundaries are now checked for valid coordinates, duplicate adjacent points, zero-area shapes and self-crossing edges before they are saved or restored. The map editor shows validation errors directly and asks for explicit confirmation before saving a mapping. A single field location point remains supported; area boundaries require a valid 3+ point polygon. These safeguards protect the operational relationship Farm → Fields → Crops → Incidents without changing existing stored records unless the user edits or restores a map.

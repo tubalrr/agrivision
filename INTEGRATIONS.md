@@ -11,6 +11,12 @@ Used by the optional Dashboard Farm Weather card. A user must tap the weather bu
 Weather is informational, not a guarantee or a substitute for local observation. When the service fails, local farm tasks, records, maps, reports, and backups remain available. Review Open-Meteo's current terms, attribution rules, and usage limits before distribution:
 - https://open-meteo.com/
 
+## Local Feed Logs → Inventory
+
+Feed-log save and stock reconciliation run in one Room database transaction. For a new feed log, the app looks for an inventory item whose name matches the feed name, then checks that units match and that sufficient stock exists. A successful deduction creates a `USAGE` inventory ledger entry linked to the feed-log ID. Re-saving the same feed-log ID cannot deduct stock a second time.
+
+If the inventory item is missing, the units differ, or stock is insufficient, the feed log is still retained and a clear note explains why inventory was not changed. Feed consumption is deliberately not converted into a finance expense automatically because purchase expenses may already be recorded; doing both could double-count costs. Feed stock is stored locally, remains available offline, and is included in normal Room-backed backup/restore.
+
 ## How the four reference repositories are used
 
 - **public-apis/public-apis** — API discovery catalogue. Open-Meteo was selected for a specific farm use case. Entries in the catalogue are not assumed to be reliable, free for every use, or production-ready.

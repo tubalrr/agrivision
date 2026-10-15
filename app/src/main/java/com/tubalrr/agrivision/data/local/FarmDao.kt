@@ -79,6 +79,9 @@ interface FarmDao {
     @Query("SELECT * FROM feed_logs WHERE farmId = :farmId ORDER BY date DESC, createdAt DESC")
     fun observeFeedLogs(farmId: String): Flow<List<FeedLogEntity>>
 
+    @Query("SELECT * FROM feed_logs WHERE farmId = :farmId AND feedLogId = :feedLogId LIMIT 1")
+    suspend fun getFeedLog(farmId: String, feedLogId: String): FeedLogEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertFeedLog(record: FeedLogEntity)
 
@@ -130,6 +133,9 @@ interface FarmDao {
 
     @Query("SELECT * FROM inventory_transactions WHERE farmId = :farmId ORDER BY date DESC, createdAt DESC")
     fun observeInventoryTransactions(farmId: String): Flow<List<InventoryTransactionEntity>>
+
+    @Query("SELECT * FROM inventory_transactions WHERE farmId = :farmId AND sourceType = :sourceType AND sourceId = :sourceId LIMIT 1")
+    suspend fun getInventoryTransactionForSource(farmId: String, sourceType: String, sourceId: String): InventoryTransactionEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertInventoryTransaction(record: InventoryTransactionEntity)
