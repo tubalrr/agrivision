@@ -81,6 +81,7 @@ internal object LocalAuthStore {
         prefs(context).all.keys.any { it.startsWith("account.") && it.endsWith(".hash") }
 
     fun current(context: Context): LocalAuthUser? {
+        FirebaseAccountService.current(context)?.let { return it }
         val p = prefs(context)
         val identifier = p.getString("session_identifier", null) ?: return null
         val role = p.getString("account.$identifier.role", null) ?: run {
@@ -91,6 +92,7 @@ internal object LocalAuthStore {
     }
 
     fun logout(context: Context) {
+        FirebaseAccountService.logout(context)
         prefs(context).edit().remove("session_identifier").apply()
     }
 
@@ -215,27 +217,39 @@ internal fun AuthScreen(
     onAuthenticated: (LocalAuthUser) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    // No account is provisioned by default. On a fresh install, make the first step
-    // registration instead of presenting a login form that cannot succeed yet.
+    val firebaseConfigured = FirebaseAccountService.isConfigured(context)
+    // Start with registration on a fresh local-only install. A Firebase build starts at
+    // login because existing cloud accounts cannot be enumerated safely from the client.
     var mode by remember(context) {
-        mutableStateOf(if (LocalAuthStore.hasAnyAccount(context)) "login" else "register")
+        mutableStateOf(if (firebaseConfigured || LocalAuthStore.hasAnyAccount(context)) "login" else "register")
     }
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf("Farmer") }
     var message by remember { mutableStateOf("") }
+    var isBusy by remember { mutableStateOf(false) }
     var showResetInfo by remember { mutableStateOf(false) }
+    val isFirebaseEmail = firebaseConfigured && identifier.trim().contains("@")
+    val isFirebaseRecovery = mode == "forgot" && isFirebaseEmail
     val isEn = language == "en"
 
     if (showResetInfo) {
         AlertDialog(
             onDismissRequest = { showResetInfo = false },
             title = { Text(if (isEn) "Local password reset" else "Pag-reset ng password") },
-            text = { Text(if (isEn)
-                "This prototype resets a password stored on this phone. It does not send an email or SMS verification code. For production use, connect a verified server-side password recovery flow."
+            text = { Text(if (firebaseConfigured)
+                featureText(
+                    language,
+                    "Para sa Firebase email accounts, magpapadala ng reset link sa email. Ang phone-number accounts ay local prototype pa lamang at walang SMS verification.",
+                    "Firebase email accounts receive a password-reset link by email. Phone-number accounts are still local-only and do not send SMS verification."
+                )
             else
-                "Sa prototype na ito, sa teleponong ito lang ire-reset ang password. Walang email o SMS verification code na ipinapadala. Para sa production, kailangan ng verified server-side password recovery.") },
+                featureText(
+                    language,
+                    "Sa local prototype, sa device na ito lang ire-reset ang password at walang email/SMS na ipinapadala.",
+                    "The local prototype resets the password on this device only; it does not send an email or SMS."
+                )) },
             confirmButton = { TextButton(onClick = { showResetInfo = false; mode = "forgot"; message = "" }) { Text(if (isEn) "Continue" else "Magpatuloy") } },
             dismissButton = { TextButton(onClick = { showResetInfo = false }) { Text(if (isEn) "Cancel" else "Kanselahin") } }
         )
@@ -293,33 +307,29 @@ internal fun AuthScreen(
                 label = { Text(featureText(language, "Email o numero ng telepono", "Email or phone number")) },
                 singleLine = true
             )
-            if (mode != "login") {
-                if (mode == "register") {
-                    Text(featureText(language, "Piliin ang uri ng account", "Choose account role"), color = AgriMuted)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = selectedRole == "Farmer", onClick = { selectedRole = "Farmer" }, label = { Text(featureText(language, "Magsasaka", "Farmer")) })
-                        FilterChip(selected = selectedRole == "Buyer", onClick = { selectedRole = "Buyer" }, label = { Text(featureText(language, "Mamimili", "Buyer")) })
-                    }
+            if (mode == "register") {
+                Text(featureText(language, "Piliin ang uri ng account", "Choose account role"), color = AgriMuted)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = selectedRole == "Farmer", onClick = { selectedRole = "Farmer" }, label = { Text(featureText(language, "Magsasaka", "Farmer")) })
+                    FilterChip(selected = selectedRole == "Buyer", onClick = { selectedRole = "Buyer" }, label = { Text(featureText(language, "Mamimili", "Buyer")) })
                 }
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it; message = "" },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text(if (mode == "forgot") featureText(language, "Bagong password", "New password") else featureText(language, "Password", "Password")) },
+                    label = { Text(featureText(language, "Password", "Password")) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true
                 )
-                if (mode == "register" || mode == "forgot") {
-                    OutlinedTextField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it; message = "" },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(featureText(language, "Ulitin ang password", "Confirm password")) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true
-                    )
-                }
-            } else {
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it; message = "" },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(featureText(language, "Ulitin ang password", "Confirm password")) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+            } else if (mode == "login") {
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it; message = "" },
@@ -327,6 +337,29 @@ internal fun AuthScreen(
                     label = { Text("Password") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true
+                )
+            } else if (!isFirebaseRecovery) {
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it; message = "" },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(featureText(language, "Bagong password", "New password")) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it; message = "" },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(featureText(language, "Ulitin ang password", "Confirm password")) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+            } else {
+                Text(
+                    featureText(language, "Ipadadala ang reset link sa email address na ito.", "A reset link will be sent to this email address."),
+                    color = AgriMuted,
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
 
@@ -336,39 +369,91 @@ internal fun AuthScreen(
             Spacer(Modifier.height(10.dp))
             Button(
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isBusy,
                 shape = RoundedCornerShape(14.dp),
                 onClick = {
-                    val result = runCatching {
-                        when (mode) {
-                            "register" -> {
-                                require(password == confirmPassword) {
-                                    featureText(language, "Hindi magkapareho ang password.", "Passwords do not match.")
+                    if (isBusy) return@Button
+                    if (mode == "register" && isFirebaseEmail) {
+                        if (password != confirmPassword) {
+                            message = featureText(language, "Hindi magkapareho ang password.", "Passwords do not match.")
+                        } else {
+                            isBusy = true
+                            FirebaseAccountService.registerEmail(context, identifier, password, selectedRole) { result ->
+                                isBusy = false
+                                result.onSuccess {
+                                    message = ""
+                                    onAuthenticated(it)
+                                }.onFailure {
+                                    message = it.message ?: featureText(language, "Hindi makagawa ng account.", "Could not create account.")
                                 }
-                                LocalAuthStore.register(context, identifier, password, selectedRole).getOrThrow()
                             }
-                            "forgot" -> {
-                                require(password == confirmPassword) {
-                                    featureText(language, "Hindi magkapareho ang password.", "Passwords do not match.")
-                                }
-                                LocalAuthStore.resetLocalPassword(context, identifier, password).getOrThrow()
-                                LocalAuthStore.login(context, identifier, password).getOrThrow()
-                            }
-                            else -> LocalAuthStore.login(context, identifier, password).getOrThrow()
                         }
-                    }
-                    result.onSuccess {
-                        message = ""
-                        onAuthenticated(it)
-                    }.onFailure {
-                        message = it.message ?: featureText(language, "May nangyaring error.", "Something went wrong.")
+                    } else if (mode == "login" && isFirebaseEmail) {
+                        isBusy = true
+                        FirebaseAccountService.loginEmail(context, identifier, password) { result ->
+                            isBusy = false
+                            result.onSuccess {
+                                message = ""
+                                onAuthenticated(it)
+                            }.onFailure {
+                                message = it.message ?: featureText(language, "Hindi makapag-log in.", "Could not log in.")
+                            }
+                        }
+                    } else if (isFirebaseRecovery) {
+                        isBusy = true
+                        FirebaseAccountService.sendPasswordResetEmail(context, identifier) { result ->
+                            isBusy = false
+                            result.onSuccess {
+                                mode = "login"
+                                password = ""
+                                confirmPassword = ""
+                                message = featureText(
+                                    language,
+                                    "Kung rehistrado ang email, ipinadala ang password-reset link. Tingnan din ang spam folder.",
+                                    "If this email is registered, a password-reset link has been sent. Check the spam folder too."
+                                )
+                            }.onFailure {
+                                message = it.message ?: featureText(language, "Hindi makapagpadala ng reset email.", "Could not send reset email.")
+                            }
+                        }
+                    } else {
+                        val result = runCatching {
+                            when (mode) {
+                                "register" -> {
+                                    require(password == confirmPassword) {
+                                        featureText(language, "Hindi magkapareho ang password.", "Passwords do not match.")
+                                    }
+                                    LocalAuthStore.register(context, identifier, password, selectedRole).getOrThrow()
+                                }
+                                "forgot" -> {
+                                    require(password == confirmPassword) {
+                                        featureText(language, "Hindi magkapareho ang password.", "Passwords do not match.")
+                                    }
+                                    LocalAuthStore.resetLocalPassword(context, identifier, password).getOrThrow()
+                                    LocalAuthStore.login(context, identifier, password).getOrThrow()
+                                }
+                                else -> LocalAuthStore.login(context, identifier, password).getOrThrow()
+                            }
+                        }
+                        result.onSuccess {
+                            message = ""
+                            onAuthenticated(it)
+                        }.onFailure {
+                            message = it.message ?: featureText(language, "May nangyaring error.", "Something went wrong.")
+                        }
                     }
                 }
             ) {
-                Text(when (mode) {
-                    "register" -> featureText(language, "Gumawa ng account", "Create account")
-                    "forgot" -> featureText(language, "I-reset at magpatuloy", "Reset and continue")
-                    else -> featureText(language, "Mag-log in", "Log in")
-                }, fontWeight = FontWeight.Bold)
+                Text(
+                    when {
+                        isBusy -> featureText(language, "Sandali...", "Please wait...")
+                        mode == "register" -> featureText(language, "Gumawa ng account", "Create account")
+                        isFirebaseRecovery -> featureText(language, "Magpadala ng reset link", "Send reset link")
+                        mode == "forgot" -> featureText(language, "I-reset at magpatuloy", "Reset and continue")
+                        else -> featureText(language, "Mag-log in", "Log in")
+                    },
+                    fontWeight = FontWeight.Bold
+                )
             }
             if (mode == "login") {
                 TextButton(onClick = { showResetInfo = true }) { Text(featureText(language, "Nakalimutan ang password?", "Forgot password?")) }
@@ -382,11 +467,19 @@ internal fun AuthScreen(
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                featureText(
-                    language,
-                    "Local prototype: account data ay nasa device na ito lang. Hindi ito cloud login at hindi nagve-verify ng email/phone.",
-                    "Local prototype: accounts stay on this device. This is not cloud authentication and does not verify email/phone ownership."
-                ),
+                if (firebaseConfigured) {
+                    featureText(
+                        language,
+                        "Firebase: email/password accounts ay cloud-based. Phone-number/password accounts ay local prototype pa lamang; kailangan ng Firebase Phone Auth (SMS OTP) para maging cloud-based.",
+                        "Firebase email/password accounts are cloud-based. Phone-number/password accounts remain local-only; cloud phone sign-in requires Firebase Phone Auth (SMS OTP)."
+                    )
+                } else {
+                    featureText(
+                        language,
+                        "Local prototype: account data ay nasa device na ito lang. Maglagay ng app/google-services.json para paganahin ang Firebase email login.",
+                        "Local prototype: accounts stay on this device. Add app/google-services.json to enable Firebase email login."
+                    )
+                },
                 color = AgriMuted,
                 style = MaterialTheme.typography.labelSmall
             )
