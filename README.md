@@ -27,7 +27,38 @@ Built with:
 - Photo field records
 - Backup and restore
 
+## Added in Version 1.23.0
+
+- **Login/Register prototype:** email or phone, password, Farmer/Buyer roles, remembered on-device session, local reset flow, and logout in Profile. Passwords are salted and hashed on-device. This is not server authentication and does not verify contact ownership.
+- **Pest & Disease Scan:** take or upload a leaf photo, see a clearly labeled mock result/confidence/treatment, link it to a crop and farm, save a scan record, and view Room-backed scan history. No trained model is bundled yet.
+- **Farm Weather:** the new Weather screen fetches current conditions and a 7-day Open-Meteo forecast using saved field/farm-boundary GPS coordinates. Responses are cached in Room for offline viewing. Strong-wind, heavy-rain and dry-spell indicators are heuristic planning hints, not official PAGASA warnings.
+- **Market Prices:** searchable, filterable sample prices for palay, corn and vegetables with trend and update date. All numbers are mock/demo data, not live quotes.
+- **Notifications:** Profile switches for watering, fertilizing, spraying, harvest, and weather indicators. Android notification permission is requested only when enabling an alert type.
+- **Planting Calendar & Soil Guide:** generic crop timing, soil notes and fertilizer guidance, with an Add to Tasks action. Validate all schedules and fertilizer advice locally before field use.
+- **More tab:** keeps bottom navigation compact while exposing Scan, Prices, Weather, Calendar, Help/Settings, and the existing Reports screen. Dashboard includes Scan, Prices and Weather shortcuts.
+- **Offline extras cache:** a separate Room database stores scan history, weather responses and market sample data. Existing farm, task, finance and report records remain local in their current database.
+
+## Mock data and future API replacement
+
+- **Leaf detection:** replace the mock result function in `AgriVisionFeatureScreens.kt` with a `LeafDiseaseDetector` interface implementation using a validated on-device ML model or trusted API. Keep confidence, diagnosis, treatment, crop/farm association, and scan persistence. Do not treat mock confidence as a medical/agronomic guarantee.
+- **Market prices:** replace `mockMarketPrices()` with a provider that maps an official/authorized market API into `MarketPriceEntity`. Preserve source, market/location, unit and last-updated metadata and obey source terms/rate limits.
+- **Weather:** the new screen requests Open-Meteo only when online and when the screen opens/refreshes, caches the JSON in `weather_cache`, and shows cached data offline. Check provider terms/attribution before public distribution.
+- **Authentication:** current local accounts are device-only. The “forgot password” option resets a local account and does not send an SMS/email verification. Connect Firebase Auth or another trusted provider and verified recovery before production or multi-device use.
+- **Cloud sync:** no cloud sync server is included. Farm/task/report records stay on-device and continue working offline. Adding sync needs authenticated APIs, TLS/encryption, conflict handling, backups, delete/export workflows and tests.
+
+## Rebuild and export the APK
+
+1. Open the repository in Android Studio and wait for Gradle sync.
+2. Run tests/lint/debug build from the repository root: `./gradlew test lint assembleDebug` (Windows PowerShell: `./gradlew.bat test lint assembleDebug`).
+3. The debug APK is normally at `app/build/outputs/apk/debug/app-debug.apk`.
+4. For a signed release APK, use **Build → Generate Signed Bundle / APK → APK** in Android Studio. Create/select a keystore, select the release build, and save the APK. Keep the keystore and passwords safe; never commit them.
+5. A secure CI environment can set `AGRIVISION_RELEASE_STORE_FILE`, `AGRIVISION_RELEASE_STORE_PASSWORD`, `AGRIVISION_RELEASE_KEY_ALIAS`, and `AGRIVISION_RELEASE_KEY_PASSWORD` for the workflow's optional signed release build. A release APK is not signed unless valid signing configuration is provided.
+
 ## Latest Version
+
+**Version 1.23.0** · Android version code: `27`
+
+This release adds the on-device account prototype and optional new farm screens without removing Dashboard, Map, Farm, Reports, Tasks, or Profile. See the sections above for mock-data, offline and release-signing details.
 
 **Version 1.22.0** · Android version code: `26`
 
