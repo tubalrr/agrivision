@@ -102,6 +102,7 @@ internal fun ProductionFinanceScreen(
     if (showFeedDialog) {
         FeedLogDialog(
             livestock = livestock,
+            inventory = inventory,
             onDismiss = { showFeedDialog = false },
             onSave = { record -> onFeedLog(record); showFeedDialog = false }
         )
@@ -1443,13 +1444,19 @@ private fun FeedStockSummaryCard(
 @Composable
 private fun FeedLogDialog(
     livestock: List<Livestock>,
+    inventory: List<InventoryItem>,
     onDismiss: () -> Unit,
     onSave: (com.tubalrr.agrivision.data.local.FeedLogRecord) -> Unit
 ) {
+    val feedInventory = remember(inventory) {
+        inventory.filter { it.category.contains("feed", ignoreCase = true) }
+            .sortedBy { it.name.lowercase(Locale.US) }
+    }
     var livestockId by remember { mutableStateOf(livestock.firstOrNull()?.groupId.orEmpty()) }
-    var feedName by remember { mutableStateOf("") }
+    var selectedInventoryId by remember { mutableStateOf(feedInventory.firstOrNull()?.inventoryId.orEmpty()) }
+    var feedName by remember { mutableStateOf(feedInventory.firstOrNull()?.name.orEmpty()) }
     var quantity by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf("kg") }
+    var unit by remember { mutableStateOf(feedInventory.firstOrNull()?.unit ?: "kg") }
     var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
     var notes by remember { mutableStateOf("") }
 
@@ -1459,10 +1466,54 @@ private fun FeedLogDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(livestockId, { livestockId = it }, label = { Text("Livestock / Group ID") }, singleLine = true)
-                OutlinedTextField(feedName, { feedName = it }, label = { Text("Feed name") }, singleLine = true)
+                if (feedInventory.isNotEmpty()) {
+                    Text("Choose from feed inventory", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        feedInventory.take(10).forEach { item ->
+                            FilterChip(
+                                selected = selectedInventoryId == item.inventoryId &&
+                                    feedName == item.name && unit == item.unit,
+                                onClick = {
+                                    selectedInventoryId = item.inventoryId
+                                    feedName = item.name
+                                    unit = item.unit
+                                },
+                                label = {
+                                    Text(
+                                        item.name + " · " + String.format(Locale.US, "%.2f %s", item.stock, item.unit),
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    feedName,
+                    {
+                        feedName = it
+                        selectedInventoryId = feedInventory.firstOrNull { item -> item.name == it && item.unit == unit }?.inventoryId.orEmpty()
+                    },
+                    label = { Text("Feed name") },
+                    supportingText = { Text("Use the exact inventory name for automatic stock deduction.") },
+                    singleLine = true
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(quantity, { quantity = it }, label = { Text("Quantity") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(unit, { unit = it }, label = { Text("Unit") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(
+                        unit,
+                        {
+                            unit = it
+                            selectedInventoryId = feedInventory.firstOrNull { item -> item.name == feedName && item.unit == it }?.inventoryId.orEmpty()
+                        },
+                        label = { Text("Unit") },
+                        supportingText = { Text("Must match the inventory unit.") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 OutlinedTextField(date, { date = it }, label = { Text("Date") }, singleLine = true)
                 OutlinedTextField(notes, { notes = it }, label = { Text("Notes") }, minLines = 2)
