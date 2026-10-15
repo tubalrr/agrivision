@@ -29,6 +29,10 @@ Built with:
 
 ## Latest Version
 
+**Version 1.22.0** · Android version code: `26`
+
+This release adds an optional recorded cost to each Feed Log. The cost is preserved through Room, backup/restore, and DA Feed Logs exports; older feed records and older backups remain valid with a zero-cost default. Livestock Cost & Return now includes only the explicitly entered feed-log costs alongside finance expenses linked to that livestock group. No feed cost is estimated from current inventory prices, and the UI warns against recording the same feed cost twice in Finance. Room schema migration 12 → 13 adds the new field without clearing existing farm records.
+
 **Version 1.21.0** · Android version code: `25`
 
 This release connects Feed Logs to Inventory with an atomic Room transaction. Saving a new feed log deducts matching stock only when the inventory name and unit match and sufficient quantity is available. The movement ledger points back to the feed-log ID to prevent duplicate deduction on retries. Missing feed stock, unit mismatches, and shortages are saved as visible notes instead of silently adjusting quantities. Feed Management also shows a stock snapshot. Feed consumption is not automatically booked as an expense, avoiding accidental double-counting of feed purchases.

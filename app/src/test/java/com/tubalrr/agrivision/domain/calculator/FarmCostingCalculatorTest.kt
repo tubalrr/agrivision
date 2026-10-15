@@ -68,14 +68,16 @@ class FarmCostingCalculatorTest {
             ),
             feedLogs = listOf(
                 com.tubalrr.agrivision.data.local.FeedLogRecord(
-                    livestockId = "L1", date = "2026-10-01", feedName = "Layer crumble", quantityKg = 30.0, unit = "kg"
+                    livestockId = "L1", date = "2026-10-01", feedName = "Layer crumble",
+                    quantityKg = 30.0, unit = "kg", costAmount = 400.0
                 )
             )
         ).single()
         assertEquals(4200.0, result.income, 0.001)
-        assertEquals(2500.0, result.expenses, 0.001)
-        assertEquals(1700.0, result.netProfit, 0.001)
-        assertEquals(31.25, result.costPerHead!!, 0.001)
+        assertEquals(2900.0, result.expenses, 0.001)
+        assertEquals(400.0, result.feedCost, 0.001)
+        assertEquals(1300.0, result.netProfit, 0.001)
+        assertEquals(36.25, result.costPerHead!!, 0.001)
         assertEquals(24.0, result.productionByUnit["trays"] ?: 0.0, 0.001)
         assertEquals(30.0, result.feedUsageByUnit["kg"] ?: 0.0, 0.001)
     }

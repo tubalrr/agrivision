@@ -116,8 +116,8 @@ object DaReportExporter {
             Data(listOf("Record Type", "Input", "Category/Stage", "Quantity", "Unit", "Supplier", "Date", "Notes"), inventory + crop + livestock)
         }
         "Feed Logs" -> Data(
-            listOf("Feed Log ID", "Livestock ID", "Date", "Feed", "Quantity", "Unit", "Notes"),
-            s.feedLogs.map { listOf(it.feedLogId, it.livestockId, it.date, it.feedName, number(it.quantityKg), it.unit, it.notes) }
+            listOf("Feed Log ID", "Livestock ID", "Date", "Feed", "Quantity", "Unit", "Recorded Feed Cost (PHP)", "Notes"),
+            s.feedLogs.map { listOf(it.feedLogId, it.livestockId, it.date, it.feedName, number(it.quantityKg), it.unit, money(it.costAmount), it.notes) }
         )
         "Crop Lifecycle" -> Data(
             listOf("Event ID", "Crop ID", "Field ID", "Stage", "Date", "Input", "Quantity", "Unit", "Notes"),

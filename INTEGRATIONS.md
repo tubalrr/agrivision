@@ -11,6 +11,12 @@ Used by the optional Dashboard Farm Weather card. A user must tap the weather bu
 Weather is informational, not a guarantee or a substitute for local observation. When the service fails, local farm tasks, records, maps, reports, and backups remain available. Review Open-Meteo's current terms, attribution rules, and usage limits before distribution:
 - https://open-meteo.com/
 
+## Feed Cost → Livestock Cost & Return
+
+Each feed log can store an optional **total cost of the feed consumed in that event** (PHP). The value is explicit user-entered data, not a price inferred from changing on-hand stock or the latest inventory purchase. It is retained in Room, JSON/ZIP backup workflows, and DA Feed Logs export. Older database records and backups default to ₱0 until a user records a verified cost.
+
+Livestock cost analysis adds entered feed-log costs to finance expenses linked to the livestock group. Do not also record the exact same consumed feed cost as a separate Finance expense, or the combined cost would be double-counted. Unknown feed costs remain unknown instead of being estimated.
+
 ## Local Feed Logs → Inventory
 
 Feed-log save and stock reconciliation run in one Room database transaction. For a new feed log, the app looks for an inventory item whose name matches the feed name, then checks that units match and that sufficient stock exists. A successful deduction creates a `USAGE` inventory ledger entry linked to the feed-log ID. Re-saving the same feed-log ID cannot deduct stock a second time.
