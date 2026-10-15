@@ -660,7 +660,12 @@ internal fun ProductionFinanceScreen(
                     FarmRecordCard(
                         log.feedName.ifBlank { "Feed record" },
                         String.format(Locale.US, "%.2f %s", log.quantityKg, log.unit),
-                        listOf(log.date, log.livestockId.ifBlank { "Unlinked livestock" }, log.notes).filter { it.isNotBlank() }.joinToString(" · "),
+                        listOf(
+                            log.date,
+                            log.livestockId.ifBlank { "Unlinked livestock" },
+                            if (log.costAmount > 0.0) "Feed cost ₱" + money(log.costAmount) else "Cost not recorded",
+                            log.notes
+                        ).filter { it.isNotBlank() }.joinToString(" · "),
                         Icons.Outlined.Restaurant
                     )
                 }
@@ -839,7 +844,7 @@ private fun LivestockProfitabilityCard(
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
         Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Recorded Livestock Cost & Return", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
-            Text("Income and costs include only saved transactions linked to each group. Feed logs show usage; they are not converted into peso cost automatically.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+            Text("Costs combine finance expenses linked to this group with the explicit cost entered on each feed log. Unknown feed costs are not estimated; do not enter the same feed cost again in Finance.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
             if (rows.isEmpty()) {
                 Text("Register a livestock group first, then link income and expenses to calculate its recorded result.", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
             } else rows.forEach { row ->
@@ -863,6 +868,12 @@ private fun LivestockProfitabilityCard(
                         }
                     }
                     Text(row.costPerHead?.let { "Recorded cost/head: ₱" + money(it) } ?: "Cost/head: no current heads", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        if (row.feedCost > 0.0) "Recorded feed cost included: ₱" + money(row.feedCost)
+                        else "No feed cost entered for this group’s feed logs.",
+                        color = AgriMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     if (row.productionByUnit.isNotEmpty()) {
                         Text("Linked output: " + row.productionByUnit.entries.joinToString { String.format(Locale.US, "%.2f", it.value) + " " + it.key }, color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                     }
@@ -1457,6 +1468,7 @@ private fun FeedLogDialog(
     var feedName by remember { mutableStateOf(feedInventory.firstOrNull()?.name.orEmpty()) }
     var quantity by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf(feedInventory.firstOrNull()?.unit ?: "kg") }
+    var feedCost by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Calendar.getInstance().time)) }
     var notes by remember { mutableStateOf("") }
 
@@ -1515,13 +1527,22 @@ private fun FeedLogDialog(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                OutlinedTextField(date, { date = it }, label = { Text("Date") }, singleLine = true)
+                OutlinedTextField(
+                    value = feedCost,
+                    onValueChange = { feedCost = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                    label = { Text("Feed cost used (₱, optional)") },
+                    supportingText = { Text("Total cost for this feed event, not price per sack. Leave blank if unknown.") },
+                    singleLine = true
+                )
+                OutlinedTextField(date, { date = it }, label = { Text("Date (YYYY-MM-DD)") }, singleLine = true)
                 OutlinedTextField(notes, { notes = it }, label = { Text("Notes") }, minLines = 2)
             }
         },
         confirmButton = {
             Button(
-                enabled = feedName.isNotBlank() && (quantity.toDoubleOrNull() ?: 0.0) > 0.0,
+                enabled = feedName.isNotBlank() &&
+                    (quantity.toDoubleOrNull()?.let { it.isFinite() && it > 0.0 } == true) &&
+                    (feedCost.isBlank() || feedCost.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 } == true),
                 onClick = {
                     onSave(
                         com.tubalrr.agrivision.data.local.FeedLogRecord(
@@ -1530,7 +1551,8 @@ private fun FeedLogDialog(
                             feedName = feedName.trim(),
                             quantityKg = quantity.toDoubleOrNull() ?: 0.0,
                             unit = unit.trim().ifBlank { "kg" },
-                            notes = notes.trim()
+                            notes = notes.trim(),
+                            costAmount = feedCost.toDoubleOrNull() ?: 0.0
                         )
                     )
                 }

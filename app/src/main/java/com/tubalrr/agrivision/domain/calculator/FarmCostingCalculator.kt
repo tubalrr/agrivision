@@ -69,6 +69,7 @@ data class LivestockProfitability(
     val currentHeads: Int,
     val income: Double,
     val expenses: Double,
+    val feedCost: Double,
     val netProfit: Double,
     val costPerHead: Double?,
     val productionByUnit: Map<String, Double>,
@@ -91,10 +92,15 @@ fun FarmCostingCalculator.summarizeLivestock(
         val unit = match.groupValues[2].trim().ifBlank { "unit" }
         unit.lowercase(Locale.US) to amount
     }.groupBy { it.first }.mapValues { (_, values) -> values.sumOf { it.second } }
-    val feedByUnit = feedLogs.filter { it.livestockId == group.groupId }
+    val groupFeedLogs = feedLogs.filter { it.livestockId == group.groupId }
+    val feedByUnit = groupFeedLogs
         .groupBy { it.unit.trim().ifBlank { "unit" } }
         .mapValues { (_, rows) -> rows.sumOf { it.quantityKg.coerceAtLeast(0.0) } }
-    val cost = linkedExpenses.sumOf { it.amount.coerceAtLeast(0.0) }
+    val feedCost = groupFeedLogs.sumOf {
+        it.costAmount.takeIf { amount -> amount.isFinite() }?.coerceAtLeast(0.0) ?: 0.0
+    }
+    val linkedExpenseCost = linkedExpenses.sumOf { it.amount.coerceAtLeast(0.0) }
+    val cost = linkedExpenseCost + feedCost
     val income = linkedSales.sumOf { it.amount.coerceAtLeast(0.0) }
     LivestockProfitability(
         group.groupId,
@@ -102,6 +108,7 @@ fun FarmCostingCalculator.summarizeLivestock(
         group.currentPopulation.coerceAtLeast(0),
         income,
         cost,
+        feedCost,
         income - cost,
         group.currentPopulation.takeIf { it > 0 }?.let { cost / it },
         outputByUnit,

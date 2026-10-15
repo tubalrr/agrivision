@@ -28,7 +28,7 @@ import androidx.room.RoomDatabase
         IncidentEventEntity::class,
         ReportSubmissionEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 abstract class AgriDatabase : RoomDatabase() {
@@ -46,7 +46,7 @@ abstract class AgriDatabase : RoomDatabase() {
                     AgriDatabase::class.java,
                     "agrivision.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -344,6 +344,13 @@ abstract class AgriDatabase : RoomDatabase() {
                 // Previous versions did not track settlement; legacy transactions remain classified as paid.
                 db.execSQL("ALTER TABLE expenses ADD COLUMN paymentStatus TEXT NOT NULL DEFAULT 'Paid'")
                 db.execSQL("ALTER TABLE sales ADD COLUMN paymentStatus TEXT NOT NULL DEFAULT 'Paid'")
+            }
+        }
+
+        private val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Existing feed logs have no verified cost; keep their data with a zero-value default.
+                db.execSQL("ALTER TABLE feed_logs ADD COLUMN costAmount REAL NOT NULL DEFAULT 0.0")
             }
         }
 

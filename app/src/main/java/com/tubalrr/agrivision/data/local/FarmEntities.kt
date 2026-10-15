@@ -177,6 +177,7 @@ data class FeedLogEntity(
     val quantityKg: Double,
     val unit: String,
     val notes: String = "",
+    @ColumnInfo(defaultValue = "0.0") val costAmount: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis()
 )
 

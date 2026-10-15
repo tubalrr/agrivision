@@ -68,7 +68,7 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         const val BACKUP_FORMAT_VERSION = 1
-        const val ROOM_SCHEMA_VERSION = 12
+        const val ROOM_SCHEMA_VERSION = 13
     }
 
     private val _backupStatus = MutableStateFlow("")
@@ -867,6 +867,9 @@ class FarmViewModel(application: Application) : AndroidViewModel(application) {
         require(snapshot.feedLogs.all { it.quantityKg.isFinite() && it.quantityKg >= 0.0 }) {
             "Backup contains an invalid feed log quantity."
         }
+        require(snapshot.feedLogs.all { it.costAmount.isFinite() && it.costAmount >= 0.0 }) {
+            "Backup contains an invalid feed log cost."
+        }
         require(snapshot.cropLifecycleEvents.all { it.quantity.isBlank() || it.quantity.trim().toDoubleOrNull()?.let { v -> v.isFinite() && v >= 0.0 } == true }) {
             "Backup contains an invalid crop lifecycle quantity."
         }
@@ -1214,6 +1217,7 @@ private fun FeedLogRecord.toJson() = JSONObject().apply {
     put("quantityKg", quantityKg)
     put("unit", unit)
     put("notes", notes)
+    put("costAmount", costAmount)
     put("createdAt", createdAt)
 }
 
@@ -1478,6 +1482,7 @@ private fun jsonToSnapshot(json: JSONObject): FarmSnapshot {
             quantityKg = o.optDouble("quantityKg", 0.0),
             unit = o.optString("unit", "kg"),
             notes = o.optString("notes"),
+            costAmount = o.optDouble("costAmount", 0.0),
             createdAt = o.optLong("createdAt", System.currentTimeMillis())
         )
     }

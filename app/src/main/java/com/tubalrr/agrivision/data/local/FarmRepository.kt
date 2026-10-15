@@ -39,6 +39,7 @@ data class FeedLogRecord(
     val quantityKg: Double = 0.0,
     val unit: String = "kg",
     val notes: String = "",
+    val costAmount: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -379,6 +380,7 @@ class FarmRepository(
                     quantityKg = it.quantityKg,
                     unit = it.unit,
                     notes = it.notes,
+                    costAmount = it.costAmount,
                     createdAt = it.createdAt
                 )
             }
@@ -394,8 +396,10 @@ class FarmRepository(
         val feedLogId = record.feedLogId.ifBlank { UUID.randomUUID().toString() }
         val feedName = record.feedName.trim()
         val quantity = record.quantityKg
+        val costAmount = record.costAmount
         require(feedName.isNotBlank()) { "Feed name is required." }
         require(quantity.isFinite() && quantity > 0.0) { "Feed quantity must be greater than zero." }
+        require(costAmount.isFinite() && costAmount >= 0.0) { "Feed cost must be zero or a positive amount." }
 
         database.withTransaction {
             val existingLog = dao.getFeedLog(DEFAULT_FARM_ID, feedLogId)
@@ -463,6 +467,7 @@ class FarmRepository(
                     quantityKg = quantity,
                     unit = record.unit.trim().ifBlank { "kg" },
                     notes = notes,
+                    costAmount = costAmount,
                     createdAt = if (record.createdAt > 0L) record.createdAt else System.currentTimeMillis()
                 )
             )
