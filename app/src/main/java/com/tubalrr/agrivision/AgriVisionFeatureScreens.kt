@@ -443,7 +443,7 @@ internal fun WeatherScreen(padding: PaddingValues, farm: FarmRecord, fields: Lis
                 }
             }
             item { Text(featureText(language, "Mga risk indicator", "Risk indicators"), color = AgriText, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium) }
-            val warnings = remember(value, language) { featureWeatherWarnings(value, language) }
+            val warnings = featureWeatherWarnings(value, language)
             if (warnings.isEmpty()) item { InfoCard(featureText(language, "Walang risk threshold na na-detect", "No heuristic risk threshold triggered"), featureText(language, "Tingnan pa rin ang opisyal na PAGASA bulletins at aktuwal na kondisyon sa bukid.", "Continue checking official PAGASA bulletins and actual farm conditions.")) }
             else items(warnings) { pair ->
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = if (AgriIsDark) AgriSurfaceVariant else AgriGoldSoft)) {
