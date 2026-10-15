@@ -71,8 +71,9 @@ internal fun AgriVisionApp(
         mutableStateOf(
             if (preferences.getBoolean("remember_last_tab", false)) {
                 when (preferences.getInt("last_selected_tab", 0)) {
-                    3 -> 4 // Reports now lives inside More.
-                    4 -> 3 // Keep the old Tasks tab selection.
+                    3 -> 4 // Legacy Reports tab now lives inside More.
+                    4 -> 3 // Legacy Tasks tab.
+                    6 -> 4 // More tab, including its last child destination.
                     else -> preferences.getInt("last_selected_tab", 0).coerceIn(0, 5)
                 }
             } else 0
@@ -80,9 +81,11 @@ internal fun AgriVisionApp(
     }
     var moreDestination by remember {
         mutableStateOf(
-            if (preferences.getBoolean("remember_last_tab", false) &&
-                preferences.getInt("last_selected_tab", 0) == 3
-            ) "Reports" else "Home"
+            when (preferences.getInt("last_selected_tab", 0)) {
+                3 -> "Reports"
+                6 -> preferences.getString("last_more_destination", "Home").orEmpty().ifBlank { "Home" }
+                else -> "Home"
+            }
         )
     }
     var featurePreferences by remember { mutableStateOf(readFeaturePreferences(context)) }
@@ -143,12 +146,16 @@ internal fun AgriVisionApp(
 
     LaunchedEffect(selected, rememberLastTab) {
         if (rememberLastTab) {
-            val legacyIndex = when {
+            val persistedIndex = when {
                 selected == 4 && moreDestination == "Reports" -> 3
                 selected == 3 -> 4
+                selected == 4 -> 6
                 else -> selected
             }
-            preferences.edit().putInt("last_selected_tab", legacyIndex).apply()
+            preferences.edit()
+                .putInt("last_selected_tab", persistedIndex)
+                .putString("last_more_destination", if (selected == 4) moreDestination else "Home")
+                .apply()
         } else {
             preferences.edit().remove("last_selected_tab").apply()
         }
@@ -353,7 +360,8 @@ internal fun AgriVisionApp(
                     onSelected = { next ->
                         if (hapticNavigation) view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                         selected = next
-                        if (next != 4) moreDestination = "Home"
+                        // Selecting More from the bottom bar always returns to its landing page.
+                        moreDestination = "Home"
                     }
                 )
             }
