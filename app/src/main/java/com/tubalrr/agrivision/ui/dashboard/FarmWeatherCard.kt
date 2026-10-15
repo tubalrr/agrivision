@@ -56,7 +56,8 @@ private data class FarmForecastDay(
     val minimumTemperatureC: Double,
     val maximumTemperatureC: Double,
     val precipitationProbabilityPercent: Int,
-    val precipitationSumMm: Double
+    val precipitationSumMm: Double,
+    val maximumWindKmh: Double
 )
 
 private data class FarmWeather(
@@ -120,8 +121,8 @@ private suspend fun loadFarmWeather(coordinates: FarmCoordinates): FarmWeather =
     val query = "https://api.open-meteo.com/v1/forecast" +
         "?latitude=$lat&longitude=$lon" +
         "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m" +
-        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum" +
-        "&forecast_days=5&timezone=auto"
+        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max" +
+        "&forecast_days=7&timezone=auto"
     val connection = (URL(query).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"
         connectTimeout = 8000
@@ -142,11 +143,12 @@ private suspend fun loadFarmWeather(coordinates: FarmCoordinates): FarmWeather =
         val minimums = daily?.optJSONArray("temperature_2m_min")
         val probabilities = daily?.optJSONArray("precipitation_probability_max")
         val precipitation = daily?.optJSONArray("precipitation_sum")
+        val maximumWinds = daily?.optJSONArray("wind_speed_10m_max")
         val forecast = if (
             dates != null && codes != null && maximums != null &&
             minimums != null && probabilities != null && precipitation != null
         ) {
-            (0 until minOf(5, dates.length())).mapNotNull { index ->
+            (0 until minOf(7, dates.length())).mapNotNull { index ->
                 val date = dates.optString(index, "")
                 val low = minimums.optDouble(index, Double.NaN)
                 val high = maximums.optDouble(index, Double.NaN)
@@ -157,7 +159,8 @@ private suspend fun loadFarmWeather(coordinates: FarmCoordinates): FarmWeather =
                     minimumTemperatureC = low,
                     maximumTemperatureC = high,
                     precipitationProbabilityPercent = probabilities.optInt(index, -1),
-                    precipitationSumMm = precipitation.optDouble(index, 0.0)
+                    precipitationSumMm = precipitation.optDouble(index, 0.0),
+                    maximumWindKmh = maximumWinds?.optDouble(index, 0.0) ?: 0.0
                 )
             }
         } else emptyList()
@@ -287,7 +290,7 @@ internal fun FarmWeatherCard(
                     style = MaterialTheme.typography.labelSmall
                 )
                 if (current.forecast.isNotEmpty()) {
-                    Text("5-day forecast", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Text("7-day forecast", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -327,6 +330,23 @@ internal fun FarmWeatherCard(
                     if (rainyDay != null) {
                         Text(
                             "Planning note: rain is forecast on ${rainyDay.date}. Check local conditions before scheduling weather-sensitive field work.",
+                            color = AgriWarning,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    val strongWind = current.forecast.firstOrNull { it.maximumWindKmh >= 60.0 }
+                    if (strongWind != null) {
+                        Text(
+                            "Strong-wind / possible storm conditions forecast on ${strongWind.date}. This is not an official typhoon warning; follow PAGASA advisories.",
+                            color = AgriWarning,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    val totalRain = current.forecast.sumOf { it.precipitationSumMm }
+                    val maxForecastHeat = current.forecast.maxOfOrNull { it.maximumTemperatureC } ?: current.temperatureC
+                    if (totalRain < 5.0 && maxForecastHeat >= 32.0) {
+                        Text(
+                            "Possible dry-spell indicator: under 5 mm forecast rain in 7 days with high temperatures. Check local conditions.",
                             color = AgriWarning,
                             style = MaterialTheme.typography.bodySmall
                         )
