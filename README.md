@@ -68,9 +68,13 @@ Built with:
 
 **Version 1.24.0** · Android version code: `28`
 
-This release adds the on-device account prototype and optional new farm screens without removing Dashboard, Map, Farm, Reports, Tasks, or Profile. See the sections above for mock-data, offline and release-signing details.
+This release adds optional Firebase email/password authentication, Firebase password-reset email, and per-user Firestore profile metadata when `app/google-services.json` is configured. It also fixes first-run navigation to open registration when a local-only install has no account. Farm/task/report cloud sync is not included; those operational records remain on-device.
 
-**Version 1.23.0** · Android version code: `27`\n\nThis release added the local account prototype, pest/disease scan flow, weather, sample market prices, task/weather notifications, planting calendar and the More destination. See the details above.\n\n**Version 1.22.0** · Android version code: `26`
+**Version 1.23.0** · Android version code: `27`
+
+This release added the pest/disease scan flow, weather, sample market prices, task/weather notifications, planting calendar, More destination, and a local account prototype. See the details above.
+
+**Version 1.22.0** · Android version code: `26`
 
 This release adds an optional recorded cost to each Feed Log. The cost is preserved through Room, backup/restore, and DA Feed Logs exports; older feed records and older backups remain valid with a zero-cost default. Livestock Cost & Return now includes only the explicitly entered feed-log costs alongside finance expenses linked to that livestock group. No feed cost is estimated from current inventory prices, and the UI warns against recording the same feed cost twice in Finance. Room schema migration 12 → 13 adds the new field without clearing existing farm records.
 
