@@ -70,33 +70,85 @@ internal fun AgriVisionApp(
     var selected by remember {
         mutableStateOf(
             if (preferences.getBoolean("remember_last_tab", false)) {
-                preferences.getInt("last_selected_tab", 0).coerceIn(0, 5)
+                when (preferences.getInt("last_selected_tab", 0)) {
+                    3 -> 4 // Reports now lives inside More.
+                    4 -> 3 // Keep the old Tasks tab selection.
+                    else -> preferences.getInt("last_selected_tab", 0).coerceIn(0, 5)
+                }
             } else 0
         )
     }
+    var moreDestination by remember {
+        mutableStateOf(
+            if (preferences.getBoolean("remember_last_tab", false) &&
+                preferences.getInt("last_selected_tab", 0) == 3
+            ) "Reports" else "Home"
+        )
+    }
+    var featurePreferences by remember { mutableStateOf(readFeaturePreferences(context)) }
+    var currentUser by remember { mutableStateOf(LocalAuthStore.current(context)) }
+    var pendingFeaturePreferences by remember { mutableStateOf<FeaturePreferences?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var showExitConfirmation by remember { mutableStateOf(false) }
     var farmRemindersEnabled by remember { mutableStateOf(preferences.getBoolean("farm_reminders_enabled", false)) }
     var pendingTaskFilter by remember { mutableStateOf<String?>(null) }
 
+    fun persistFeaturePreferences(value: FeaturePreferences) {
+        featurePreferences = value
+        saveFeaturePreferences(context, value)
+    }
+
+    fun openMore(destination: String) {
+        moreDestination = destination
+        selected = 4
+    }
+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        farmRemindersEnabled = granted
-        preferences.edit().putBoolean("farm_reminders_enabled", granted).apply()
-        if (granted) FarmReminderScheduler.schedule(context) else FarmReminderScheduler.cancel(context)
+        val pending = pendingFeaturePreferences
+        if (pending != null) {
+            if (granted) persistFeaturePreferences(pending)
+            pendingFeaturePreferences = null
+        } else {
+            farmRemindersEnabled = granted
+            preferences.edit().putBoolean("farm_reminders_enabled", granted).apply()
+        }
     }
 
-    LaunchedEffect(farmRemindersEnabled) {
+    val onFeaturePreferencesChange: (FeaturePreferences) -> Unit = { value ->
+        val turnsOnAlert =
+            (value.wateringNotifications && !featurePreferences.wateringNotifications) ||
+            (value.fertilizingNotifications && !featurePreferences.fertilizingNotifications) ||
+            (value.sprayingNotifications && !featurePreferences.sprayingNotifications) ||
+            (value.harvestNotifications && !featurePreferences.harvestNotifications) ||
+            (value.weatherNotifications && !featurePreferences.weatherNotifications)
+        val permissionMissing = Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (turnsOnAlert && permissionMissing) {
+            pendingFeaturePreferences = value
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            persistFeaturePreferences(value)
+        }
+    }
+
+    LaunchedEffect(farmRemindersEnabled, featurePreferences.anyNotificationsEnabled) {
         val permissionGranted = Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        if (farmRemindersEnabled && permissionGranted) FarmReminderScheduler.schedule(context)
-        if (!farmRemindersEnabled) FarmReminderScheduler.cancel(context)
+        val remindersNeeded = farmRemindersEnabled || featurePreferences.anyNotificationsEnabled
+        if (remindersNeeded && permissionGranted) FarmReminderScheduler.schedule(context)
+        else FarmReminderScheduler.cancel(context)
     }
 
     LaunchedEffect(selected, rememberLastTab) {
         if (rememberLastTab) {
-            preferences.edit().putInt("last_selected_tab", selected).apply()
+            val legacyIndex = when {
+                selected == 4 && moreDestination == "Reports" -> 3
+                selected == 3 -> 4
+                else -> selected
+            }
+            preferences.edit().putInt("last_selected_tab", legacyIndex).apply()
         } else {
             preferences.edit().remove("last_selected_tab").apply()
         }
@@ -173,10 +225,22 @@ internal fun AgriVisionApp(
     }
 
     MaterialTheme(colorScheme = scheme) {
-        // Android edge-swipe/back should navigate inside the app instead of closing it.
-        // Only show the exit confirmation when the user is already on Dashboard.
+        if (currentUser == null) {
+            AuthScreen(
+                language = featurePreferences.language,
+                onLanguageChange = { persistFeaturePreferences(featurePreferences.copy(language = it)) },
+                onAuthenticated = {
+                    currentUser = it
+                    selected = 0
+                    moreDestination = "Home"
+                }
+            )
+        } else {
+        // Keep new feature routes inside More; system back returns to its landing page first.
         BackHandler(enabled = !showSettings && !showExitConfirmation) {
-            if (selected != 0) {
+            if (selected == 4 && moreDestination != "Home") {
+                moreDestination = "Home"
+            } else if (selected != 0) {
                 selected = 0
                 pendingTaskFilter = null
             } else {
@@ -285,9 +349,11 @@ internal fun AgriVisionApp(
                 AgriBottomBar(
                     selected = selected,
                     compact = compactNavigation,
+                    language = featurePreferences.language,
                     onSelected = { next ->
                         if (hapticNavigation) view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                         selected = next
+                        if (next != 4) moreDestination = "Home"
                     }
                 )
             }
@@ -309,17 +375,20 @@ internal fun AgriVisionApp(
                     farm = farm,
                     fields = fields,
                     farmViewModel = farmViewModel,
-                    onOpenTasks = { pendingTaskFilter = null; selected = 4 },
-                    onOpenOverdueTasks = { pendingTaskFilter = "Overdue"; selected = 4 },
+                    onOpenTasks = { pendingTaskFilter = null; selected = 3 },
+                    onOpenOverdueTasks = { pendingTaskFilter = "Overdue"; selected = 3 },
                     onOpenInventory = {
                         farmCategory = "Inventory"
                         selected = 2
                     },
-                    onOpenFinance = { selected = 3 },
+                    onOpenFinance = { openMore("Reports") },
                     onOpenFarm = { category ->
                         farmCategory = category
                         selected = 2
                     },
+                    onOpenScan = { openMore("Scan") },
+                    onOpenPrices = { openMore("Prices") },
+                    onOpenWeather = { openMore("Weather") },
                     totalAnimals = totalLivestock,
                     totalExpenses = totalExpenses,
                     totalSales = totalSales,
@@ -358,7 +427,8 @@ internal fun AgriVisionApp(
                     onAddEquipment = farmViewModel::addEquipment,
                     onAddCropLifecycleEvent = farmViewModel::addCropLifecycleEvent
                 )
-                3 -> ProductionFinanceScreen(
+                4 -> when (moreDestination) {
+                    "Reports" -> ProductionFinanceScreen(
                     padding = padding,
                     production = production,
                     crops = crops,
@@ -388,8 +458,61 @@ internal fun AgriVisionApp(
                     onSubmissionSaved = farmViewModel::saveReportSubmission,
                     onExpensePaymentStatus = farmViewModel::setExpensePaymentStatus,
                     onSalePaymentStatus = farmViewModel::setSalePaymentStatus
-                )
-                4 -> TasksScreen(
+                    )
+                    "Scan" -> PestDetectionScreen(
+                        padding = padding,
+                        farm = farm,
+                        crops = crops,
+                        language = featurePreferences.language,
+                        onBack = { moreDestination = "Home" }
+                    )
+                    "Prices" -> MarketPricesScreen(
+                        padding = padding,
+                        farm = farm,
+                        language = featurePreferences.language,
+                        onBack = { moreDestination = "Home" }
+                    )
+                    "Weather" -> WeatherScreen(
+                        padding = padding,
+                        farm = farm,
+                        fields = fields,
+                        language = featurePreferences.language,
+                        onBack = { moreDestination = "Home" }
+                    )
+                    "Calendar" -> PlantingCalendarScreen(
+                        padding = padding,
+                        farm = farm,
+                        crops = crops,
+                        language = featurePreferences.language,
+                        onAddTask = farmViewModel::addTask,
+                        onBack = { moreDestination = "Home" }
+                    )
+                    "Help" -> HelpSettingsScreen(
+                        padding = padding,
+                        language = featurePreferences.language,
+                        isDark = themeMode == "pro",
+                        onLanguageChange = { onFeaturePreferencesChange(featurePreferences.copy(language = it)) },
+                        onThemeChange = { dark ->
+                            themeMode = if (dark) "pro" else "field"
+                            setAgriThemePro(dark)
+                            preferences.edit().putString("appearance_theme", themeMode).apply()
+                        },
+                        onBack = { moreDestination = "Home" }
+                    )
+                    else -> MoreHubScreen(
+                        padding = padding,
+                        farm = farm,
+                        language = featurePreferences.language,
+                        online = rememberInternetAvailable(),
+                        onOpenReports = { openMore("Reports") },
+                        onOpenScan = { openMore("Scan") },
+                        onOpenPrices = { openMore("Prices") },
+                        onOpenWeather = { openMore("Weather") },
+                        onOpenCalendar = { openMore("Calendar") },
+                        onOpenHelp = { openMore("Help") }
+                    )
+                }
+                3 -> TasksScreen(
                     padding = padding,
                     tasks = tasks,
                     inventory = inventory,
@@ -398,7 +521,7 @@ internal fun AgriVisionApp(
                     onAddTask = farmViewModel::addTask,
                     onToggleTask = farmViewModel::toggleTask
                 )
-                else -> ProfileScreen(
+                5 -> ProfileScreen(
                     padding = padding,
                     staffProfile = daStaffProfile,
                     onStaffProfileSaved = farmViewModel::saveDaStaffProfile,
@@ -422,9 +545,25 @@ internal fun AgriVisionApp(
                     onAddAssistance = farmViewModel::addAssistance,
                     onUpdateAssistance = farmViewModel::updateAssistance,
                     onAddField = farmViewModel::addField,
-                    onUpdateField = farmViewModel::updateField
+                    onUpdateField = farmViewModel::updateField,
+                    currentUser = currentUser,
+                    featurePreferences = featurePreferences,
+                    isDarkFeatureTheme = themeMode == "pro",
+                    onFeaturePreferencesChange = onFeaturePreferencesChange,
+                    onFeatureThemeChange = { dark ->
+                        themeMode = if (dark) "pro" else "field"
+                        setAgriThemePro(dark)
+                        preferences.edit().putString("appearance_theme", themeMode).apply()
+                    },
+                    onLogout = {
+                        LocalAuthStore.logout(context)
+                        currentUser = null
+                        moreDestination = "Home"
+                        showSettings = false
+                    }
                 )
             }
+        }
         }
     }
 }
@@ -433,15 +572,16 @@ internal fun AgriVisionApp(
 internal fun AgriBottomBar(
     selected: Int,
     compact: Boolean = false,
+    language: String = "fil",
     onSelected: (Int) -> Unit
 ) {
     val items = listOf(
-        "Dashboard" to Icons.Outlined.Dashboard,
-        "Map" to Icons.Outlined.Map,
-        "Farm" to Icons.Outlined.Yard,
-        "Reports" to Icons.Outlined.Assessment,
-        "Tasks" to Icons.Outlined.Checklist,
-        "Profile" to Icons.Outlined.Person
+        featureText(language, "Dashboard", "Dashboard") to Icons.Outlined.Dashboard,
+        featureText(language, "Mapa", "Map") to Icons.Outlined.Map,
+        featureText(language, "Farm", "Farm") to Icons.Outlined.Yard,
+        featureText(language, "Gawain", "Tasks") to Icons.Outlined.Checklist,
+        featureText(language, "Higit pa", "More") to Icons.Outlined.MoreHoriz,
+        featureText(language, "Profile", "Profile") to Icons.Outlined.Person
     )
     val barShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
