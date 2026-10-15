@@ -6,6 +6,11 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Cloud account support is optional until this Firebase project supplies its own config.
+if (project.file("google-services.json").isFile) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) {
@@ -89,6 +94,11 @@ dependencies {
     implementation("androidx.work:work-runtime:2.12.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("com.google.maps.android:maps-compose:8.6.0")
+
+    // Firebase email authentication and role profile storage, enabled when app/google-services.json exists.
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
 
     val roomVersion = "2.8.5"
     implementation("androidx.room:room-runtime:$roomVersion")
