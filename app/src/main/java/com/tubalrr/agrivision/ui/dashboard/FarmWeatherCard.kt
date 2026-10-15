@@ -246,6 +246,7 @@ internal fun FarmWeatherCard(
                             error = null
                             try {
                                 weather = loadFarmWeather(coordinates)
+                                weatherForCoordinates = coordinates
                             } catch (_: Exception) {
                                 error = "Weather refresh failed. Check your connection and try again."
                             } finally {
