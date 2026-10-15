@@ -198,7 +198,7 @@ class DaReportExporterTest {
             applications
         ) { jsonBytes = it }
 
-        val csvText = String(csvBytes, Charsets.UTF_8).removePrefix("\\uFEFF")
+        val csvText = String(csvBytes, Charsets.UTF_8).removePrefix("\uFEFF")
         org.junit.Assert.assertTrue(csvText.contains("Ana Dela Cruz"))
         org.junit.Assert.assertTrue(csvText.contains("Ben Santos"))
         org.junit.Assert.assertTrue(csvText.contains("farm-002"))
@@ -227,7 +227,7 @@ class DaReportExporterTest {
             emptyList()
         ) { csvBytes = it }
 
-        val lines = String(csvBytes, Charsets.UTF_8).removePrefix("\\uFEFF")
+        val lines = String(csvBytes, Charsets.UTF_8).removePrefix("\uFEFF")
             .trimEnd('\n').split('\n')
         assertEquals(
             "Farm Record ID,Farmer ID,Farmer Name,Contact Number,Farm Name,Province,Municipality/City,Barangay,Farm Area,Land Tenure,Commodities,Application Status,Review Notes",
