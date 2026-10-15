@@ -74,13 +74,15 @@ private fun weatherCodeLabel(code: Int): String = when (code) {
 }
 
 private fun resolveFarmCoordinates(farm: FarmRecord, fields: List<FieldRecord>): FarmCoordinates? {
-    val field = fields.firstOrNull { it.latitude != null && it.longitude != null }
+    val field = fields.firstOrNull {
+        val lat = it.latitude
+        val lon = it.longitude
+        lat != null && lon != null &&
+            lat.isFinite() && lon.isFinite() &&
+            lat in -90.0..90.0 && lon in -180.0..180.0
+    }
     if (field != null) {
-        val lat = field.latitude!!
-        val lon = field.longitude!!
-        if (lat.isFinite() && lon.isFinite() && lat in -90.0..90.0 && lon in -180.0..180.0) {
-            return FarmCoordinates(lat, lon)
-        }
+        return FarmCoordinates(field.latitude!!, field.longitude!!)
     }
 
     // Use saved mapped boundaries only; never infer a location from a town name.
