@@ -157,6 +157,14 @@ private fun FeatureActionCard(title: String, detail: String, icon: androidx.comp
     }
 }
 
+internal fun interface MarketPriceProvider {
+    suspend fun load(): List<MarketPriceEntity>
+}
+
+internal object MockMarketPriceProvider : MarketPriceProvider {
+    override suspend fun load(): List<MarketPriceEntity> = mockMarketPrices()
+}
+
 private fun mockMarketPrices(): List<MarketPriceEntity> {
     val now = System.currentTimeMillis()
     return listOf(
@@ -172,7 +180,13 @@ private fun mockMarketPrices(): List<MarketPriceEntity> {
 }
 
 @Composable
-internal fun MarketPricesScreen(padding: PaddingValues, farm: FarmRecord, language: String, onBack: () -> Unit) {
+internal fun MarketPricesScreen(
+    padding: PaddingValues,
+    farm: FarmRecord,
+    language: String,
+    onBack: () -> Unit,
+    provider: MarketPriceProvider = MockMarketPriceProvider
+) {
     val context = LocalContext.current
     val dao = remember(context) { AgriExtrasDatabase.getInstance(context).extrasDao() }
     val prices by dao.observeMarketPrices().collectAsState(initial = emptyList())
@@ -182,7 +196,9 @@ internal fun MarketPricesScreen(padding: PaddingValues, farm: FarmRecord, langua
     var category by remember { mutableStateOf("All") }
     var isRefreshing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(dao) { if (dao.countMarketPrices() == 0) dao.saveMarketPrices(mockMarketPrices()) }
+    LaunchedEffect(dao, provider) {
+        if (dao.countMarketPrices() == 0) dao.saveMarketPrices(provider.load())
+    }
     val visible = remember(prices, query, category) {
         prices.filter { (category == "All" || it.category == category) && (query.isBlank() || it.commodity.contains(query.trim(), ignoreCase = true)) }
     }
@@ -202,7 +218,7 @@ internal fun MarketPricesScreen(padding: PaddingValues, farm: FarmRecord, langua
                     FilterChip(selected = category == option, onClick = { category = option }, label = { Text(when(option) { "All" -> featureText(language, "Lahat", "All"); "Grains" -> featureText(language, "Butil", "Grains"); else -> featureText(language, "Gulay", "Vegetables") }) })
                 }
                 OutlinedButton(enabled = !isRefreshing, onClick = {
-                    scope.launch { isRefreshing = true; try { dao.clearMarketPrices(); dao.saveMarketPrices(mockMarketPrices()) } finally { isRefreshing = false } }
+                    scope.launch { isRefreshing = true; try { dao.clearMarketPrices(); dao.saveMarketPrices(provider.load()) } finally { isRefreshing = false } }
                 }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
                     if (isRefreshing) CircularProgressIndicator(Modifier.size(15.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.Refresh, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
@@ -455,17 +471,26 @@ private fun WeatherMetric(label: String, value: String, modifier: Modifier) {
     }
 }
 
-private data class MockDetectionResult(val diagnosis: String, val confidence: Int, val severity: String, val treatment: String)
+internal data class LeafDetectionResult(val diagnosis: String, val confidence: Int, val severity: String, val treatment: String)
 
-private fun mockDetectLeaf(imageKey: String, language: String): MockDetectionResult {
+internal fun interface LeafDiseaseDetector {
+    suspend fun analyze(context: Context, photoUri: Uri, language: String): LeafDetectionResult
+}
+
+internal object MockLeafDiseaseDetector : LeafDiseaseDetector {
+    override suspend fun analyze(context: Context, photoUri: Uri, language: String): LeafDetectionResult =
+        mockDetectLeaf(photoUri.toString(), language)
+}
+
+private fun mockDetectLeaf(imageKey: String, language: String): LeafDetectionResult {
     val results = if (language == "en") listOf(
-        MockDetectionResult("Possible fungal leaf spot", 86, "Moderate", "Isolate affected plants when feasible, remove heavily infected leaves, improve airflow, and consult a local agriculturist before applying fungicide."),
-        MockDetectionResult("Possible leaf blight", 81, "High", "Check lesion spread, avoid wetting foliage overnight, clean tools, and confirm the cause before choosing treatment."),
-        MockDetectionResult("Possible bacterial leaf spot", 79, "Moderate", "Avoid handling wet foliage, remove severely affected material where appropriate, and ask an agricultural technician to confirm the cause.")
+        LeafDetectionResult("Possible fungal leaf spot", 86, "Moderate", "Isolate affected plants when feasible, remove heavily infected leaves, improve airflow, and consult a local agriculturist before applying fungicide."),
+        LeafDetectionResult("Possible leaf blight", 81, "High", "Check lesion spread, avoid wetting foliage overnight, clean tools, and confirm the cause before choosing treatment."),
+        LeafDetectionResult("Possible bacterial leaf spot", 79, "Moderate", "Avoid handling wet foliage, remove severely affected material where appropriate, and ask an agricultural technician to confirm the cause.")
     ) else listOf(
-        MockDetectionResult("Posibleng fungal leaf spot", 86, "Katamtaman", "Ihiwalay ang apektadong halaman kung maaari, alisin ang matinding infected leaves, panatilihing maaliwalas ang tanim, at kumonsulta sa agriculturist bago gumamit ng fungicide."),
-        MockDetectionResult("Posibleng leaf blight", 81, "Mataas", "Suriin ang pagkalat ng lesions, linisin ang tools, at kumpirmahin ang sanhi bago pumili ng treatment."),
-        MockDetectionResult("Posibleng bacterial leaf spot", 79, "Katamtaman", "Iwasan ang paghawak kapag basa ang dahon at humingi ng diagnosis sa agricultural technician; maaaring magkapareho ang hitsura ng iba't ibang sakit.")
+        LeafDetectionResult("Posibleng fungal leaf spot", 86, "Katamtaman", "Ihiwalay ang apektadong halaman kung maaari, alisin ang matinding infected leaves, panatilihing maaliwalas ang tanim, at kumonsulta sa agriculturist bago gumamit ng fungicide."),
+        LeafDetectionResult("Posibleng leaf blight", 81, "Mataas", "Suriin ang pagkalat ng lesions, linisin ang tools, at kumpirmahin ang sanhi bago pumili ng treatment."),
+        LeafDetectionResult("Posibleng bacterial leaf spot", 79, "Katamtaman", "Iwasan ang paghawak kapag basa ang dahon at humingi ng diagnosis sa agricultural technician; maaaring magkapareho ang hitsura ng iba't ibang sakit.")
     )
     return results[Math.floorMod(imageKey.hashCode(), results.size)]
 }
@@ -499,14 +524,21 @@ private suspend fun decodePrivatePhoto(context: Context, uri: Uri): Bitmap? = wi
 }
 
 @Composable
-internal fun PestDetectionScreen(padding: PaddingValues, farm: FarmRecord, crops: List<CropRecord>, language: String, onBack: () -> Unit) {
+internal fun PestDetectionScreen(
+    padding: PaddingValues,
+    farm: FarmRecord,
+    crops: List<CropRecord>,
+    language: String,
+    onBack: () -> Unit,
+    detector: LeafDiseaseDetector = MockLeafDiseaseDetector
+) {
     val context = LocalContext.current
     val dao = remember(context) { AgriExtrasDatabase.getInstance(context).extrasDao() }
     val scope = rememberCoroutineScope()
     val history by dao.observeScanHistory(farm.farmId).collectAsState(initial = emptyList())
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var result by remember { mutableStateOf<MockDetectionResult?>(null) }
+    var result by remember { mutableStateOf<LeafDetectionResult?>(null) }
     var selectedCropId by remember { mutableStateOf(crops.firstOrNull()?.cropId.orEmpty()) }
     var scanning by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
@@ -564,7 +596,7 @@ internal fun PestDetectionScreen(padding: PaddingValues, farm: FarmRecord, crops
                             scope.launch {
                                 scanning = true; result = null; savedScanId = null
                                 delay(400)
-                                result = mockDetectLeaf(imageUri.toString(), language)
+                                result = detector.analyze(context, imageUri ?: return@launch, language)
                                 scanning = false
                             }
                         },
