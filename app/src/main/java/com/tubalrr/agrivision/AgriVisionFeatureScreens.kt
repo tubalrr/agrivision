@@ -471,7 +471,13 @@ private fun WeatherMetric(label: String, value: String, modifier: Modifier) {
     }
 }
 
-internal data class LeafDetectionResult(val diagnosis: String, val confidence: Int, val severity: String, val treatment: String)
+internal data class LeafDetectionResult(
+    val diagnosis: String,
+    val confidence: Int,
+    val severity: String,
+    val treatment: String,
+    val source: String = "mock"
+)
 
 internal fun interface LeafDiseaseDetector {
     suspend fun analyze(context: Context, photoUri: Uri, language: String): LeafDetectionResult
@@ -651,11 +657,23 @@ internal fun PestDetectionScreen(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(featureText(language, "Posibleng resulta", "Possible result"), color = AgriGreen, fontWeight = FontWeight.Bold)
                     Text(detection.diagnosis, color = AgriText, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                    Text("Mock confidence: " + detection.confidence + "%", color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text(
+                        (if (detection.source.equals("mock", true)) "Mock confidence: " else "Confidence: ") + detection.confidence + "%",
+                        color = AgriGreen,
+                        fontWeight = FontWeight.Bold
+                    )
                     Text(featureText(language, "Antas: ", "Severity: ") + detection.severity, color = AgriMuted)
                     Text(featureText(language, "Rekomendasyon", "Recommended next steps"), color = AgriText, fontWeight = FontWeight.Bold)
                     Text(detection.treatment, color = AgriText, style = MaterialTheme.typography.bodyMedium)
-                    Text(featureText(language, "Hindi ito tunay na AI diagnosis. Kumpirmahin sa agriculturist bago mag-apply ng pesticide/fungicide.", "This is not a real AI diagnosis. Confirm with an agriculturist before applying pesticide/fungicide."), color = AgriWarning, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (detection.source.equals("mock", true)) {
+                            featureText(language, "Demo result lang ito at hindi tunay na AI diagnosis. Kumpirmahin sa agriculturist bago gumamit ng pesticide/fungicide.", "This is a demo result, not a real AI diagnosis. Confirm with an agriculturist before using pesticide/fungicide.")
+                        } else {
+                            featureText(language, "AI output ito at maaaring magkamali. Kumpirmahin sa agriculturist bago gumamit ng pesticide/fungicide.", "AI output can be wrong. Confirm with an agriculturist before using pesticide/fungicide.")
+                        },
+                        color = AgriWarning,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     Button(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = savedScanId == null,
@@ -669,7 +687,8 @@ internal fun PestDetectionScreen(
                                     cropName = if (crop == null) "" else crop.name + " · " + crop.crop,
                                     imagePath = imageUri?.toString().orEmpty(),
                                     diagnosis = detection.diagnosis, confidencePercent = detection.confidence,
-                                    severity = detection.severity, treatment = detection.treatment
+                                    severity = detection.severity, treatment = detection.treatment,
+                                    detectorVersion = detection.source
                                 ))
                                 savedScanId = id
                                 message = featureText(language, "Na-save sa scan history ng farm.", "Saved to farm scan history.")
