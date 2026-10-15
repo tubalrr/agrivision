@@ -56,7 +56,13 @@ internal fun ProfileScreen(
     backupPreview: BackupRestorePreview? = null,
     backupRestoreInProgress: Boolean = false,
     onConfirmBackupRestore: () -> Unit = {},
-    onCancelBackupRestore: () -> Unit = {}
+    onCancelBackupRestore: () -> Unit = {},
+    currentUser: LocalAuthUser? = null,
+    featurePreferences: FeaturePreferences = FeaturePreferences(),
+    isDarkFeatureTheme: Boolean = false,
+    onFeaturePreferencesChange: (FeaturePreferences) -> Unit = {},
+    onFeatureThemeChange: (Boolean) -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
     var showFarmerApplication by remember { mutableStateOf(false) }
     var editingFarmId by remember { mutableStateOf<String?>(null) }
@@ -278,6 +284,19 @@ internal fun ProfileScreen(
                 profile = staffProfile,
                 onEdit = { showStaffEdit = true }
             )
+        }
+
+        item {
+            currentUser?.let { user ->
+                FeatureProfileCard(
+                    user = user,
+                    preferences = featurePreferences,
+                    isDark = isDarkFeatureTheme,
+                    onPreferencesChange = onFeaturePreferencesChange,
+                    onThemeChange = onFeatureThemeChange,
+                    onLogout = onLogout
+                )
+            }
         }
 
         item {
