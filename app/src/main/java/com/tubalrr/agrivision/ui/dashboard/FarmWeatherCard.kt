@@ -209,7 +209,7 @@ internal fun FarmWeatherCard(
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
                     Text("Farm Weather", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "Optional live data • saved farm records stay on this device",
+                        "Tap to send saved GPS coordinates to Open-Meteo; farm records stay on this device",
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
                     )

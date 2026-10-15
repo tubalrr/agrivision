@@ -81,6 +81,7 @@ internal fun DashboardScreen(
     onOpenTasks: () -> Unit = {},
     onOpenOverdueTasks: () -> Unit = onOpenTasks,
     onOpenInventory: () -> Unit = {},
+    onOpenFinance: () -> Unit = {},
     onOpenFarm: (String) -> Unit = {},
     totalAnimals: Int,
     totalExpenses: Double,
@@ -460,9 +461,12 @@ internal fun DashboardScreen(
                 inventory = inventory,
                 tasks = tasks,
                 incidents = fieldIncidents,
+                sales = sales,
+                expenses = expenses,
                 onOpenTasks = onOpenTasks,
                 onOpenOverdueTasks = onOpenOverdueTasks,
                 onOpenInventory = onOpenInventory,
+                onOpenFinance = onOpenFinance,
                 onOpenCrops = { onOpenFarm("Crops") },
                 onReviewIncident = { reviewIncident = it }
             )
@@ -1026,8 +1030,11 @@ private fun buildFarmActionItems(
     inventory: List<InventoryItem>,
     tasks: List<FarmTask>,
     incidents: List<FieldIncident>,
+    sales: List<SaleRecord>,
+    expenses: List<ExpenseRecord>,
     onOpenTasks: () -> Unit,
     onOpenInventory: () -> Unit,
+    onOpenFinance: () -> Unit,
     onOpenCrops: () -> Unit,
     onReviewIncident: (FieldIncident) -> Unit
 ): List<FarmActionItem> {
@@ -1140,6 +1147,31 @@ private fun buildFarmActionItems(
         )
     }
 
+    val unpaidSales = sales.filterNot { it.paymentStatus.equals("Paid", ignoreCase = true) }
+    val unpaidExpenses = expenses.filterNot { it.paymentStatus.equals("Paid", ignoreCase = true) }
+    if (unpaidSales.isNotEmpty() || unpaidExpenses.isNotEmpty()) {
+        val receivables = unpaidSales.sumOf { it.amount }
+        val payables = unpaidExpenses.sumOf { it.amount }
+        val financeDetails = buildList {
+            if (unpaidSales.isNotEmpty()) {
+                add("Sales receivable ₱${String.format(Locale.US, "%,.2f", receivables)}")
+            }
+            if (unpaidExpenses.isNotEmpty()) {
+                add("Unpaid expenses ₱${String.format(Locale.US, "%,.2f", payables)}")
+            }
+        }.joinToString(" · ")
+        actions += FarmActionItem(
+            title = "Review unsettled payments",
+            detail = financeDetails,
+            category = "Finance",
+            icon = Icons.Outlined.AccountBalanceWallet,
+            priority = 2,
+            priorityLabel = "PAYMENTS",
+            buttonLabel = "Open finance",
+            onClick = onOpenFinance
+        )
+    }
+
     return actions.sortedWith(
         compareBy<FarmActionItem> { it.priority }
             .thenBy { it.title.lowercase(Locale.US) }
@@ -1152,9 +1184,12 @@ private fun FarmActionCenter(
     inventory: List<InventoryItem>,
     tasks: List<FarmTask>,
     incidents: List<FieldIncident>,
+    sales: List<SaleRecord>,
+    expenses: List<ExpenseRecord>,
     onOpenTasks: () -> Unit,
     onOpenOverdueTasks: () -> Unit,
     onOpenInventory: () -> Unit,
+    onOpenFinance: () -> Unit,
     onOpenCrops: () -> Unit,
     onReviewIncident: (FieldIncident) -> Unit
 ) {
@@ -1163,8 +1198,11 @@ private fun FarmActionCenter(
         inventory = inventory,
         tasks = tasks,
         incidents = incidents,
+        sales = sales,
+        expenses = expenses,
         onOpenTasks = onOpenTasks,
         onOpenInventory = onOpenInventory,
+        onOpenFinance = onOpenFinance,
         onOpenCrops = onOpenCrops,
         onReviewIncident = onReviewIncident
     )
@@ -1205,8 +1243,8 @@ private fun FarmActionCenter(
                     )
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Farm Action Center", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
-                    Text("Practical reminders from your farm records", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
+                    Text("Farm Intelligence Center", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                    Text("Local insights from saved crops, stock, tasks, cases and payments", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
                 }
             }
 

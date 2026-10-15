@@ -315,6 +315,7 @@ internal fun AgriVisionApp(
                         farmCategory = "Inventory"
                         selected = 2
                     },
+                    onOpenFinance = { selected = 3 },
                     onOpenFarm = { category ->
                         farmCategory = category
                         selected = 2
