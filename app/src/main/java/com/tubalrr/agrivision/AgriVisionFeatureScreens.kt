@@ -539,11 +539,11 @@ internal fun PestDetectionScreen(padding: PaddingValues, farm: FarmRecord, crops
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = AgriCard)) {
                 Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(Modifier.weight(1f), onClick = {
+                        Button(modifier = Modifier.weight(1f), onClick = {
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) cameraLauncher.launch(null)
                             else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                         }) { Icon(Icons.Outlined.CameraAlt, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(5.dp)); Text(featureText(language, "Kumuha", "Camera")) }
-                        OutlinedButton(Modifier.weight(1f), onClick = { galleryLauncher.launch("image/*") }) { Icon(Icons.Outlined.PhotoLibrary, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(5.dp)); Text(featureText(language, "Mag-upload", "Upload")) }
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = { galleryLauncher.launch("image/*") }) { Icon(Icons.Outlined.PhotoLibrary, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(5.dp)); Text(featureText(language, "Mag-upload", "Upload")) }
                     }
                     if (imageBitmap != null) Image(bitmap = imageBitmap!!.asImageBitmap(), contentDescription = featureText(language, "Larawan ng dahon", "Leaf photo"), modifier = Modifier.fillMaxWidth().height(220.dp).border(1.dp, AgriLine, RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
                     else Box(Modifier.fillMaxWidth().height(150.dp).background(AgriSurfaceVariant, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
