@@ -76,6 +76,10 @@ internal object LocalAuthStore {
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /** A fresh installation has no local account, so direct first-time users to registration. */
+    fun hasAnyAccount(context: Context): Boolean =
+        prefs(context).all.keys.any { it.startsWith("account.") && it.endsWith(".hash") }
+
     fun current(context: Context): LocalAuthUser? {
         val p = prefs(context)
         val identifier = p.getString("session_identifier", null) ?: return null
@@ -210,14 +214,18 @@ internal fun AuthScreen(
     onLanguageChange: (String) -> Unit,
     onAuthenticated: (LocalAuthUser) -> Unit
 ) {
-    var mode by remember { mutableStateOf("login") }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // No account is provisioned by default. On a fresh install, make the first step
+    // registration instead of presenting a login form that cannot succeed yet.
+    var mode by remember(context) {
+        mutableStateOf(if (LocalAuthStore.hasAnyAccount(context)) "login" else "register")
+    }
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf("Farmer") }
     var message by remember { mutableStateOf("") }
     var showResetInfo by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
     val isEn = language == "en"
 
     if (showResetInfo) {
