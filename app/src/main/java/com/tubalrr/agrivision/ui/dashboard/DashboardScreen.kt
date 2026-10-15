@@ -83,6 +83,9 @@ internal fun DashboardScreen(
     onOpenInventory: () -> Unit = {},
     onOpenFinance: () -> Unit = {},
     onOpenFarm: (String) -> Unit = {},
+    onOpenScan: () -> Unit = {},
+    onOpenPrices: () -> Unit = {},
+    onOpenWeather: () -> Unit = {},
     totalAnimals: Int,
     totalExpenses: Double,
     totalSales: Double,
@@ -450,6 +453,39 @@ internal fun DashboardScreen(
                         iconTint = if (AgriIsDark) AgriGold else Color(0xFF96701B),
                         modifier = Modifier.weight(1f),
                         onClick = onOpenInventory
+                    )
+                }
+                val quickLanguage = LocalContext.current.getSharedPreferences("agrivision_preferences", android.content.Context.MODE_PRIVATE).getString("language", "fil").orEmpty()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    DashboardQuickAction(
+                        title = "Scan",
+                        subtitle = featureText(quickLanguage, "Suriin ang dahon", "Check a leaf"),
+                        icon = Icons.Outlined.CameraAlt,
+                        accent = if (AgriIsDark) AgriSurfaceVariant else Color(0xFFE4F2E5),
+                        iconTint = AgriGreen,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenScan
+                    )
+                    DashboardQuickAction(
+                        title = "Prices",
+                        subtitle = featureText(quickLanguage, "Presyo ng ani", "Crop prices"),
+                        icon = Icons.Outlined.CurrencyExchange,
+                        accent = if (AgriIsDark) AgriSurfaceVariant else AgriGoldSoft,
+                        iconTint = if (AgriIsDark) AgriGold else Color(0xFF96701B),
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenPrices
+                    )
+                    DashboardQuickAction(
+                        title = "Weather",
+                        subtitle = featureText(quickLanguage, "7-day forecast", "7-day forecast"),
+                        icon = Icons.Outlined.Cloud,
+                        accent = if (AgriIsDark) AgriSurfaceVariant else AgriGreenSoft,
+                        iconTint = AgriGreen,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenWeather
                     )
                 }
             }
