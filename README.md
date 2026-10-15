@@ -29,9 +29,9 @@ Built with:
 
 ## Latest Version
 
-**Version 1.19.0** · Android version code: `23`
+**Version 1.20.0** · Android version code: `24`
 
-This release hardens the Field Mapping System. Farm, field and incident boundaries are now checked for valid coordinates, duplicate adjacent points, zero-area shapes and self-crossing edges before they are saved or restored. The map editor shows validation errors directly and asks for explicit confirmation before saving a mapping. A single field location point remains supported; area boundaries require a valid 3+ point polygon. These safeguards protect the operational relationship Farm → Fields → Crops → Incidents without changing existing stored records unless the user edits or restores a map.
+This release adds an optional Farm Weather card using Open-Meteo. It requests current conditions only after the user taps Get farm weather, uses saved field GPS coordinates or the saved farm boundary, shows temperature, feels-like temperature, humidity, precipitation and wind, and supports manual refresh. Weather errors are shown without blocking offline farm workflows. It also hardens the Field Mapping System. Farm, field and incident boundaries are now checked for valid coordinates, duplicate adjacent points, zero-area shapes and self-crossing edges before they are saved or restored. The map editor shows validation errors directly and asks for explicit confirmation before saving a mapping. A single field location point remains supported; area boundaries require a valid 3+ point polygon. These safeguards protect the operational relationship Farm → Fields → Crops → Incidents without changing existing stored records unless the user edits or restores a map.
 
 **Version 1.18.0** · Android version code: `22`
 
