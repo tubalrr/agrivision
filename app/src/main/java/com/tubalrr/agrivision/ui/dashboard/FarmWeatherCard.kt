@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cloud
@@ -42,8 +45,19 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
+
+private data class FarmForecastDay(
+    val date: String,
+    val weatherCode: Int,
+    val minimumTemperatureC: Double,
+    val maximumTemperatureC: Double,
+    val precipitationProbabilityPercent: Int,
+    val precipitationSumMm: Double
+)
 
 private data class FarmWeather(
     val temperatureC: Double,
@@ -52,6 +66,7 @@ private data class FarmWeather(
     val precipitationMm: Double,
     val windKmh: Double,
     val weatherCode: Int,
+    val forecast: List<FarmForecastDay>,
     val fetchedAt: Long = System.currentTimeMillis()
 )
 
@@ -105,7 +120,8 @@ private suspend fun loadFarmWeather(coordinates: FarmCoordinates): FarmWeather =
     val query = "https://api.open-meteo.com/v1/forecast" +
         "?latitude=$lat&longitude=$lon" +
         "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m" +
-        "&timezone=auto"
+        "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum" +
+        "&forecast_days=5&timezone=auto"
     val connection = (URL(query).openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"
         connectTimeout = 8000
@@ -117,14 +133,42 @@ private suspend fun loadFarmWeather(coordinates: FarmCoordinates): FarmWeather =
         val status = connection.responseCode
         check(status in 200..299) { "Weather service returned HTTP $status" }
         val response = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        val current = JSONObject(response).getJSONObject("current")
+        val root = JSONObject(response)
+        val current = root.getJSONObject("current")
+        val daily = root.optJSONObject("daily")
+        val dates = daily?.optJSONArray("time")
+        val codes = daily?.optJSONArray("weather_code")
+        val maximums = daily?.optJSONArray("temperature_2m_max")
+        val minimums = daily?.optJSONArray("temperature_2m_min")
+        val probabilities = daily?.optJSONArray("precipitation_probability_max")
+        val precipitation = daily?.optJSONArray("precipitation_sum")
+        val forecast = if (
+            dates != null && codes != null && maximums != null &&
+            minimums != null && probabilities != null && precipitation != null
+        ) {
+            (0 until minOf(5, dates.length())).mapNotNull { index ->
+                val date = dates.optString(index, "")
+                val low = minimums.optDouble(index, Double.NaN)
+                val high = maximums.optDouble(index, Double.NaN)
+                if (date.isBlank() || !low.isFinite() || !high.isFinite()) null
+                else FarmForecastDay(
+                    date = date,
+                    weatherCode = codes.optInt(index, -1),
+                    minimumTemperatureC = low,
+                    maximumTemperatureC = high,
+                    precipitationProbabilityPercent = probabilities.optInt(index, -1),
+                    precipitationSumMm = precipitation.optDouble(index, 0.0)
+                )
+            }
+        } else emptyList()
         FarmWeather(
             temperatureC = current.getDouble("temperature_2m"),
             apparentTemperatureC = current.getDouble("apparent_temperature"),
             humidityPercent = current.getInt("relative_humidity_2m"),
             precipitationMm = current.getDouble("precipitation"),
             windKmh = current.getDouble("wind_speed_10m"),
-            weatherCode = current.getInt("weather_code")
+            weatherCode = current.getInt("weather_code"),
+            forecast = forecast
         )
     } finally {
         connection.disconnect()
@@ -242,6 +286,52 @@ internal fun FarmWeatherCard(
                     color = AgriMuted,
                     style = MaterialTheme.typography.labelSmall
                 )
+                if (current.forecast.isNotEmpty()) {
+                    Text("5-day forecast", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        current.forecast.forEach { day ->
+                            Column(
+                                Modifier.width(112.dp)
+                                    .background(AgriSurfaceVariant, RoundedCornerShape(15.dp))
+                                    .padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                val dayLabel = runCatching {
+                                    LocalDate.parse(day.date).format(DateTimeFormatter.ofPattern("EEE", weatherLocale))
+                                }.getOrDefault(day.date)
+                                Text(dayLabel, fontWeight = FontWeight.Bold, color = AgriText)
+                                Text(weatherCodeLabel(day.weatherCode), color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                                Text(
+                                    "${"%.0f".format(Locale.US, day.maximumTemperatureC)}° / ${"%.0f".format(Locale.US, day.minimumTemperatureC)}°",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AgriText,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                if (day.precipitationProbabilityPercent in 0..100) {
+                                    Text("Rain ${day.precipitationProbabilityPercent}%", color = AgriGreen, style = MaterialTheme.typography.labelSmall)
+                                }
+                                Text(
+                                    "${"%.1f".format(Locale.US, day.precipitationSumMm)} mm",
+                                    color = AgriMuted,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+                    val rainyDay = current.forecast.firstOrNull {
+                        it.precipitationProbabilityPercent >= 70 || it.precipitationSumMm >= 8.0
+                    }
+                    if (rainyDay != null) {
+                        Text(
+                            "Planning note: rain is forecast on ${rainyDay.date}. Check local conditions before scheduling weather-sensitive field work.",
+                            color = AgriWarning,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
                 OutlinedButton(
                     onClick = {
                         scope.launch {
