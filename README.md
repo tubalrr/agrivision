@@ -95,6 +95,23 @@ Version 1.7.0 upgraded the Profile Center with a farmer identity hero, registrat
 
 Version 1.6.0 upgraded Tasks with a dedicated farm task center, overdue/open/completed/stock-alert metrics, date shortcuts for today and tomorrow, a date picker, task status filters, category icons, clearer due-state indicators, and farm-specific category chips when creating tasks. Task records continue to use the existing local storage model and save/toggle flow.
 
+## Optional online data sources
+
+AgriVision remains offline-first. These public data sources are candidates for optional, read-only farm insights; they do not upload farm records or replace local records.
+
+- **Open-Meteo** — weather forecasts by coordinates for planning field activities. Review the current API terms and attribution requirements before production use: https://open-meteo.com/
+- **NASA POWER** — historical and near-real-time meteorological and solar data that can support longer-term crop and farm planning: https://power.larc.nasa.gov/docs/
+- **Nominatim (OpenStreetMap)** — optional reverse geocoding for map coordinates. Use only in compliance with the public service usage policy; do not send personal farmer details: https://nominatim.org/release-docs/latest/api/Overview/
+
+Integration rules:
+1. Online lookups are opt-in and must show when the device is offline.
+2. Never put API keys or personal data in source control, URLs, logs, or analytics.
+3. Treat forecasts as estimates, display source and update time, and never overwrite a farmer's saved data.
+4. Keep the existing local workflows usable without internet access.
+5. Recheck licensing, service limits, attribution, and commercial-use conditions before release.
+
+Reference lists: [public-apis](https://github.com/public-apis/public-apis), [awesome-selfhosted](https://github.com/awesome-selfhosted/awesome-selfhosted), [Agent-Reach](https://github.com/Panniantong/Agent-Reach), and [API-mega-list](https://github.com/cporter202/API-mega-list). These are discovery catalogs, not guarantees that every linked service is free, stable, or suitable for production.
+
 ## Field Mapping System
 
 The Map tab is a functional operational layer, not a decorative map. It uses Google Maps Compose in satellite mode and reads/writes the local Room registry.
