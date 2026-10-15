@@ -45,6 +45,8 @@ This release hardens backup and restore. The exported `.zip` archive contains th
 
 This release adds optional source links for financial income/expenses, a crop cost-and-profit summary using only explicitly linked transactions, Room migration 10 → 11, and backup support for the new links. It also adds opt-in local reminders based on saved due tasks, near-term harvest dates, low/expired stock, and active high-priority/review-pending cases; optional GPS coordinate capture for fields/incidents; private local copying of attached incident photos; coordinate range validation; JUnit tests for crop lifecycle/cost calculations; and CI checks for tests, lint, debug APK, and an unsigned release APK artifact. Build status does not replace on-device validation. The release APK is unsigned until release-signing credentials are configured.
 
+Weather feature: the optional Dashboard weather card uses Open-Meteo and requires saved GPS coordinates from a field or farm boundary. It requests data only when the user taps the button and requires internet access; no account sync or background forecast fetching is added.
+
 Production-readiness boundaries: data remains on-device/offline-first; cloud account sync and official DA API transmission are not configured. New ZIP backups include incident photo files for cross-device restore. Older JSON-only backups do not contain photo bytes, so photos can only be kept if their files are still readable on the restoring device. Daily notification delivery requires the user to enable reminders and allow notifications; Android may defer background work.
 
 **Version 1.15.1** · Android version code: `19`
