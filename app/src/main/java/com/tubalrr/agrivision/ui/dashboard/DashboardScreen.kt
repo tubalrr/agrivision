@@ -93,6 +93,8 @@ internal fun DashboardScreen(
     openTasks: Int
 ) {
     val dashboardLocale = LocalConfiguration.current.locales[0]
+    val dashboardLanguage = LocalContext.current.getSharedPreferences("agrivision_preferences", android.content.Context.MODE_PRIVATE).getString("language", "fil").orEmpty()
+    val isInternetAvailable = rememberInternetAvailable()
     val lowStock = inventory.count { it.status.equals("Low", ignoreCase = true) }
     val completedTasks = tasks.count { it.done }
     val totalTasks = tasks.size
@@ -239,6 +241,10 @@ internal fun DashboardScreen(
                     }
                 }
             }
+        }
+
+        if (!isInternetAvailable) {
+            item { OfflineBadge(dashboardLanguage) }
         }
 
         item {
