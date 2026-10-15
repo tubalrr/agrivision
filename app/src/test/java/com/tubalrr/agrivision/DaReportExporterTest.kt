@@ -228,7 +228,7 @@ class DaReportExporterTest {
         ) { csvBytes = it }
 
         val lines = String(csvBytes, Charsets.UTF_8).removePrefix("\\uFEFF")
-            .trimEnd('\\n').split('\\n')
+            .trimEnd('\n').split('\n')
         assertEquals(
             "Farm Record ID,Farmer ID,Farmer Name,Contact Number,Farm Name,Province,Municipality/City,Barangay,Farm Area,Land Tenure,Commodities,Application Status,Review Notes",
             lines.first()
