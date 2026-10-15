@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tubalrr.agrivision.domain.model.FarmRecord
@@ -136,6 +137,7 @@ internal fun FarmWeatherCard(
     fields: List<FieldRecord>
 ) {
     val coordinates = remember(farm.boundaryPoints, fields) { resolveFarmCoordinates(farm, fields) }
+    val weatherLocale = LocalConfiguration.current.locales[0]
     val scope = rememberCoroutineScope()
     var weather by remember { mutableStateOf<FarmWeather?>(null) }
     var weatherForCoordinates by remember { mutableStateOf<FarmCoordinates?>(null) }
@@ -236,7 +238,7 @@ internal fun FarmWeatherCard(
                     }
                 }
                 Text(
-                    "Updated ${SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(Date(current.fetchedAt))} • Source: Open-Meteo",
+                    "Updated ${SimpleDateFormat("MMM d, HH:mm", weatherLocale).format(Date(current.fetchedAt))} • Source: Open-Meteo",
                     color = AgriMuted,
                     style = MaterialTheme.typography.labelSmall
                 )
