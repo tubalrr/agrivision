@@ -468,6 +468,14 @@ internal fun DashboardScreen(
             )
         }
 
+
+        item {
+            FarmWeatherCard(
+                farm = farm,
+                fields = fields
+            )
+        }
+
         item { SectionTitle("Farm Operations") }
 
         item {
