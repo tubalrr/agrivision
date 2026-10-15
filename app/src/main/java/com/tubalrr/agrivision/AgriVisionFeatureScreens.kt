@@ -501,7 +501,19 @@ private suspend fun copyPhotoToPrivateStorage(context: Context, source: Uri): Ur
     if (!dir.exists() && !dir.mkdirs()) return@withContext null
     val file = File(dir, "leaf-" + UUID.randomUUID() + ".jpg")
     try {
-        input.use { src -> FileOutputStream(file).use { dest -> src.copyTo(dest) } }
+        input.use { src ->
+            FileOutputStream(file).use { dest ->
+                val buffer = ByteArray(8 * 1024)
+                var total = 0L
+                while (true) {
+                    val count = src.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    require(total <= 12L * 1024L * 1024L) { "Image is larger than the 12 MB scan limit." }
+                    dest.write(buffer, 0, count)
+                }
+            }
+        }
         Uri.fromFile(file)
     } catch (_: Exception) { file.delete(); null }
 }
@@ -518,8 +530,20 @@ private suspend fun saveBitmapToPrivateStorage(context: Context, bitmap: Bitmap)
 
 private suspend fun decodePrivatePhoto(context: Context, uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
     runCatching {
-        if (uri.scheme.equals("file", true)) BitmapFactory.decodeFile(uri.path)
-        else context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+        val path = uri.path
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        if (uri.scheme.equals("file", true)) {
+            BitmapFactory.decodeFile(path, bounds)
+        } else {
+            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        }
+        var sampleSize = 1
+        while (bounds.outWidth / sampleSize > 1280 || bounds.outHeight / sampleSize > 1280) {
+            sampleSize *= 2
+        }
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        if (uri.scheme.equals("file", true)) BitmapFactory.decodeFile(path, options)
+        else context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
     }.getOrNull()
 }
 
@@ -594,10 +618,23 @@ internal fun PestDetectionScreen(
                         enabled = imageUri != null && !scanning,
                         onClick = {
                             scope.launch {
-                                scanning = true; result = null; savedScanId = null
-                                delay(400)
-                                result = detector.analyze(context, imageUri ?: return@launch, language)
-                                scanning = false
+                                val photo = imageUri
+                                if (photo == null) {
+                                    message = featureText(language, "Pumili muna ng larawan.", "Choose a photo first.")
+                                    return@launch
+                                }
+                                scanning = true
+                                result = null
+                                savedScanId = null
+                                message = ""
+                                try {
+                                    delay(250)
+                                    result = detector.analyze(context, photo, language)
+                                } catch (_: Exception) {
+                                    message = featureText(language, "Hindi masuri ang larawan. Subukan muli.", "The image could not be analyzed. Try again.")
+                                } finally {
+                                    scanning = false
+                                }
                             }
                         },
                         shape = RoundedCornerShape(12.dp)
