@@ -27,16 +27,16 @@ Built with:
 - Photo field records
 - Backup and restore
 
-## Added in Version 1.23.0
+## Added in Version 1.24.0
 
-- **Login/Register prototype:** email or phone, password, Farmer/Buyer roles, remembered on-device session, local reset flow, and logout in Profile. Passwords are salted and hashed on-device. This is not server authentication and does not verify contact ownership.
+- **Login/Register:** the first-run screen opens registration when no local account exists. Email/password can use Firebase Authentication when a project config is added; Firebase roles are saved to a user profile document in Firestore. Without Firebase config, accounts remain local-only. Phone-number/password accounts remain local-only in this version; Firebase phone login requires SMS OTP and is a separate flow. Profile contains logout and settings.
 - **Pest & Disease Scan:** take or upload a leaf photo, see a clearly labeled mock result/confidence/treatment, link it to a crop and farm, save a scan record, and view Room-backed scan history. No trained model is bundled yet.
 - **Farm Weather:** the new Weather screen fetches current conditions and a 7-day Open-Meteo forecast using saved field/farm-boundary GPS coordinates. Responses are cached in Room for offline viewing. Strong-wind, heavy-rain and dry-spell indicators are heuristic planning hints, not official PAGASA warnings.
 - **Market Prices:** searchable, filterable sample prices for palay, corn and vegetables with trend and update date. All numbers are mock/demo data, not live quotes.
 - **Notifications:** Profile switches for watering, fertilizing, spraying, harvest, and weather indicators. Android notification permission is requested only when enabling an alert type.
 - **Planting Calendar & Soil Guide:** generic crop timing, soil notes and fertilizer guidance, with an Add to Tasks action. Validate all schedules and fertilizer advice locally before field use.
 - **More tab:** keeps bottom navigation compact while exposing Scan, Prices, Weather, Calendar, Help/Settings, and the existing Reports screen. Dashboard includes Scan, Prices and Weather shortcuts.
-- **Offline extras cache:** a separate Room database stores scan history, weather responses and market sample data. Existing farm, task, finance and report records remain local in their current database.
+- **Offline extras cache:** a separate Room database stores scan history, weather responses and market sample data. Existing farm, task, finance and report records remain local in their current database. Farm/task/report cloud sync is not yet implemented; restoring internet does not upload these records automatically.
 
 ## Mock data and future API replacement
 
@@ -45,6 +45,16 @@ Built with:
 - **Weather:** the new screen requests Open-Meteo only when online and when the screen opens/refreshes, caches the JSON in `weather_cache`, and shows cached data offline. Check provider terms/attribution before public distribution.
 - **Authentication:** current local accounts are device-only. The “forgot password” option resets a local account and does not send an SMS/email verification. Connect Firebase Auth or another trusted provider and verified recovery before production or multi-device use.
 - **Cloud sync:** no cloud sync server is included. Farm/task/report records stay on-device and continue working offline. Adding sync needs authenticated APIs, TLS/encryption, conflict handling, backups, delete/export workflows and tests.
+
+## Optional Firebase setup (email/password authentication)
+
+1. In Firebase Console, create or select a project and add an Android app with package name `com.tubalrr.agrivision`.
+2. Download that app's `google-services.json` and place it at `app/google-services.json`. This project deliberately ignores that local file in Git so a developer's Firebase project configuration is not accidentally committed.
+3. In **Authentication → Sign-in method**, enable **Email/Password**.
+4. Create a **Cloud Firestore** database, then publish the repository's `firestore.rules` ruleset (Firebase Console → Firestore → Rules). These rules allow each signed-in user to read/write only their own `users/{uid}` profile, and deny all other collections by default.
+5. Sync Gradle and rebuild. If the JSON file is absent, the app still builds and uses the local account prototype. Email-based Firebase password recovery sends a reset email. Phone-number/password accounts remain local-only until Firebase Phone Authentication with SMS OTP is added.
+
+**Important data boundary:** the Firestore integration here covers authentication and the user profile only. Farms, tasks, reports, scan history, weather cache, and market prices are still stored locally. Do not describe this version as multi-device farm-data sync until owner-scoped Firestore collections, conflict resolution, restore/delete behavior, and sync tests are implemented. The default Firestore rules intentionally block those future collections.
 
 ## Rebuild and export the APK
 
@@ -56,11 +66,11 @@ Built with:
 
 ## Latest Version
 
-**Version 1.23.0** · Android version code: `27`
+**Version 1.24.0** · Android version code: `28`
 
 This release adds the on-device account prototype and optional new farm screens without removing Dashboard, Map, Farm, Reports, Tasks, or Profile. See the sections above for mock-data, offline and release-signing details.
 
-**Version 1.22.0** · Android version code: `26`
+**Version 1.23.0** · Android version code: `27`\n\nThis release added the local account prototype, pest/disease scan flow, weather, sample market prices, task/weather notifications, planting calendar and the More destination. See the details above.\n\n**Version 1.22.0** · Android version code: `26`
 
 This release adds an optional recorded cost to each Feed Log. The cost is preserved through Room, backup/restore, and DA Feed Logs exports; older feed records and older backups remain valid with a zero-cost default. Livestock Cost & Return now includes only the explicitly entered feed-log costs alongside finance expenses linked to that livestock group. No feed cost is estimated from current inventory prices, and the UI warns against recording the same feed cost twice in Finance. Room schema migration 12 → 13 adds the new field without clearing existing farm records.
 
