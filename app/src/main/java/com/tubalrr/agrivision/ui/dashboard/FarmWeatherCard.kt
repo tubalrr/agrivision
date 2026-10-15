@@ -137,8 +137,12 @@ internal fun FarmWeatherCard(
     val coordinates = remember(farm.boundaryPoints, fields) { resolveFarmCoordinates(farm, fields) }
     val scope = rememberCoroutineScope()
     var weather by remember { mutableStateOf<FarmWeather?>(null) }
+    var weatherForCoordinates by remember { mutableStateOf<FarmCoordinates?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    // Keep a saved forecast tied to the location it was fetched for.
+    val currentWeather = weather.takeIf { weatherForCoordinates == coordinates }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -176,7 +180,7 @@ internal fun FarmWeatherCard(
                     color = AgriMuted,
                     style = MaterialTheme.typography.bodyMedium
                 )
-            } else if (weather == null) {
+            } else if (currentWeather == null) {
                 Text(
                     error ?: "Get current conditions for the saved farm location.",
                     color = error?.let { AgriWarning } ?: AgriMuted,
@@ -189,6 +193,7 @@ internal fun FarmWeatherCard(
                             error = null
                             try {
                                 weather = loadFarmWeather(coordinates)
+                                weatherForCoordinates = coordinates
                             } catch (_: Exception) {
                                 error = "Weather unavailable. Check your connection and try again."
                             } finally {
@@ -204,7 +209,7 @@ internal fun FarmWeatherCard(
                     Text(if (loading) "Loading weather…" else "Get farm weather")
                 }
             } else {
-                val current = weather!!
+                val current = currentWeather!!
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text(
