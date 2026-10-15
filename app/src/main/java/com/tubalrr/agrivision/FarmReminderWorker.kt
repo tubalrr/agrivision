@@ -66,15 +66,24 @@ internal class FarmReminderWorker(context: Context, params: WorkerParameters) : 
                         incident.status.equals("Under Review", true))
             } else 0
 
+            val weatherCache = if (notifyWeather) {
+                try {
+                    AgriExtrasDatabase.getInstance(applicationContext).extrasDao()
+                        .getWeatherCache(FarmRepository.DEFAULT_FARM_ID)
+                } catch (_: Exception) {
+                    null
+                }
+            } else null
             val weatherAlert = if (notifyWeather) runCatching {
-                val cache = AgriExtrasDatabase.getInstance(applicationContext).extrasDao()
-                    .getWeatherCache(FarmRepository.DEFAULT_FARM_ID)
-                val daily = cache?.payloadJson?.let { org.json.JSONObject(it).optJSONObject("daily") }
+                val daily = weatherCache?.payloadJson?.let { org.json.JSONObject(it).optJSONObject("daily") }
                 val rain = daily?.optJSONArray("precipitation_sum")
                 val wind = daily?.optJSONArray("wind_speed_10m_max")
+                val temperatures = daily?.optJSONArray("temperature_2m_max")
                 val heavyRain = rain != null && (0 until rain.length()).any { rain.optDouble(it, 0.0) >= 50.0 }
                 val strongWind = wind != null && (0 until wind.length()).any { wind.optDouble(it, 0.0) >= 60.0 }
-                val lowRain = rain != null && (0 until rain.length()).sumOf { rain.optDouble(it, 0.0) } < 5.0
+                val lowRain = rain != null && temperatures != null &&
+                    (0 until minOf(rain.length(), temperatures.length())).sumOf { rain.optDouble(it, 0.0) } < 5.0 &&
+                    (0 until temperatures.length()).any { temperatures.optDouble(it, 0.0) >= 32.0 }
                 heavyRain || strongWind || lowRain
             }.getOrDefault(false) else false
 
