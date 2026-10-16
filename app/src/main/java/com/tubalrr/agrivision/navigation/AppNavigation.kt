@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tubalrr.agrivision.ui.settings.AppSettingsDialog
 
 @Composable
 internal fun AgriVisionApp(
