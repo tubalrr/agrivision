@@ -68,7 +68,7 @@ internal fun AgriVisionApp(
         mutableStateOf(savedMode)
     }
     var selected by remember {
-        mutableStateOf(
+        mutableIntStateOf(
             if (preferences.getBoolean("remember_last_tab", false)) {
                 when (preferences.getInt("last_selected_tab", 0)) {
                     3 -> 4 // Legacy Reports tab now lives inside More.
