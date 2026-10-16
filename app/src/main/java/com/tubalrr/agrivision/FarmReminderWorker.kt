@@ -120,9 +120,10 @@ internal class FarmReminderWorker(context: Context, params: WorkerParameters) : 
     @SuppressLint("MissingPermission")
     private fun showReminder(text: String) {
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= 26) {
-            manager.createNotificationChannel(NotificationChannel("farm_reminders", "Farm reminders", NotificationManager.IMPORTANCE_DEFAULT))
-        }
+        // minSdk is 26, so notification channels are available on every supported device.
+        manager.createNotificationChannel(
+            NotificationChannel("farm_reminders", "Farm reminders", NotificationManager.IMPORTANCE_DEFAULT)
+        )
         val launch = applicationContext.packageManager.getLaunchIntentForPackage(applicationContext.packageName)
         val pending = launch?.let { PendingIntent.getActivity(applicationContext, 0, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) }
         val notification = NotificationCompat.Builder(applicationContext, "farm_reminders")
