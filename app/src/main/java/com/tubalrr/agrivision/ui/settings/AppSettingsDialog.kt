@@ -1,4 +1,6 @@
-package com.tubalrr.agrivision
+package com.tubalrr.agrivision.ui.settings
+
+import com.tubalrr.agrivision.*
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -66,7 +68,7 @@ internal fun AppSettingsDialog(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("App Preferences", fontWeight = FontWeight.ExtraBold)
-                Text("AgriVision · Version 1.19.0", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
+                Text("AgriVision · Version 1.24.0", color = AgriMuted, style = MaterialTheme.typography.labelMedium)
             }
         },
         text = {
