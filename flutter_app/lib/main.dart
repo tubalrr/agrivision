@@ -1459,10 +1459,12 @@ class _AgriHomeState extends State<AgriHome> {
         rethrow;
       }
 
+      if (!mounted) return;
       setState(() {
         _records = nextFarmers;
         _activities = nextActivities;
       });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
