@@ -40,7 +40,7 @@ A separate Flutter implementation lives in `flutter_app/` with a premium Materia
 - DA report builder with all-farm or selected-farmer scope and CSV/JSON file export/share
 - Flutter analysis, tests, and debug APK build in GitHub Actions
 
-**Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `\\.\\build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.
+**Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `.\build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.
 
 The original Kotlin/Jetpack Compose app is retained while Flutter migration continues. Flutter uses its own local storage and does not yet import native Room records or sync to a central server. PDF reports, official DA submission, native map/weather/scan/market modules, and the remaining native features are still to be migrated. CSV and JSON exports are available for the Flutter registry and locally recorded farm activities. See the [Flutter Edition guide](docs/FLUTTER_EDITION.md) for exact limits, and review the [Privacy Policy](PRIVACY_POLICY.md) before using real beneficiary data.
 
