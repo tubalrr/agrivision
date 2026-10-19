@@ -4,6 +4,21 @@
 
 A phone-first agriculture management app focused on understanding farm activity and helping farmers decide what needs attention.
 
+## Project documentation
+
+- [Privacy Policy](PRIVACY_POLICY.md) — current behavior of the native Android app and Flutter edition.
+- [License](LICENSE) — MIT for project-owned source, subject to third-party notices.
+- [Architecture](ARCHITECTURE.md) — native app data flows and Room architecture.
+- [Integrations & source policy](INTEGRATIONS.md) — enabled and candidate third-party services.
+- [Contributing](CONTRIBUTING.md) — setup, tests, and patch guidelines.
+- [Security policy](SECURITY.md) — safe vulnerability reporting and release boundaries.
+- [Documentation index](docs/README.md) — Flutter setup, data dictionary, privacy/deployment notes, and release checklist.
+- [Flutter Edition guide](docs/FLUTTER_EDITION.md) — setup, modules, storage, and current limitations.
+- [Data dictionary](docs/DATA_DICTIONARY.md) — Flutter registry/activity fields and backup format.
+- [DA deployment and privacy checklist](docs/DA_PRIVACY_AND_DEPLOYMENT.md) — extra steps before real beneficiary data is used.
+
+> **Important:** AgriVision currently has two distinct implementations. The Flutter edition has a local farmer registry, farmer-linked farm activity records, CSV/JSON reports, and manual JSON backup/restore. The native Kotlin app contains additional Room-backed field mapping and farm-management features. Their databases are not shared. Neither implementation currently transmits operational farm records to an official Department of Agriculture backend.
+
 ## Android App
 
 Built with:
@@ -15,18 +30,19 @@ Built with:
 
 ## Flutter Edition (new)
 
-A separate Flutter implementation is being built in `flutter_app/` with a premium Material 3 DA staff workspace.
+A separate Flutter implementation lives in `flutter_app/` with a premium Material 3 DA staff workspace and original AgriVision branding.
 
 - Dashboard with live counts from saved farmer applications
 - Searchable Farmer & Farm Registry with application review status and notes
 - Farmer-linked Farm Operations for crops, livestock, finance, and tasks
 - Device-local persistence for registry and activity records
+- Manual validated JSON backup/restore with non-destructive merge
 - DA report builder with all-farm or selected-farmer scope and CSV/JSON file export/share
 - Flutter analysis, tests, and debug APK build in GitHub Actions
 
-**Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `./build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.
+**Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `\\.\\build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.
 
-The original Kotlin/Jetpack Compose app is retained while Flutter migration continues. Flutter uses its own local storage and does not yet import native Room records or sync to a central server. PDF reports, official DA submission, native map/weather/scan/market modules, and the remaining native features are still to be migrated. CSV and JSON exports are available for the Flutter registry and locally recorded farm activities.
+The original Kotlin/Jetpack Compose app is retained while Flutter migration continues. Flutter uses its own local storage and does not yet import native Room records or sync to a central server. PDF reports, official DA submission, native map/weather/scan/market modules, and the remaining native features are still to be migrated. CSV and JSON exports are available for the Flutter registry and locally recorded farm activities. See the [Flutter Edition guide](docs/FLUTTER_EDITION.md) for exact limits, and review the [Privacy Policy](PRIVACY_POLICY.md) before using real beneficiary data.
 
 
 ## Planned Features
