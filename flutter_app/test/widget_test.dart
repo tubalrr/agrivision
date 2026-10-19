@@ -88,6 +88,6 @@ void main() {
 
     expect(find.text('AgriVision'), findsWidgets);
     expect(find.text('DA Reports'), findsWidgets);
-    expect(find.text('Farmer & Farm Registry'), findsOneWidget);
+    expect(find.text('Registry at a glance'), findsOneWidget);
   });
 }
