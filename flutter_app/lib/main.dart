@@ -157,6 +157,70 @@ String applicationsToCsv(List<FarmerApplication> records) {
   return '\uFEFF${rows.map((row) => row.map(cell).join(',')).join('\r\n')}';
 }
 
+class FarmActivity {
+  const FarmActivity({
+    required this.id,
+    required this.farmRecordId,
+    required this.type,
+    required this.title,
+    required this.category,
+    required this.quantity,
+    required this.unit,
+    required this.amount,
+    required this.date,
+    required this.status,
+    required this.notes,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String farmRecordId;
+  final String type;
+  final String title;
+  final String category;
+  final String quantity;
+  final String unit;
+  final double amount;
+  final String date;
+  final String status;
+  final String notes;
+  final String updatedAt;
+
+  factory FarmActivity.fromJson(Map<String, dynamic> json) {
+    String value(String key) => (json[key] ?? '').toString();
+    return FarmActivity(
+      id: value('id'),
+      farmRecordId: value('farmRecordId'),
+      type: value('type'),
+      title: value('title'),
+      category: value('category'),
+      quantity: value('quantity'),
+      unit: value('unit'),
+      amount: double.tryParse(value('amount')) ?? 0,
+      date: value('date'),
+      status: value('status'),
+      notes: value('notes'),
+      updatedAt: value('updatedAt'),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'farmRecordId': farmRecordId,
+    'type': type,
+    'title': title,
+    'category': category,
+    'quantity': quantity,
+    'unit': unit,
+    'amount': amount,
+    'date': date,
+    'status': status,
+    'notes': notes,
+    'updatedAt': updatedAt,
+  };
+}
+
+
 class AgriVisionApp extends StatelessWidget {
   const AgriVisionApp({super.key});
 
