@@ -1289,6 +1289,347 @@ class _AgriHomeState extends State<AgriHome> {
   }
 }
 
+class ActivityDialog extends StatefulWidget {
+  const ActivityDialog({
+    super.key,
+    required this.farmRecordId,
+    required this.type,
+    this.existing,
+  });
+
+  final String farmRecordId;
+  final String type;
+  final FarmActivity? existing;
+
+  @override
+  State<ActivityDialog> createState() => _ActivityDialogState();
+}
+
+class _ActivityDialogState extends State<ActivityDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _title;
+  late final TextEditingController _quantity;
+  late final TextEditingController _unit;
+  late final TextEditingController _amount;
+  late final TextEditingController _date;
+  late final TextEditingController _notes;
+  late final TextEditingController _categoryController;
+  late String _category;
+  late String _status;
+
+  List<String> get _categories => switch (widget.type) {
+    'Crops' => const ['Planting', 'Crop growth', 'Harvest', 'Pest / disease', 'Other'],
+    'Livestock' => const ['Poultry', 'Cattle', 'Swine', 'Goat / sheep', 'Other'],
+    'Finance' => const ['Expense', 'Income / sale', 'Assistance', 'Other'],
+    _ => const ['Field inspection', 'Follow-up', 'Document review', 'Distribution', 'Other'],
+  };
+
+  List<String> get _statuses => switch (widget.type) {
+    'Crops' => const ['Planned', 'In progress', 'Harvested', 'Needs review', 'Completed'],
+    'Livestock' => const ['Active', 'For monitoring', 'Needs attention', 'Completed'],
+    'Finance' => const ['Recorded', 'Pending', 'Paid', 'Received', 'For review'],
+    _ => const ['Pending', 'In progress', 'Completed', 'Cancelled'],
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    final activity = widget.existing;
+    _title = TextEditingController(text: activity?.title ?? '');
+    _quantity = TextEditingController(text: activity?.quantity ?? '');
+    _unit = TextEditingController(text: activity?.unit ?? (widget.type == 'Crops' ? 'ha' : ''));
+    _amount = TextEditingController(
+      text: activity == null || activity.amount == 0 ? '' : activity.amount.toString(),
+    );
+    _date = TextEditingController(
+      text: activity?.date ?? DateTime.now().toIso8601String().substring(0, 10),
+    );
+    _notes = TextEditingController(text: activity?.notes ?? '');
+    _category = activity?.category.isNotEmpty == true
+        ? activity!.category
+        : _categories.first;
+    if (!_categories.contains(_category)) _category = 'Other';
+    _categoryController = TextEditingController();
+    _status = activity?.status.isNotEmpty == true ? activity!.status : _statuses.first;
+    if (!_statuses.contains(_status)) _status = _statuses.first;
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _quantity.dispose();
+    _unit.dispose();
+    _amount.dispose();
+    _date.dispose();
+    _notes.dispose();
+    _categoryController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = widget.existing == null;
+    final farmerTitle = widget.type == 'Crops'
+        ? 'Crop record'
+        : widget.type == 'Livestock'
+            ? 'Livestock record'
+            : widget.type == 'Finance'
+                ? 'Finance record'
+                : 'Farm task';
+    return Dialog.fullscreen(
+      child: Scaffold(
+        backgroundColor: _cream,
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close_rounded),
+          ),
+          title: Text(isNew ? 'Add $farmerTitle' : 'Edit $farmerTitle',
+              style: const TextStyle(fontWeight: FontWeight.w800)),
+          actions: [
+            TextButton(onPressed: _save, child: const Text('Save')),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: _mint, borderRadius: BorderRadius.circular(17)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.link_rounded, color: _green),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'This record will be linked to farm record ${widget.farmRecordId}. Records for other farmers stay separate.',
+                        style: const TextStyle(color: _forest, fontSize: 12, height: 1.45),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              _field(_title, 'Title / crop / animal / purpose *',
+                  icon: Icons.edit_note_rounded,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'This field is required.'
+                      : null),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _category,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: _categories.map((value) =>
+                    DropdownMenuItem(value: value, child: Text(value))).toList(),
+                onChanged: (value) => setState(() => _category = value ?? _categories.first),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _field(_quantity, widget.type == 'Crops'
+                        ? 'Area / quantity' : 'Quantity / count',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _field(_unit, 'Unit (ha, kg, heads...)'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _field(_amount, 'Amount (PHP, if applicable)',
+                  icon: Icons.payments_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    final parsed = double.tryParse(value.trim());
+                    if (parsed == null || !parsed.isFinite || parsed < 0) {
+                      return 'Enter a valid non-negative amount.';
+                    }
+                    return null;
+                  }),
+              const SizedBox(height: 12),
+              _field(_date, 'Record date (YYYY-MM-DD)',
+                  icon: Icons.calendar_month_outlined,
+                  validator: (value) {
+                    final parsed = DateTime.tryParse(value?.trim() ?? '');
+                    return parsed == null ? 'Use YYYY-MM-DD.' : null;
+                  }),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _status,
+                decoration: const InputDecoration(labelText: 'Status'),
+                items: _statuses.map((value) =>
+                    DropdownMenuItem(value: value, child: Text(value))).toList(),
+                onChanged: (value) => setState(() => _status = value ?? _statuses.first),
+              ),
+              const SizedBox(height: 12),
+              _field(_notes, 'Notes', icon: Icons.sticky_note_2_outlined, maxLines: 3),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _save,
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                icon: Icon(isNew ? Icons.add_task_rounded : Icons.save_outlined),
+                label: Text(isNew ? 'Save record' : 'Save changes'),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Local record only. It is not submitted to a DA database automatically.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _muted, fontSize: 11, height: 1.45),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    IconData? icon,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) => TextFormField(
+    controller: controller,
+    keyboardType: keyboardType,
+    maxLines: maxLines,
+    validator: validator,
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: icon == null ? null : Icon(icon, size: 20),
+    ),
+  );
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    final now = DateTime.now().toIso8601String();
+    Navigator.pop(
+      context,
+      FarmActivity(
+        id: widget.existing?.id ?? 'ACT-${DateTime.now().microsecondsSinceEpoch}',
+        farmRecordId: widget.farmRecordId,
+        type: widget.type,
+        title: _title.text.trim(),
+        category: _category,
+        quantity: _quantity.text.trim(),
+        unit: _unit.text.trim(),
+        amount: double.tryParse(_amount.text.trim()) ?? 0,
+        date: _date.text.trim(),
+        status: _status,
+        notes: _notes.text.trim(),
+        updatedAt: now,
+      ),
+    );
+  }
+}
+
+class _ActivityTile extends StatelessWidget {
+  const _ActivityTile({
+    required this.activity,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final FarmActivity activity;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (activity.type) {
+      'Crops' => Icons.grass_outlined,
+      'Livestock' => Icons.pets_outlined,
+      'Finance' => Icons.account_balance_wallet_outlined,
+      _ => Icons.checklist_rounded,
+    };
+    final detail = [
+      activity.category,
+      if (activity.quantity.trim().isNotEmpty)
+        '${activity.quantity} ${activity.unit}'.trim(),
+      activity.date,
+    ].where((value) => value.trim().isNotEmpty).join(' · ');
+    final amount = activity.amount > 0
+        ? '₱${activity.amount.toStringAsFixed(2)}'
+        : '';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(13, 13, 7, 13),
+        child: Row(
+          children: [
+            Container(
+              width: 43,
+              height: 43,
+              decoration: BoxDecoration(color: _mint, borderRadius: BorderRadius.circular(14)),
+              child: Icon(icon, color: _green),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(activity.title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _ink, fontWeight: FontWeight.w800, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text(detail, maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _muted, fontSize: 11)),
+                  if (amount.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(amount, style: const TextStyle(color: _green, fontSize: 12, fontWeight: FontWeight.w900)),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: activity.status.toLowerCase().contains('complete') ||
+                            activity.status.toLowerCase().contains('paid') ||
+                            activity.status.toLowerCase().contains('received') ||
+                            activity.status.toLowerCase().contains('harvested')
+                        ? _mint : const Color(0xFFFFF0D7),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(activity.status.toUpperCase(),
+                      style: const TextStyle(color: _green, fontSize: 8, fontWeight: FontWeight.w900)),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Edit',
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 17),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Delete',
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline_rounded, size: 17, color: Color(0xFFB33B32)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ApplicationDialog extends StatefulWidget {
   const ApplicationDialog({super.key, this.existing});
   final FarmerApplication? existing;
