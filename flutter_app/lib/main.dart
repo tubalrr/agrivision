@@ -124,7 +124,7 @@ class FarmerApplication {
 String applicationsToCsv(List<FarmerApplication> records) {
   String cell(String value) {
     // Prevent spreadsheet formula execution for untrusted user-entered text.
-    final dangerous = RegExp(r'^[\\s\\uFEFF]*[=+\\-@＝＋－＠]').hasMatch(value);
+    final dangerous = RegExp(r'^[\s\uFEFF]*[=+\-@＝＋－＠]').hasMatch(value);
     final safe = dangerous ? "'$value" : value;
     return '"${safe.replaceAll('"', '""')}"';
   }
@@ -484,7 +484,7 @@ class _AgriHomeState extends State<AgriHome> {
     ];
     String cell(String value) {
       // Escape spreadsheet formula prefixes, including those after leading whitespace.
-      final dangerous = RegExp(r'^[\\s\\uFEFF]*[=+\\-@＝＋－＠]').hasMatch(value);
+      final dangerous = RegExp(r'^[\s\uFEFF]*[=+\-@＝＋－＠]').hasMatch(value);
       final safe = dangerous ? "'$value" : value;
       return '"${safe.replaceAll('"', '""')}"';
     }
