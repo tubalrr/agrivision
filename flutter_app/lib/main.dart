@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:cross_file/cross_file.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -496,19 +497,30 @@ class _AgriHomeState extends State<AgriHome> {
       );
       return;
     }
+    final now = DateTime.now();
     final content = _reportFormat == 'JSON'
         ? const JsonEncoder.withIndent('  ').convert({
             'app': 'AgriVision Flutter',
             'reportType': _reportType,
             'scope': _reportScope,
-            'generatedAt': DateTime.now().toIso8601String(),
+            'generatedAt': now.toIso8601String(),
             'recordCount': rows.length,
             'records': rows,
           })
         : _rowsToCsv(rows);
+    final extension = _reportFormat.toLowerCase();
+    final safeType = _reportType.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    final fileName = 'agrivision-$safeType-${now.toIso8601String().substring(0, 10)}.$extension';
+    final mimeType = _reportFormat == 'JSON' ? 'application/json' : 'text/csv';
     await SharePlus.instance.share(
       ShareParams(
-        text: content,
+        files: [
+          XFile.fromData(
+            utf8.encode(content),
+            name: fileName,
+            mimeType: mimeType,
+          ),
+        ],
         subject: 'AgriVision DA $_reportType $_reportFormat',
       ),
     );
