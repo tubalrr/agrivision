@@ -512,17 +512,15 @@ class _AgriHomeState extends State<AgriHome> {
     final safeType = _reportType.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
     final fileName = 'agrivision-$safeType-${now.toIso8601String().substring(0, 10)}.$extension';
     final mimeType = _reportFormat == 'JSON' ? 'application/json' : 'text/csv';
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [
-          XFile.fromData(
-            utf8.encode(content),
-            name: fileName,
-            mimeType: mimeType,
-          ),
-        ],
-        subject: 'AgriVision DA $_reportType $_reportFormat',
-      ),
+    await Share.shareXFiles(
+      [
+        XFile.fromData(
+          utf8.encode(content),
+          mimeType: mimeType,
+        ),
+      ],
+      subject: 'AgriVision DA $_reportType $_reportFormat',
+      fileNameOverrides: [fileName],
     );
   }
 
