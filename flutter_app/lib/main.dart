@@ -300,9 +300,11 @@ class _AgriHomeState extends State<AgriHome> {
       );
       return;
     }
-    await Share.share(
-      applicationsToCsv(_records),
-      subject: 'AgriVision DA Farmer Applications CSV',
+    await SharePlus.instance.share(
+      ShareParams(
+        text: applicationsToCsv(_records),
+        subject: 'AgriVision DA Farmer Applications CSV',
+      ),
     );
   }
 
@@ -515,7 +517,7 @@ class _AgriHomeState extends State<AgriHome> {
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   itemCount: _filteredRecords.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final record = _filteredRecords[index];
                     return _FarmerTile(
@@ -848,7 +850,7 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
               _field(_area, 'Farm area (e.g. 2.5 ha)', icon: Icons.crop_square_rounded),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: _tenure,
+                initialValue: _tenure,
                 decoration: const InputDecoration(labelText: 'Land tenure'),
                 items: const ['Owned', 'Leased', 'Agrarian reform', 'Shared / other']
                     .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
@@ -861,7 +863,7 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
               const _FormSectionTitle(title: 'DA review', number: '03'),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _status,
+                initialValue: _status,
                 decoration: const InputDecoration(labelText: 'Application status'),
                 items: const ['For Review', 'Incomplete', 'Approved', 'Rejected']
                     .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
