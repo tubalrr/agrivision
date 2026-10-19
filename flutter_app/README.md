@@ -9,6 +9,7 @@ A premium Flutter interface for the DA staff workflow. The original Kotlin/Jetpa
 - Farm Operations screen with crops, livestock, finance, and tasks tabs.
 - Add/edit/delete farm activity records linked to a selected farmer/farm application.
 - Local persistence using SharedPreferences (this is device-local storage, not cloud sync).
+- Full JSON backup and restore for farmer and farm activity records, with validation, confirmation, and safe merge (no local-only records are deleted).
 - DA reports for farmer applications and operational records with all-farm or selected-farmer scope.
 - Share actual CSV or JSON report files using Android's share sheet.
 - Empty states instead of invented farmer or farm records.
@@ -37,7 +38,7 @@ Open the `flutter_app` folder (not the repository root) in Android Studio to wor
 
 ## Current scope and data warning
 
-This is the first Flutter migration milestone, not a replacement for every existing native feature yet. The Flutter registry uses its own local SharedPreferences store and does **not** automatically import or sync the existing Kotlin Room database. Existing Kotlin farm maps, crop/livestock/finance modules, weather, scan history, and the full DA PDF/JSON report exporter have not been migrated in this milestone.
+This is the first Flutter migration milestone, not a replacement for every existing native feature yet. The Flutter registry uses its own local SharedPreferences store, supports manual JSON backup/restore, and does **not** automatically import or sync the existing Kotlin Room database. Existing Kotlin farm maps, crop/livestock/finance modules, weather, scan history, and the full DA PDF/JSON report exporter have not been migrated in this milestone.
 
 The Flutter DA Reports screen exports Farmer Applications, Crop Records, Livestock Records, Finance Records, Task Register, and Complete Farm Activity in CSV or JSON. A PDF report template, official DA submission workflow, and remaining native maps/weather/scan/market functions are still future migration work. Cloud sync, verified DA staff authentication, and role-based access are not connected in this prototype.
 

@@ -81,6 +81,83 @@ void main() {
     expect(restored.amount, 750.50);
   });
 
+  test('local backup exports and restores farmer and farm activity records', () {
+    const farmer = FarmerApplication(
+      id: 'FAR-BACKUP-1',
+      farmerName: 'Maria Santos',
+      contact: '09000000000',
+      farmName: 'Santos Farm',
+      province: 'North Cotabato',
+      municipality: 'Antipas',
+      barangay: 'Poblacion',
+      area: '2 ha',
+      landTenure: 'Owned',
+      commodities: 'Corn',
+      status: 'Approved',
+      reviewNotes: '',
+      updatedAt: '2026-10-19T10:00:00',
+    );
+    const activity = FarmActivity(
+      id: 'ACT-BACKUP-1',
+      farmRecordId: 'FAR-BACKUP-1',
+      type: 'Crops',
+      title: 'Corn planting',
+      category: 'Planting',
+      quantity: '2',
+      unit: 'ha',
+      amount: 0,
+      date: '2026-10-19',
+      status: 'In progress',
+      notes: '',
+      updatedAt: '2026-10-19T10:05:00',
+    );
+
+    final json = buildAgriVisionBackupJson(
+      farmers: [farmer],
+      activities: [activity],
+      exportedAt: DateTime.parse('2026-10-19T10:10:00'),
+    );
+    final backup = parseAgriVisionBackupJson(json);
+
+    expect(backup.farmers, hasLength(1));
+    expect(backup.farmers.single.farmerName, 'Maria Santos');
+    expect(backup.activities, hasLength(1));
+    expect(backup.activities.single.farmRecordId, farmer.id);
+    expect(backup.activities.single.title, 'Corn planting');
+    expect(backup.exportedAt, '2026-10-19T10:10:00.000');
+  });
+
+  test('backup import rejects unsupported JSON and orphaned activities', () {
+    expect(
+      () => parseAgriVisionBackupJson('{"format":"other","schemaVersion":1,"farmers":[],"activities":[]}'),
+      throwsFormatException,
+    );
+
+    const orphanBackup = '''
+    {
+      "format": "agrivision.local-backup",
+      "schemaVersion": 1,
+      "exportedAt": "2026-10-19T10:00:00",
+      "farmers": [],
+      "activities": [{
+        "id": "ACT-ORPHAN",
+        "farmRecordId": "MISSING-FARMER",
+        "type": "Crops",
+        "title": "Unlinked crop",
+        "category": "Planting",
+        "quantity": "1",
+        "unit": "ha",
+        "amount": 0,
+        "date": "2026-10-19",
+        "status": "Planned",
+        "notes": "",
+        "updatedAt": "2026-10-19T10:00:00"
+      }]
+    }
+    ''';
+    expect(() => parseAgriVisionBackupJson(orphanBackup), throwsFormatException);
+  });
+
   testWidgets('app opens with AgriVision overview', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const AgriVisionApp());

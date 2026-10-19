@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'branding/agrivision_mark.dart';
@@ -226,6 +227,121 @@ class FarmActivity {
   };
 }
 
+
+class AgriVisionBackup {
+  const AgriVisionBackup({
+    required this.exportedAt,
+    required this.farmers,
+    required this.activities,
+  });
+
+  final String exportedAt;
+  final List<FarmerApplication> farmers;
+  final List<FarmActivity> activities;
+}
+
+String buildAgriVisionBackupJson({
+  required List<FarmerApplication> farmers,
+  required List<FarmActivity> activities,
+  DateTime? exportedAt,
+}) {
+  final timestamp = (exportedAt ?? DateTime.now()).toIso8601String();
+  return const JsonEncoder.withIndent('  ').convert({
+    'format': 'agrivision.local-backup',
+    'schemaVersion': 1,
+    'app': 'AgriVision',
+    'exportedAt': timestamp,
+    'recordCounts': {
+      'farmers': farmers.length,
+      'activities': activities.length,
+    },
+    'farmers': farmers.map((record) => record.toJson()).toList(),
+    'activities': activities.map((activity) => activity.toJson()).toList(),
+  });
+}
+
+AgriVisionBackup parseAgriVisionBackupJson(String content) {
+  if (content.length > 10 * 1024 * 1024) {
+    throw const FormatException('Backup is larger than the 10 MB safety limit.');
+  }
+
+  dynamic decoded;
+  try {
+    decoded = jsonDecode(content);
+  } on FormatException {
+    throw const FormatException('This file is not valid JSON.');
+  }
+  if (decoded is! Map) {
+    throw const FormatException('The backup must be a JSON object.');
+  }
+  final root = Map<String, dynamic>.from(decoded);
+  if (root['format'] != 'agrivision.local-backup' ||
+      root['schemaVersion'] != 1) {
+    throw const FormatException(
+      'Unsupported backup format or version. Choose an AgriVision backup file.',
+    );
+  }
+  if (root['farmers'] is! List || root['activities'] is! List) {
+    throw const FormatException('The backup is missing farmer or activity records.');
+  }
+
+  final farmers = <FarmerApplication>[];
+  final farmerIds = <String>{};
+  for (final item in root['farmers'] as List<dynamic>) {
+    if (item is! Map) {
+      throw const FormatException('A farmer record is malformed.');
+    }
+    final farmer = FarmerApplication.fromJson(Map<String, dynamic>.from(item));
+    if (farmer.id.trim().isEmpty || farmer.farmerName.trim().isEmpty) {
+      throw const FormatException('Every farmer must have a record ID and name.');
+    }
+    if (!farmerIds.add(farmer.id)) {
+      throw FormatException('Duplicate farmer record ID: ${farmer.id}');
+    }
+    farmers.add(farmer);
+  }
+
+  final activities = <FarmActivity>[];
+  final activityIds = <String>{};
+  const allowedTypes = {'Crops', 'Livestock', 'Finance', 'Tasks'};
+  for (final item in root['activities'] as List<dynamic>) {
+    if (item is! Map) {
+      throw const FormatException('A farm activity record is malformed.');
+    }
+    final map = Map<String, dynamic>.from(item);
+    final activity = FarmActivity.fromJson(map);
+    if (activity.id.trim().isEmpty ||
+        activity.farmRecordId.trim().isEmpty ||
+        activity.title.trim().isEmpty) {
+      throw const FormatException('Every farm activity needs an ID, farmer link, and title.');
+    }
+    if (!activityIds.add(activity.id)) {
+      throw FormatException('Duplicate activity record ID: ${activity.id}');
+    }
+    if (!allowedTypes.contains(activity.type)) {
+      throw FormatException('Unknown farm activity type: ${activity.type}');
+    }
+    if (!farmerIds.contains(activity.farmRecordId)) {
+      throw FormatException(
+        'Activity "${activity.title}" is linked to a farmer that is missing from this backup.',
+      );
+    }
+    final rawAmount = map['amount'];
+    if (rawAmount != null) {
+      final parsedAmount = double.tryParse(rawAmount.toString());
+      if (parsedAmount == null || !parsedAmount.isFinite || parsedAmount < 0) {
+        throw FormatException('Invalid amount on activity "${activity.title}".');
+      }
+    }
+    activities.add(activity);
+  }
+
+  return AgriVisionBackup(
+    exportedAt: (root['exportedAt'] ?? '').toString(),
+    farmers: farmers,
+    activities: activities,
+  );
+}
 
 class AgriVisionApp extends StatelessWidget {
   const AgriVisionApp({super.key});
@@ -1211,6 +1327,250 @@ class _AgriHomeState extends State<AgriHome> {
     ];
   }
 
+  Future<void> _exportFullBackup() async {
+    final content = buildAgriVisionBackupJson(
+      farmers: _records,
+      activities: _activities,
+    );
+    final now = DateTime.now();
+    final fileName = 'agrivision-backup-${now.toIso8601String().substring(0, 10)}.json';
+    try {
+      await Share.shareXFiles(
+        [
+          XFile.fromData(
+            utf8.encode(content),
+            mimeType: 'application/json',
+          ),
+        ],
+        subject: 'AgriVision full local backup',
+        fileNameOverrides: [fileName],
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hindi na-share ang backup. Subukan ulit.')),
+      );
+    }
+  }
+
+  Future<void> _restoreFullBackup() async {
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (files.isEmpty) return;
+
+      final bytes = await files.first.readAsBytes();
+      if (bytes.length > 10 * 1024 * 1024) {
+        throw const FormatException('Backup is larger than the 10 MB safety limit.');
+      }
+      final backup = parseAgriVisionBackupJson(utf8.decode(bytes));
+
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Restore AgriVision backup?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Backup contents', style: TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 12),
+              _backupCountRow(Icons.groups_2_outlined, 'Farmer records', backup.farmers.length),
+              const SizedBox(height: 8),
+              _backupCountRow(Icons.agriculture_outlined, 'Farm activity records', backup.activities.length),
+              const SizedBox(height: 14),
+              const Text(
+                'Restore uses a safe merge: records with matching IDs are updated, new records are added, and local-only records are kept. Nothing is deleted.',
+                style: TextStyle(fontSize: 12, height: 1.45, color: _muted),
+              ),
+              if (backup.exportedAt.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Backup created: ${backup.exportedAt}',
+                  style: const TextStyle(fontSize: 11, color: _muted),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.restore_rounded, size: 18),
+              label: const Text('Restore records'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+
+      final mergedFarmers = <String, FarmerApplication>{
+        for (final record in _records) record.id: record,
+      };
+      for (final record in backup.farmers) {
+        mergedFarmers[record.id] = record;
+      }
+      final mergedActivities = <String, FarmActivity>{
+        for (final activity in _activities) activity.id: activity,
+      };
+      for (final activity in backup.activities) {
+        mergedActivities[activity.id] = activity;
+      }
+
+      final nextFarmers = mergedFarmers.values.toList();
+      final nextActivities = mergedActivities.values.toList();
+      final prefs = await SharedPreferences.getInstance();
+      const farmersKey = 'agrivision_flutter_registry_v1';
+      const activitiesKey = 'agrivision_flutter_operations_v1';
+      final oldFarmers = prefs.getString(farmersKey);
+      final oldActivities = prefs.getString(activitiesKey);
+      try {
+        final savedFarmers = await prefs.setString(
+          farmersKey,
+          jsonEncode(nextFarmers.map((record) => record.toJson()).toList()),
+        );
+        if (!savedFarmers) throw StateError('Unable to save farmer records.');
+        final savedActivities = await prefs.setString(
+          activitiesKey,
+          jsonEncode(nextActivities.map((activity) => activity.toJson()).toList()),
+        );
+        if (!savedActivities) throw StateError('Unable to save farm activities.');
+      } catch (_) {
+        if (oldFarmers == null) {
+          await prefs.remove(farmersKey);
+        } else {
+          await prefs.setString(farmersKey, oldFarmers);
+        }
+        if (oldActivities == null) {
+          await prefs.remove(activitiesKey);
+        } else {
+          await prefs.setString(activitiesKey, oldActivities);
+        }
+        rethrow;
+      }
+
+      setState(() {
+        _records = nextFarmers;
+        _activities = nextActivities;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Backup restored: ${backup.farmers.length} farmers and ${backup.activities.length} farm activity records imported.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on FormatException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hindi ma-restore ang backup: ${error.message}')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hindi na-restore ang backup. Walang binagong records.')),
+      );
+    }
+  }
+
+  Widget _backupCountRow(IconData icon, String label, int count) => Row(
+    children: [
+      Icon(icon, color: _green, size: 19),
+      const SizedBox(width: 9),
+      Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+      Text(count.toString(), style: const TextStyle(fontWeight: FontWeight.w900, color: _forest)),
+    ],
+  );
+
+  Widget _backupRestoreCard() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(17),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(color: _mint, borderRadius: BorderRadius.circular(14)),
+                child: const Icon(Icons.backup_outlined, color: _green, size: 25),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Backup & Restore', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                    SizedBox(height: 4),
+                    Text(
+                      'Protect farmer registry and farm activity records when changing devices.',
+                      style: TextStyle(color: _muted, fontSize: 12, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAF7),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: _line),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.storage_outlined, color: _green, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${_records.length} farmers · ${_activities.length} activity records on this device',
+                    style: const TextStyle(fontSize: 11, color: _muted, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _exportFullBackup,
+                  icon: const Icon(Icons.ios_share_rounded, size: 18),
+                  label: const Text('Export backup'),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _restoreFullBackup,
+                  icon: const Icon(Icons.restore_rounded, size: 18),
+                  label: const Text('Restore'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Backup files contain farmer contact and farm data. Keep them in a private, trusted location. Cloud sync is not enabled.',
+            style: TextStyle(fontSize: 11, color: _muted, height: 1.4),
+          ),
+        ],
+      ),
+    ),
+  );
+
   Widget _more() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
@@ -1245,6 +1605,8 @@ class _AgriHomeState extends State<AgriHome> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        _backupRestoreCard(),
         const SizedBox(height: 12),
         const _InfoTile(
           icon: Icons.offline_pin_outlined,
