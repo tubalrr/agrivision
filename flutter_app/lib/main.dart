@@ -519,6 +519,7 @@ class _AgriHomeState extends State<AgriHome> {
     final pages = [
       _dashboard(),
       _registry(),
+      _farmRecords(),
       _reports(),
       _more(),
     ];
@@ -536,6 +537,7 @@ class _AgriHomeState extends State<AgriHome> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Overview'),
           NavigationDestination(icon: Icon(Icons.groups_2_outlined), label: 'Registry'),
+          NavigationDestination(icon: Icon(Icons.agriculture_outlined), label: 'Farm Data'),
           NavigationDestination(icon: Icon(Icons.assessment_outlined), label: 'DA Reports'),
           NavigationDestination(icon: Icon(Icons.tune_rounded), label: 'More'),
         ],
@@ -658,7 +660,7 @@ class _AgriHomeState extends State<AgriHome> {
                   ),
                 )),
               const SizedBox(height: 10),
-              _ReportShortcut(onTap: () => setState(() => _tab = 2)),
+              _ReportShortcut(onTap: () => setState(() => _tab = 3)),
             ]),
           ),
         ),
@@ -736,6 +738,220 @@ class _AgriHomeState extends State<AgriHome> {
       ],
     );
   }
+
+  Future<void> _openActivityDialog({
+    required String farmRecordId,
+    required String type,
+    FarmActivity? existing,
+  }) async {
+    final result = await showDialog<FarmActivity>(
+      context: context,
+      builder: (_) => ActivityDialog(
+        farmRecordId: farmRecordId,
+        type: type,
+        existing: existing,
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      final index = _activities.indexWhere((a) => a.id == result.id);
+      if (index >= 0) {
+        _activities[index] = result;
+      } else {
+        _activities.insert(0, result);
+      }
+    });
+    await _persistActivities();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(existing == null ? '${type} record saved.' : '${type} record updated.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _deleteActivity(FarmActivity activity) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete farm record?'),
+        content: Text('Delete "${activity.title}" from this farmer’s records?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB33B32)),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _activities.removeWhere((a) => a.id == activity.id));
+    await _persistActivities();
+  }
+
+  Widget _farmRecords() {
+    final chosen = _selectedFarmRecord;
+    final selectedId = chosen?.id ?? '';
+    final linkedActivities = _activities.where((a) => a.farmRecordId == selectedId).toList();
+    final categoryCount = linkedActivities.where((a) => a.type == _activityType).length;
+    final visibleActivities = _filteredActivities;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _topBar(),
+              const SizedBox(height: 18),
+              const _SectionHeading(
+                title: 'Farm Operations',
+                subtitle: 'Crops, livestock, finance, and tasks saved against a specific farmer record.',
+              ),
+              const SizedBox(height: 14),
+              if (_records.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: _line),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: selectedId,
+                      icon: const Icon(Icons.expand_more_rounded),
+                      items: _records.map((r) => DropdownMenuItem<String>(
+                        value: r.id,
+                        child: Text(
+                          '${r.farmerName} · ${r.farmName.isEmpty ? 'Farm not specified' : r.farmName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )).toList(),
+                      onChanged: (value) => setState(() => _selectedFarmRecordId = value ?? ''),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _activityChip('Crops', Icons.grass_outlined),
+                    const SizedBox(width: 7),
+                    _activityChip('Livestock', Icons.pets_outlined),
+                    const SizedBox(width: 7),
+                    _activityChip('Finance', Icons.account_balance_wallet_outlined),
+                    const SizedBox(width: 7),
+                    _activityChip('Tasks', Icons.checklist_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_records.isNotEmpty)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        onChanged: (value) => setState(() => _activitySearch = value),
+                        decoration: const InputDecoration(
+                          hintText: 'Search records',
+                          prefixIcon: Icon(Icons.search_rounded),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    FilledButton.icon(
+                      onPressed: () => _openActivityDialog(farmRecordId: selectedId, type: _activityType),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add'),
+                    ),
+                  ],
+                ),
+              if (chosen != null) ...[
+                const SizedBox(height: 11),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${chosen.farmerName} · ${chosen.id}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Text('${categoryCount} ${_activityType.toLowerCase()} records',
+                        style: const TextStyle(color: _green, fontSize: 11, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: _records.isEmpty
+              ? _EmptyCard(
+                  icon: Icons.agriculture_outlined,
+                  title: 'Register a farmer first',
+                  message: 'Farm operations must be linked to a specific farmer/farm. Register a record before adding crops, livestock, finance, or tasks.',
+                  action: FilledButton.icon(
+                    onPressed: () => _openApplication(),
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    label: const Text('Register farmer'),
+                  ),
+                )
+              : visibleActivities.isEmpty
+                  ? _EmptyCard(
+                      icon: _activityType == 'Crops'
+                          ? Icons.grass_outlined
+                          : _activityType == 'Livestock'
+                              ? Icons.pets_outlined
+                              : _activityType == 'Finance'
+                                  ? Icons.account_balance_wallet_outlined
+                                  : Icons.checklist_rounded,
+                      title: 'No ${_activityType.toLowerCase()} records yet',
+                      message: 'Add a ${_activityType.toLowerCase()} record for ${chosen?.farmerName ?? 'this farmer'}. The record will stay linked to this farmer.',
+                      action: FilledButton.icon(
+                        onPressed: () => _openActivityDialog(farmRecordId: selectedId, type: _activityType),
+                        icon: const Icon(Icons.add_rounded),
+                        label: Text('Add ${_activityType.toLowerCase()} record'),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 2, 20, 24),
+                      itemCount: visibleActivities.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 9),
+                      itemBuilder: (context, index) {
+                        final activity = visibleActivities[index];
+                        return _ActivityTile(
+                          activity: activity,
+                          onEdit: () => _openActivityDialog(
+                            farmRecordId: activity.farmRecordId,
+                            type: activity.type,
+                            existing: activity,
+                          ),
+                          onDelete: () => _deleteActivity(activity),
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _activityChip(String type, IconData icon) => FilterChip(
+    selected: _activityType == type,
+    onSelected: (_) => setState(() => _activityType = type),
+    avatar: Icon(icon, size: 17, color: _activityType == type ? _green : _muted),
+    label: Text(type),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+  );
 
   Widget _reports() {
     final review = _records.where((r) => _isReview(r.status)).length;
