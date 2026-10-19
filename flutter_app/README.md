@@ -5,9 +5,12 @@ A premium Flutter interface for the DA staff workflow. The original Kotlin/Jetpa
 ## Current Flutter features
 
 - Premium green/cream DA staff overview with live counts from locally saved records.
-- Farmer & Farm Registry with search, add/edit application form, status, and review notes.
+- Farmer & Farm Registry with search, registration application, editable statuses, and DA review notes.
+- Farm Operations screen with crops, livestock, finance, and tasks tabs.
+- Add/edit/delete farm activity records linked to a selected farmer/farm application.
 - Local persistence using SharedPreferences (this is device-local storage, not cloud sync).
-- DA Farmer Applications CSV export through the Android share sheet.
+- DA reports for farmer applications and operational records with all-farm or selected-farmer scope.
+- Share actual CSV or JSON report files using Android's share sheet.
 - Empty states instead of invented farmer or farm records.
 - Responsive Material 3 layout and bottom navigation.
 
@@ -36,7 +39,7 @@ Open the `flutter_app` folder (not the repository root) in Android Studio to wor
 
 This is the first Flutter migration milestone, not a replacement for every existing native feature yet. The Flutter registry uses its own local SharedPreferences store and does **not** automatically import or sync the existing Kotlin Room database. Existing Kotlin farm maps, crop/livestock/finance modules, weather, scan history, and the full DA PDF/JSON report exporter have not been migrated in this milestone.
 
-The Flutter DA Reports screen currently exports the Farmer Applications register as CSV. PDF/JSON and the other report categories will be migrated and tested in later stages. Cloud sync, verified DA staff authentication, and role-based access are not connected in this prototype.
+The Flutter DA Reports screen exports Farmer Applications, Crop Records, Livestock Records, Finance Records, Task Register, and Complete Farm Activity in CSV or JSON. A PDF report template, official DA submission workflow, and remaining native maps/weather/scan/market functions are still future migration work. Cloud sync, verified DA staff authentication, and role-based access are not connected in this prototype.
 
 ## CI
 
