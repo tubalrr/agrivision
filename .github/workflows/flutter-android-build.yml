@@ -39,6 +39,9 @@ jobs:
       - name: Resolve packages
         run: flutter pub get
 
+      - name: Apply AgriVision branding
+        run: dart run tool/apply_branding.dart
+
       - name: Analyze Flutter code
         run: flutter analyze
 

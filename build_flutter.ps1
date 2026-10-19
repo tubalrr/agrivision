@@ -15,6 +15,9 @@ try {
     flutter pub get
     if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
 
+    dart run tool/apply_branding.dart
+    if ($LASTEXITCODE -ne 0) { throw "Applying AgriVision branding failed." }
+
     flutter analyze
     if ($LASTEXITCODE -ne 0) { throw "flutter analyze failed." }
 

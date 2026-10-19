@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'branding/agrivision_mark.dart';
 
 const _forest = Color(0xFF173F35);
 const _green = Color(0xFF2F7559);
@@ -586,8 +587,14 @@ class _AgriHomeState extends State<AgriHome> {
                     Positioned(
                       right: -10,
                       top: -15,
-                      child: Icon(Icons.eco_rounded,
-                          size: 130, color: Colors.white.withValues(alpha: .08)),
+                      child: Opacity(
+                        opacity: .10,
+                        child: const AgriVisionMark(
+                          size: 130,
+                          backgroundColor: Colors.transparent,
+                          onDark: true,
+                        ),
+                      ),
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1221,7 +1228,7 @@ class _AgriHomeState extends State<AgriHome> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(color: _mint, borderRadius: BorderRadius.circular(17)),
-                  child: const Icon(Icons.eco_rounded, color: _green, size: 30),
+                  child: const AgriVisionMark(size: 56, backgroundColor: _mint, onDark: false),
                 ),
                 const SizedBox(width: 14),
                 const Expanded(
@@ -1274,7 +1281,7 @@ class _AgriHomeState extends State<AgriHome> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(color: _forest, borderRadius: BorderRadius.circular(14)),
-          child: const Icon(Icons.eco_rounded, color: Colors.white, size: 25),
+          child: const AgriVisionMark(size: 44, backgroundColor: _forest, onDark: true),
         ),
         const SizedBox(width: 11),
         const Expanded(
