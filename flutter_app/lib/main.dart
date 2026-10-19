@@ -1337,15 +1337,17 @@ class _AgriHomeState extends State<AgriHome> {
     final now = DateTime.now();
     final fileName = 'agrivision-backup-${now.toIso8601String().substring(0, 10)}.json';
     try {
-      await Share.shareXFiles(
-        [
-          XFile.fromData(
-            utf8.encode(content),
-            mimeType: 'application/json',
-          ),
-        ],
-        subject: 'AgriVision full local backup',
-        fileNameOverrides: [fileName],
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              utf8.encode(content),
+              mimeType: 'application/json',
+            ),
+          ],
+          subject: 'AgriVision full local backup',
+          fileNameOverrides: [fileName],
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -1357,17 +1359,13 @@ class _AgriHomeState extends State<AgriHome> {
 
   Future<void> _restoreFullBackup() async {
     try {
-      final picked = await FilePicker.pickFiles(
+      final pickedFiles = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
-        withData: true,
       );
-      if (picked == null || picked.files.isEmpty) return;
+      if (pickedFiles == null || pickedFiles.isEmpty) return;
 
-      final bytes = picked.files.first.bytes;
-      if (bytes == null) {
-        throw const FormatException('Hindi mabasa ang piniling backup file.');
-      }
+      final bytes = await pickedFiles.first.readAsBytes();
       if (bytes.length > 10 * 1024 * 1024) {
         throw const FormatException('Backup is larger than the 10 MB safety limit.');
       }
