@@ -1038,7 +1038,7 @@ class _AgriHomeState extends State<AgriHome> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('$reportCount records'.replaceFirst('$', ''),
+                          Text('$reportCount records',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
                           Text('$_reportType · $_reportFormat · $_reportScope',
                               style: TextStyle(color: Colors.white.withValues(alpha: .77), fontSize: 11)),
@@ -1058,7 +1058,7 @@ class _AgriHomeState extends State<AgriHome> {
                   minimumSize: const Size.fromHeight(49),
                 ),
                 icon: const Icon(Icons.ios_share_rounded),
-                label: Text(reportCount == 0 ? 'No records to export' : 'Share $_reportFormat report'.replaceFirst('$', '')),
+                label: Text(reportCount == 0 ? 'No records to export' : 'Share $_reportFormat report'),
               ),
             ],
           ),
@@ -1313,7 +1313,6 @@ class _ActivityDialogState extends State<ActivityDialog> {
   late final TextEditingController _amount;
   late final TextEditingController _date;
   late final TextEditingController _notes;
-  late final TextEditingController _categoryController;
   late String _category;
   late String _status;
 
@@ -1349,7 +1348,6 @@ class _ActivityDialogState extends State<ActivityDialog> {
         ? activity!.category
         : _categories.first;
     if (!_categories.contains(_category)) _category = 'Other';
-    _categoryController = TextEditingController();
     _status = activity?.status.isNotEmpty == true ? activity!.status : _statuses.first;
     if (!_statuses.contains(_status)) _status = _statuses.first;
   }
@@ -1362,7 +1360,6 @@ class _ActivityDialogState extends State<ActivityDialog> {
     _amount.dispose();
     _date.dispose();
     _notes.dispose();
-    _categoryController.dispose();
     super.dispose();
   }
 
