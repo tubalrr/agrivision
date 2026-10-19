@@ -1355,13 +1355,17 @@ class _AgriHomeState extends State<AgriHome> {
 
   Future<void> _restoreFullBackup() async {
     try {
-      final files = await FilePicker.pickFiles(
+      final picked = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
+        withData: true,
       );
-      if (files.isEmpty) return;
+      if (picked == null || picked.files.isEmpty) return;
 
-      final bytes = await files.first.readAsBytes();
+      final bytes = picked.files.first.bytes;
+      if (bytes == null) {
+        throw const FormatException('Hindi mabasa ang piniling backup file.');
+      }
       if (bytes.length > 10 * 1024 * 1024) {
         throw const FormatException('Backup is larger than the 10 MB safety limit.');
       }
