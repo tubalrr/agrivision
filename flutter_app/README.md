@@ -21,7 +21,7 @@ Install the Flutter stable SDK (Flutter 3.47.x is the CI baseline) and Android S
 
 ```powershell
 git pull origin main
-.\\build_flutter.ps1
+.\build_flutter.ps1
 ```
 
 The helper creates the Android platform folder when needed, resolves dependencies, applies the AgriVision launcher icon/app name, runs `flutter analyze`, runs `flutter test`, and builds the debug APK.
