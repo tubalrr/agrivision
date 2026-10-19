@@ -1363,7 +1363,7 @@ class _AgriHomeState extends State<AgriHome> {
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
-      if (pickedFiles == null || pickedFiles.isEmpty) return;
+      if (pickedFiles.isEmpty) return;
 
       final bytes = await pickedFiles.first.readAsBytes();
       if (bytes.length > 10 * 1024 * 1024) {
