@@ -287,7 +287,14 @@ class _AgriHomeState extends State<AgriHome> {
   int _tab = 0;
   bool _loading = true;
   String _search = '';
+  String _activitySearch = '';
+  String _activityType = 'Crops';
+  String _selectedFarmRecordId = '';
+  String _reportType = 'Farmer Applications';
+  String _reportFormat = 'CSV';
+  String _reportScope = 'All farmers';
   List<FarmerApplication> _records = [];
+  List<FarmActivity> _activities = [];
 
   @override
   void initState() {
@@ -298,7 +305,9 @@ class _AgriHomeState extends State<AgriHome> {
   Future<void> _loadRecords() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('agrivision_flutter_registry_v1');
+    final activityRaw = prefs.getString('agrivision_flutter_operations_v1');
     final records = <FarmerApplication>[];
+    final activities = <FarmActivity>[];
     if (raw != null) {
       try {
         final decoded = jsonDecode(raw) as List<dynamic>;
@@ -308,9 +317,19 @@ class _AgriHomeState extends State<AgriHome> {
         // Keep the app usable if a previous local cache is malformed.
       }
     }
+    if (activityRaw != null) {
+      try {
+        final decoded = jsonDecode(activityRaw) as List<dynamic>;
+        activities.addAll(decoded.map((e) =>
+            FarmActivity.fromJson(Map<String, dynamic>.from(e as Map))));
+      } catch (_) {
+        // Keep valid registry records even if the activity cache is invalid.
+      }
+    }
     if (!mounted) return;
     setState(() {
       _records = records;
+      _activities = activities;
       _loading = false;
     });
   }
@@ -321,6 +340,38 @@ class _AgriHomeState extends State<AgriHome> {
       'agrivision_flutter_registry_v1',
       jsonEncode(_records.map((r) => r.toJson()).toList()),
     );
+  }
+
+  Future<void> _persistActivities() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'agrivision_flutter_operations_v1',
+      jsonEncode(_activities.map((a) => a.toJson()).toList()),
+    );
+  }
+
+  List<FarmActivity> get _filteredActivities {
+    final selectedId = _records.any((r) => r.id == _selectedFarmRecordId)
+        ? _selectedFarmRecordId
+        : (_records.isNotEmpty ? _records.first.id : '');
+    final q = _activitySearch.trim().toLowerCase();
+    return _activities.where((activity) {
+      if (activity.farmRecordId != selectedId) return false;
+      if (activity.type != _activityType) return false;
+      if (q.isEmpty) return true;
+      return [
+        activity.title, activity.category, activity.date, activity.status,
+        activity.notes, activity.quantity, activity.unit,
+      ].any((value) => value.toLowerCase().contains(q));
+    }).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  FarmerApplication? get _selectedFarmRecord {
+    for (final record in _records) {
+      if (record.id == _selectedFarmRecordId) return record;
+    }
+    return _records.isEmpty ? null : _records.first;
   }
 
   List<FarmerApplication> get _filteredRecords {
@@ -357,17 +408,108 @@ class _AgriHomeState extends State<AgriHome> {
     );
   }
 
-  Future<void> _exportApplications() async {
-    if (_records.isEmpty) {
+  static const _reportTypes = [
+    'Farmer Applications', 'Crop Records', 'Livestock Records',
+    'Finance Records', 'Task Register', 'Complete Farm Activity',
+  ];
+
+  List<Map<String, dynamic>> _reportRows() {
+    final chosenRecords = _reportScope == 'Selected farmer'
+        ? _records.where((r) => r.id == (_selectedFarmRecord?.id ?? '')).toList()
+        : _records;
+    final chosenIds = chosenRecords.map((r) => r.id).toSet();
+    final activities = _activities.where((a) => chosenIds.contains(a.farmRecordId)).toList();
+    final selectedType = switch (_reportType) {
+      'Crop Records' => 'Crops',
+      'Livestock Records' => 'Livestock',
+      'Finance Records' => 'Finance',
+      'Task Register' => 'Tasks',
+      _ => '',
+    };
+    final chosenActivities = selectedType.isEmpty
+        ? activities
+        : activities.where((a) => a.type == selectedType).toList();
+
+    if (_reportType == 'Farmer Applications') {
+      return chosenRecords.map((r) => <String, dynamic>{
+        'Farm Record ID': r.id,
+        'Farmer Name': r.farmerName,
+        'Contact Number': r.contact,
+        'Farm Name': r.farmName,
+        'Province': r.province,
+        'Municipality/City': r.municipality,
+        'Barangay': r.barangay,
+        'Farm Area': r.area,
+        'Land Tenure': r.landTenure,
+        'Commodities': r.commodities,
+        'Application Status': r.status,
+        'Review Notes': r.reviewNotes,
+        'Last Updated': r.updatedAt,
+      }).toList();
+    }
+
+    final farmerNames = {for (final r in _records) r.id: r.farmerName};
+    return chosenActivities.map((a) => <String, dynamic>{
+      'Farm Record ID': a.farmRecordId,
+      'Farmer Name': farmerNames[a.farmRecordId] ?? 'Unknown farmer',
+      'Record ID': a.id,
+      'Record Type': a.type,
+      'Title': a.title,
+      'Category': a.category,
+      'Quantity': a.quantity,
+      'Unit': a.unit,
+      'Amount': a.amount,
+      'Date': a.date,
+      'Status': a.status,
+      'Notes': a.notes,
+      'Last Updated': a.updatedAt,
+    }).toList();
+  }
+
+  String _rowsToCsv(List<Map<String, dynamic>> rows) {
+    if (_reportType == 'Farmer Applications') {
+      final text = applicationsToCsv(_records.where((r) =>
+          _reportScope == 'All farmers' || r.id == (_selectedFarmRecord?.id ?? '')).toList());
+      return text;
+    }
+    const columns = [
+      'Farm Record ID', 'Farmer Name', 'Record ID', 'Record Type', 'Title',
+      'Category', 'Quantity', 'Unit', 'Amount', 'Date', 'Status', 'Notes', 'Last Updated',
+    ];
+    String cell(String value) {
+      final safe = (value.startsWith('=') || value.startsWith('+') || value.startsWith('-') || value.startsWith('@'))
+          ? "'$value" : value;
+      return '"${safe.replaceAll('"', '""')}"';
+    }
+    final outputRows = <List<String>>[
+      columns,
+      ...rows.map((row) => columns.map((column) => (row[column] ?? '').toString()).toList()),
+    ];
+    return '\uFEFF${outputRows.map((row) => row.map(cell).join(',')).join('\r\n')}';
+  }
+
+  Future<void> _exportReport() async {
+    final rows = _reportRows();
+    if (rows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Wala pang farmer application na ie-export.')),
+        const SnackBar(content: Text('Walang records para sa napiling DA report.')),
       );
       return;
     }
+    final content = _reportFormat == 'JSON'
+        ? const JsonEncoder.withIndent('  ').convert({
+            'app': 'AgriVision Flutter',
+            'reportType': _reportType,
+            'scope': _reportScope,
+            'generatedAt': DateTime.now().toIso8601String(),
+            'recordCount': rows.length,
+            'records': rows,
+          })
+        : _rowsToCsv(rows);
     await SharePlus.instance.share(
       ShareParams(
-        text: applicationsToCsv(_records),
-        subject: 'AgriVision DA Farmer Applications CSV',
+        text: content,
+        subject: 'AgriVision DA $_reportType $_reportFormat',
       ),
     );
   }
