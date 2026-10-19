@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agrivision_flutter/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -50,6 +52,33 @@ void main() {
 
     expect(csv, contains('"Juan ""Jun"" Santos"'));
     expect(csv, contains('"Farm, North"'));
+  });
+
+  test('farm activity preserves its farmer/farm relationship on persistence', () {
+    const activity = FarmActivity(
+      id: 'ACT-001',
+      farmRecordId: 'FAR-2026-001',
+      type: 'Crops',
+      title: 'Rice planting',
+      category: 'Planting',
+      quantity: '1.5',
+      unit: 'ha',
+      amount: 750.50,
+      date: '2026-10-19',
+      status: 'In progress',
+      notes: 'Linked to the correct farm record',
+      updatedAt: '2026-10-19T10:00:00',
+    );
+
+    final restored = FarmActivity.fromJson(
+      Map<String, dynamic>.from(jsonDecode(jsonEncode(activity.toJson())) as Map),
+    );
+
+    expect(restored.id, activity.id);
+    expect(restored.farmRecordId, 'FAR-2026-001');
+    expect(restored.type, 'Crops');
+    expect(restored.title, 'Rice planting');
+    expect(restored.amount, 750.50);
   });
 
   testWidgets('app opens with AgriVision overview', (tester) async {
