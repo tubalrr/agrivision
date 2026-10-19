@@ -956,6 +956,8 @@ class _AgriHomeState extends State<AgriHome> {
   Widget _reports() {
     final review = _records.where((r) => _isReview(r.status)).length;
     final approved = _records.where((r) => _isApproved(r.status)).length;
+    final reportCount = _reportRows().length;
+    final selectedName = _selectedFarmRecord?.farmerName ?? 'No farmer selected';
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
       children: [
@@ -963,7 +965,7 @@ class _AgriHomeState extends State<AgriHome> {
         const SizedBox(height: 22),
         const _SectionHeading(
           title: 'DA Reports',
-          subtitle: 'Prepare a shareable report from saved application records.',
+          subtitle: 'Choose a report type and scope, then share a CSV or JSON export built from locally saved data.',
         ),
         const SizedBox(height: 18),
         Container(
@@ -971,29 +973,92 @@ class _AgriHomeState extends State<AgriHome> {
           decoration: BoxDecoration(
             color: _forest,
             borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [_forest, Color(0xFF2F7559)],
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Icon(Icons.description_outlined, color: Colors.white, size: 30),
-              const SizedBox(height: 16),
-              const Text('Farmer Applications Register',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 7),
+              const SizedBox(height: 15),
+              const Text(
+                'DA Report Builder',
+                style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 6),
               Text(
-                'Export all ${_records.length} saved applications as a CSV file that can be opened in spreadsheet apps.',
-                style: TextStyle(color: Colors.white.withValues(alpha: .78), height: 1.45),
+                'Prepare a focused register for ${_reportScope == 'Selected farmer' ? selectedName : 'all registered farmers'}.',
+                style: TextStyle(color: Colors.white.withValues(alpha: .8), height: 1.45),
               ),
               const SizedBox(height: 18),
+              const Text('Report type', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 7),
+              _darkSelector<String>(
+                value: _reportType,
+                values: _reportTypes,
+                label: (value) => value,
+                onChanged: (value) => setState(() => _reportType = value),
+              ),
+              const SizedBox(height: 14),
+              const Text('Report scope', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 7),
+              _darkSelector<String>(
+                value: _reportScope,
+                values: const ['All farmers', 'Selected farmer'],
+                label: (value) => value,
+                onChanged: (value) => setState(() => _reportScope = value),
+              ),
+              const SizedBox(height: 14),
+              const Text('Export format', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 7),
+              Row(
+                children: [
+                  Expanded(child: _formatChoice('CSV')),
+                  const SizedBox(width: 9),
+                  Expanded(child: _formatChoice('JSON')),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.white.withValues(alpha: .14)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.fact_check_outlined, color: Color(0xFFC8E9A8)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('$reportCount records'.replaceFirst('$', ''),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                          Text('$_reportType · $_reportFormat · $_reportScope',
+                              style: TextStyle(color: Colors.white.withValues(alpha: .77), fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 15),
               FilledButton.icon(
-                onPressed: _exportApplications,
+                onPressed: reportCount == 0 ? null : _exportReport,
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: _forest,
-                  minimumSize: const Size.fromHeight(48),
+                  disabledBackgroundColor: Colors.white.withValues(alpha: .35),
+                  minimumSize: const Size.fromHeight(49),
                 ),
                 icon: const Icon(Icons.ios_share_rounded),
-                label: const Text('Export / Share CSV'),
+                label: Text(reportCount == 0 ? 'No records to export' : 'Share $_reportFormat report'.replaceFirst('$', '')),
               ),
             ],
           ),
@@ -1002,13 +1067,18 @@ class _AgriHomeState extends State<AgriHome> {
         Row(
           children: [
             Expanded(child: _MetricCard(
+              icon: Icons.groups_2_outlined, label: 'Farmers registered',
+              value: _records.length.toString(), tint: _mint, iconColor: _green,
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _MetricCard(
               icon: Icons.pending_actions_rounded, label: 'For review',
               value: review.toString(), tint: const Color(0xFFFFF0D7), iconColor: _amber,
             )),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(child: _MetricCard(
-              icon: Icons.verified_outlined, label: 'Approved / complete',
-              value: approved.toString(), tint: _mint, iconColor: _green,
+              icon: Icons.verified_outlined, label: 'Approved',
+              value: approved.toString(), tint: const Color(0xFFE6ECFF), iconColor: const Color(0xFF4C62A8),
             )),
           ],
         ),
@@ -1019,15 +1089,16 @@ class _AgriHomeState extends State<AgriHome> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Included fields', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const Text('Report contents', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const SizedBox(height: 5),
+                Text(
+                  _reportType == 'Farmer Applications'
+                      ? 'Farmer and farm registration fields'
+                      : 'Farm-linked ${_reportType.toLowerCase()} entries',
+                  style: const TextStyle(color: _muted, fontSize: 12),
+                ),
                 const SizedBox(height: 12),
-                ...[
-                  'Farmer and farm record IDs',
-                  'Farmer name and contact number',
-                  'Farm location, area and land tenure',
-                  'Commodities and application status',
-                  'DA review notes and last-updated date',
-                ].map((text) => Padding(
+                ..._reportIncludedFields().map((text) => Padding(
                   padding: const EdgeInsets.only(bottom: 9),
                   child: Row(
                     children: [
@@ -1043,11 +1114,79 @@ class _AgriHomeState extends State<AgriHome> {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Note: this Flutter build currently exports the Farmer Applications register. Other DA report categories and PDF/JSON exports will be added in the next migration stages.',
+          'Data boundary: exports contain only records saved in this Flutter app on this device. They are not an official DA submission and are not synced to a central server.',
           style: TextStyle(color: _muted, fontSize: 12, height: 1.5),
         ),
       ],
     );
+  }
+
+  Widget _darkSelector<T>({
+    required T value,
+    required List<T> values,
+    required String Function(T) label,
+    required ValueChanged<T> onChanged,
+  }) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(13),
+    ),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<T>(
+        value: values.contains(value) ? value : values.first,
+        isExpanded: true,
+        borderRadius: BorderRadius.circular(13),
+        items: values.map((item) => DropdownMenuItem<T>(
+          value: item,
+          child: Text(label(item), maxLines: 1, overflow: TextOverflow.ellipsis),
+        )).toList(),
+        onChanged: (next) { if (next != null) onChanged(next); },
+      ),
+    ),
+  );
+
+  Widget _formatChoice(String format) => InkWell(
+    onTap: () => setState(() => _reportFormat = format),
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: _reportFormat == format ? Colors.white : Colors.white.withValues(alpha: .09),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: .2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _reportFormat == format ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+            size: 17,
+            color: _reportFormat == format ? _green : Colors.white,
+          ),
+          const SizedBox(width: 7),
+          Text(format, style: TextStyle(
+            color: _reportFormat == format ? _forest : Colors.white,
+            fontWeight: FontWeight.w800,
+          )),
+        ],
+      ),
+    ),
+  );
+
+  List<String> _reportIncludedFields() {
+    if (_reportType == 'Farmer Applications') {
+      return const [
+        'Farmer/farm record IDs, farmer name, and contact number',
+        'Farm name, location, area, land tenure, and commodities',
+        'Application status, DA review notes, and update timestamp',
+      ];
+    }
+    return const [
+      'Farmer name and linked farm record ID',
+      'Record type, title, category, date, and status',
+      'Quantity, unit, amount, and notes where applicable',
+    ];
   }
 
   Widget _more() {
