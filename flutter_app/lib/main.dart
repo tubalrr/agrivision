@@ -775,7 +775,7 @@ class _AgriHomeState extends State<AgriHome> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(existing == null ? '${type} record saved.' : '${type} record updated.'),
+        content: Text(existing == null ? '$type record saved.' : '$type record updated.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -896,7 +896,7 @@ class _AgriHomeState extends State<AgriHome> {
                         style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w700),
                       ),
                     ),
-                    Text('${categoryCount} ${_activityType.toLowerCase()} records',
+                    Text('$categoryCount ${_activityType.toLowerCase()} records',
                         style: const TextStyle(color: _green, fontSize: 11, fontWeight: FontWeight.w800)),
                   ],
                 ),
