@@ -122,7 +122,12 @@ class FarmerApplication {
 }
 
 String applicationsToCsv(List<FarmerApplication> records) {
-  String cell(String value) => '"${value.replaceAll('"', '""')}"';
+  String cell(String value) {
+    // Prevent spreadsheet formula execution for untrusted user-entered text.
+    final dangerous = RegExp(r'^[\\s\\uFEFF]*[=+\\-@＝＋－＠]').hasMatch(value);
+    final safe = dangerous ? "'$value" : value;
+    return '"${safe.replaceAll('"', '""')}"';
+  }
   final rows = <List<String>>[
     [
       'Farm Record ID',
@@ -478,8 +483,9 @@ class _AgriHomeState extends State<AgriHome> {
       'Category', 'Quantity', 'Unit', 'Amount', 'Date', 'Status', 'Notes', 'Last Updated',
     ];
     String cell(String value) {
-      final safe = (value.startsWith('=') || value.startsWith('+') || value.startsWith('-') || value.startsWith('@'))
-          ? "'$value" : value;
+      // Escape spreadsheet formula prefixes, including those after leading whitespace.
+      final dangerous = RegExp(r'^[\\s\\uFEFF]*[=+\\-@＝＋－＠]').hasMatch(value);
+      final safe = dangerous ? "'$value" : value;
       return '"${safe.replaceAll('"', '""')}"';
     }
     final outputRows = <List<String>>[
