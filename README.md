@@ -23,7 +23,7 @@ A separate Flutter implementation is being built in `flutter_app/` with a premiu
 - DA Farmer Applications CSV export/share
 - Flutter analysis, tests, and debug APK build in GitHub Actions
 
-**Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `.`\build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.
+**Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `./build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.
 
 The original Kotlin/Jetpack Compose app is retained while Flutter migration continues. The Flutter registry does not yet import the native Room database, sync to the cloud, or include all native map, crop, livestock, finance, and PDF/JSON report features. The current Flutter DA report export is CSV for Farmer Applications.
 
