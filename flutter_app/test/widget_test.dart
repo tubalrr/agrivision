@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agrivision_flutter/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('CSV export includes headers and all application rows', () {
@@ -52,6 +53,7 @@ void main() {
   });
 
   testWidgets('app opens with AgriVision overview', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const AgriVisionApp());
     await tester.pumpAndSettle();
 
