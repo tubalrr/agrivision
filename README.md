@@ -17,15 +17,16 @@ Built with:
 
 A separate Flutter implementation is being built in `flutter_app/` with a premium Material 3 DA staff workspace.
 
-- Dashboard with live counts from the locally saved registry
-- Searchable Farmer & Farm Registry with a registration application form
-- Local persistence for farmer application records
-- DA Farmer Applications CSV export/share
+- Dashboard with live counts from saved farmer applications
+- Searchable Farmer & Farm Registry with application review status and notes
+- Farmer-linked Farm Operations for crops, livestock, finance, and tasks
+- Device-local persistence for registry and activity records
+- DA report builder with all-farm or selected-farmer scope and CSV/JSON file export/share
 - Flutter analysis, tests, and debug APK build in GitHub Actions
 
 **Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `./build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.
 
-The original Kotlin/Jetpack Compose app is retained while Flutter migration continues. The Flutter registry does not yet import the native Room database, sync to the cloud, or include all native map, crop, livestock, finance, and PDF/JSON report features. The current Flutter DA report export is CSV for Farmer Applications.
+The original Kotlin/Jetpack Compose app is retained while Flutter migration continues. Flutter uses its own local storage and does not yet import native Room records or sync to a central server. PDF reports, official DA submission, native map/weather/scan/market modules, and the remaining native features are still to be migrated. CSV and JSON exports are available for the Flutter registry and locally recorded farm activities.
 
 
 ## Planned Features
