@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -788,7 +789,7 @@ class _AgriHomeState extends State<AgriHome> {
 
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile.fromData(fileBytes, mimeType: mimeType)],
+        files: [XFile.fromData(Uint8List.fromList(fileBytes), mimeType: mimeType)],
         subject: 'AgriVision $_reportType $_reportFormat',
         fileNameOverrides: [fileName],
       ),
@@ -2325,7 +2326,19 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = _activityIcon(activity.type);
+    final icon = switch (activity.type) {
+      'Crops' => Icons.grass_outlined,
+      'Livestock' => Icons.pets_outlined,
+      'Finance' => Icons.account_balance_wallet_outlined,
+      'Tasks' => Icons.checklist_rounded,
+      'Inventory' => Icons.inventory_2_outlined,
+      'Production' => Icons.agriculture_rounded,
+      'Equipment' => Icons.handyman_outlined,
+      'Field Mapping' => Icons.map_outlined,
+      'Pest & Disease' => Icons.biotech_outlined,
+      'Incidents' => Icons.report_gmailerrorred_outlined,
+      _ => Icons.folder_outlined,
+    };
     final detail = [
       activity.category,
       if (activity.quantity.trim().isNotEmpty)

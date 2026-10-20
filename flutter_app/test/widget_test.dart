@@ -149,7 +149,7 @@ void main() {
     expect(parseAgriVisionBackupJson(v1).activities.single.title, 'North field point');
   });
 
-  test('local backup exports and restores farmer and farm activity records', {
+  test('local backup exports and restores farmer and farm activity records', () {
     const farmer = FarmerApplication(
       id: 'FAR-BACKUP-1',
       farmerName: 'Maria Santos',
