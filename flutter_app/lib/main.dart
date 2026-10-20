@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'branding/agrivision_mark.dart';
+import 'branding/agrivision_splash_gate.dart';
 
 const _forest = Color(0xFF173F35);
 const _green = Color(0xFF2F7559);
@@ -393,7 +394,7 @@ class AgriVisionApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AgriHome(),
+      home: const AgriVisionSplashGate(child: AgriHome()),
     );
   }
 }
