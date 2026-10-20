@@ -345,7 +345,9 @@ AgriVisionBackup parseAgriVisionBackupJson(String content) {
 }
 
 class AgriVisionApp extends StatelessWidget {
-  const AgriVisionApp({super.key});
+  const AgriVisionApp({super.key, this.showSplash = true});
+
+  final bool showSplash;
 
   @override
   Widget build(BuildContext context) {
@@ -394,7 +396,9 @@ class AgriVisionApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AgriVisionSplashGate(child: AgriHome()),
+      home: showSplash
+          ? const AgriVisionSplashGate(child: AgriHome())
+          : const AgriHome(),
     );
   }
 }

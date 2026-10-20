@@ -160,7 +160,8 @@ void main() {
 
   testWidgets('app opens with AgriVision overview', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const AgriVisionApp());
+    // The overview test doesn't need the native WebView splash plugin.
+    await tester.pumpWidget(const AgriVisionApp(showSplash: false));
     await tester.pumpAndSettle();
 
     expect(find.text('AgriVision'), findsWidgets);
