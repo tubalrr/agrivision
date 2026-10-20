@@ -685,8 +685,22 @@ class _AgriHomeState extends State<AgriHome> {
   }
 
   Widget _dashboard() {
-    final review = _records.where((r) => _isReview(r.status)).length;
-    final approved = _records.where((r) => _isApproved(r.status)).length;
+    final profile = _selectedFarmRecord;
+    final ownActivities = profile == null
+        ? <FarmActivity>[]
+        : (_activities.where((a) => a.farmRecordId == profile.id).toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)));
+    final crops = ownActivities.where((a) => a.type == 'Crops').length;
+    final livestock = ownActivities.where((a) => a.type == 'Livestock').length;
+    final openTasks = ownActivities.where((a) {
+      if (a.type != 'Tasks') return false;
+      final status = a.status.toLowerCase();
+      return status != 'completed' && status != 'cancelled' && status != 'done';
+    }).length;
+    final profileSubtitle = profile == null
+        ? 'Set up your profile to start keeping farm records.'
+        : (profile.farmName.trim().isEmpty ? 'Your farm profile' : profile.farmName);
+
     return CustomScrollView(
       slivers: [
         SliverPadding(
@@ -728,30 +742,30 @@ class _AgriHomeState extends State<AgriHome> {
                             color: Colors.white.withValues(alpha: .14),
                             borderRadius: BorderRadius.circular(30),
                           ),
-                          child: const Text('DA STAFF WORKSPACE',
+                          child: const Text('MY FARM',
                               style: TextStyle(color: Colors.white, fontSize: 10,
                                   fontWeight: FontWeight.w800, letterSpacing: 1.1)),
                         ),
                         const SizedBox(height: 18),
-                        const Text('Good work starts\nwith clear records.',
+                        const Text('Grow your farm,\none step at a time.',
                             style: TextStyle(color: Colors.white, fontSize: 27,
                                 height: 1.12, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 10),
                         Text(
-                          'Manage farmer applications and prepare registry reports in one place.',
+                          'Keep your farm profile, crops, livestock, finances, and daily tasks organized in one place.',
                           style: TextStyle(color: Colors.white.withValues(alpha: .82),
                               height: 1.45, fontSize: 13),
                         ),
                         const SizedBox(height: 20),
                         FilledButton.icon(
-                          onPressed: () => _openApplication(),
+                          onPressed: () => _openApplication(existing: profile),
                           style: FilledButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: _forest,
                             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
                           ),
-                          icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                          label: const Text('Register a farmer'),
+                          icon: Icon(profile == null ? Icons.add_home_work_outlined : Icons.edit_outlined, size: 18),
+                          label: Text(profile == null ? 'Set up my farm' : 'Edit my farm profile'),
                         ),
                       ],
                     ),
@@ -759,42 +773,48 @@ class _AgriHomeState extends State<AgriHome> {
                 ),
               ),
               const SizedBox(height: 24),
-              const _SectionHeading(title: 'Registry at a glance', subtitle: 'Based on records saved on this device'),
+              _SectionHeading(title: 'My farm at a glance', subtitle: profileSubtitle),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(child: _MetricCard(
-                    icon: Icons.groups_2_outlined, label: 'Total farmers',
-                    value: _records.length.toString(), tint: _mint, iconColor: _green,
+                    icon: Icons.grass_outlined, label: 'Crop entries',
+                    value: crops.toString(), tint: _mint, iconColor: _green,
                   )),
                   const SizedBox(width: 10),
                   Expanded(child: _MetricCard(
-                    icon: Icons.pending_actions_rounded, label: 'For review',
-                    value: review.toString(), tint: const Color(0xFFFFF0D7), iconColor: _amber,
+                    icon: Icons.pets_outlined, label: 'Livestock',
+                    value: livestock.toString(), tint: const Color(0xFFE6ECFF),
+                    iconColor: const Color(0xFF4C62A8),
                   )),
                   const SizedBox(width: 10),
                   Expanded(child: _MetricCard(
-                    icon: Icons.verified_outlined, label: 'Approved',
-                    value: approved.toString(), tint: const Color(0xFFE6ECFF), iconColor: const Color(0xFF4C62A8),
+                    icon: Icons.checklist_rounded, label: 'Open tasks',
+                    value: openTasks.toString(), tint: const Color(0xFFFFF0D7), iconColor: _amber,
                   )),
                 ],
               ),
               const SizedBox(height: 24),
               Row(
                 children: [
-                  const Expanded(child: _SectionHeading(title: 'Recent applications', subtitle: 'Latest saved farmer records')),
+                  const Expanded(child: _SectionHeading(title: 'My farm profiles', subtitle: 'Your saved farm details')),
                   TextButton(
                     onPressed: () => setState(() => _tab = 1),
-                    child: const Text('View all'),
+                    child: const Text('Manage'),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
               if (_records.isEmpty)
-                const _EmptyCard(
-                  icon: Icons.assignment_ind_outlined,
-                  title: 'Your registry starts here',
-                  message: 'Wala pang farmer record. Tap Register a farmer para gumawa ng application.',
+                _EmptyCard(
+                  icon: Icons.agriculture_outlined,
+                  title: 'Set up your farm',
+                  message: 'Add your details to start recording crops, livestock, expenses, and tasks.',
+                  action: FilledButton.icon(
+                    onPressed: () => _openApplication(),
+                    icon: const Icon(Icons.add_home_work_outlined),
+                    label: const Text('Set up my farm'),
+                  ),
                 )
               else
                 ..._records.take(3).map((r) => Padding(
@@ -824,27 +844,27 @@ class _AgriHomeState extends State<AgriHome> {
               _topBar(),
               const SizedBox(height: 18),
               const _SectionHeading(
-                title: 'Farmer & Farm Registry',
-                subtitle: 'Applications are stored locally on this device.',
+                title: 'My Farm Profiles',
+                subtitle: 'Manage your details and the farms you keep records for.',
               ),
               const SizedBox(height: 14),
               TextField(
                 onChanged: (value) => setState(() => _search = value),
                 decoration: const InputDecoration(
-                  hintText: 'Search name, ID, farm or location',
+                  hintText: 'Search your farm, name, or location',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Text('${_filteredRecords.length} records',
+                  Text(_filteredRecords.length.toString() + ' farm profiles',
                       style: const TextStyle(color: _muted, fontWeight: FontWeight.w600)),
                   const Spacer(),
                   FilledButton.icon(
                     onPressed: () => _openApplication(),
                     icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Register'),
+                    label: const Text('Add farm'),
                   ),
                 ],
               ),
@@ -854,16 +874,16 @@ class _AgriHomeState extends State<AgriHome> {
         Expanded(
           child: _filteredRecords.isEmpty
               ? _EmptyCard(
-                  icon: _search.isEmpty ? Icons.person_add_alt_1_rounded : Icons.search_off_rounded,
-                  title: _search.isEmpty ? 'No farmer applications yet' : 'No matching records',
+                  icon: _search.isEmpty ? Icons.agriculture_outlined : Icons.search_off_rounded,
+                  title: _search.isEmpty ? 'No farm profile yet' : 'No matching farm profiles',
                   message: _search.isEmpty
-                      ? 'Pindutin ang Register para simulan ang farmer application.'
-                      : 'Subukan ang ibang pangalan, ID, farm o lokasyon.',
+                      ? 'Set up your farmer details and farm information to begin.'
+                      : 'Try another farm name, your name, or location.',
                   action: _search.isEmpty
                       ? FilledButton.icon(
                           onPressed: () => _openApplication(),
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('Register farmer'),
+                          icon: const Icon(Icons.add_home_work_outlined),
+                          label: const Text('Set up my farm'),
                         )
                       : null,
                 )
