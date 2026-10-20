@@ -223,7 +223,7 @@ private fun InventoryItemCard(
             }
 
             Text(
-                "Purchase price: ₱" + String.format(Locale.US, "%.2f", item.purchasePrice),
+                "Purchase price: \u20B1" + String.format(Locale.US, "%.2f", item.purchasePrice),
                 color = AgriText,
                 style = MaterialTheme.typography.bodySmall
             )

@@ -1825,11 +1825,11 @@ class _AgriHomeState extends State<AgriHome> {
             const SizedBox(height: 14),
             Row(
               children: [
-                metric('Income logged', '₱${summary.income.toStringAsFixed(0)}', Icons.trending_up_rounded),
+                metric('Income logged', '\u{20B1}${summary.income.toStringAsFixed(0)}', Icons.trending_up_rounded),
                 const SizedBox(width: 8),
-                metric('Expenses logged', '₱${summary.expenses.toStringAsFixed(0)}', Icons.trending_down_rounded),
+                metric('Expenses logged', '\u{20B1}${summary.expenses.toStringAsFixed(0)}', Icons.trending_down_rounded),
                 const SizedBox(width: 8),
-                metric('Net recorded', '₱${summary.netCashFlow.toStringAsFixed(0)}', Icons.account_balance_wallet_outlined),
+                metric('Net recorded', '\u{20B1}${summary.netCashFlow.toStringAsFixed(0)}', Icons.account_balance_wallet_outlined),
               ],
             ),
             const SizedBox(height: 12),
@@ -2346,7 +2346,7 @@ class _ActivityTile extends StatelessWidget {
       activity.date,
     ].where((value) => value.trim().isNotEmpty).join(' · ');
     final amount = activity.amount > 0
-        ? '₱${activity.amount.toStringAsFixed(2)}'
+        ? '\u{20B1}${activity.amount.toStringAsFixed(2)}'
         : '';
     return Card(
       child: Padding(

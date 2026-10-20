@@ -32,7 +32,7 @@ class DaReportExporterTest {
 
     @Test
     fun csvUtf8ExportHasBomAndPreservesFilipinoText() {
-        val csv = "Farmer,Barangay,Amount\nJosé,Malangag,₱1250.00\n"
+        val csv = "Farmer,Barangay,Amount\nJosé,Malangag,\u20B11250.00\n"
         val bytes = csvUtf8Bytes(csv)
 
         assertEquals(0xEF, bytes[0].toInt() and 0xFF)

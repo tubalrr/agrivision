@@ -528,14 +528,14 @@ internal fun DashboardScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardKpiCard(
                     "Sales",
-                    "₱" + money(totalSales),
+                    "\u20B1" + money(totalSales),
                     Icons.Outlined.MonetizationOn,
                     AgriGreenSoft,
                     Modifier.weight(1f)
                 )
                 DashboardKpiCard(
                     "Expenses",
-                    "₱" + money(totalExpenses),
+                    "\u20B1" + money(totalExpenses),
                     Icons.Outlined.ReceiptLong,
                     AgriGoldSoft,
                     Modifier.weight(1f)
@@ -547,7 +547,7 @@ internal fun DashboardScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DashboardKpiCard(
                     "Net Income",
-                    "₱" + money(netIncome),
+                    "\u20B1" + money(netIncome),
                     Icons.Outlined.Assessment,
                     AgriGreenSoft,
                     Modifier.weight(1f)
@@ -898,8 +898,8 @@ private fun CashFlowAnalyticsCard(
                 }
                 HorizontalDivider(color = AgriLine)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DashboardAnalyticsMetric("This month · Sales", "₱" + money(monthSales), Modifier.weight(1f))
-                    DashboardAnalyticsMetric("This month · Expenses", "₱" + money(monthExpenses), Modifier.weight(1f))
+                    DashboardAnalyticsMetric("This month · Sales", "\u20B1" + money(monthSales), Modifier.weight(1f))
+                    DashboardAnalyticsMetric("This month · Expenses", "\u20B1" + money(monthExpenses), Modifier.weight(1f))
                 }
                 Surface(
                     color = if (net >= 0) AgriGreenSoft else Color(0xFFFFE8E3),
@@ -919,7 +919,7 @@ private fun CashFlowAnalyticsCard(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text("Dated net cash flow", style = MaterialTheme.typography.labelSmall, color = AgriMuted)
                             Text(
-                                (if (net < 0) "−₱" else "₱") + money(kotlin.math.abs(net)),
+                                (if (net < 0) "−\u20B1" else "\u20B1") + money(kotlin.math.abs(net)),
                                 color = if (net >= 0) AgriGreen else AgriDanger,
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -1196,10 +1196,10 @@ private fun buildFarmActionItems(
         val payables = unpaidExpenses.sumOf { it.amount }
         val financeDetails = buildList {
             if (unpaidSales.isNotEmpty()) {
-                add("Sales receivable ₱${String.format(Locale.US, "%,.2f", receivables)}")
+                add("Sales receivable \u20B1${String.format(Locale.US, "%,.2f", receivables)}")
             }
             if (unpaidExpenses.isNotEmpty()) {
-                add("Unpaid expenses ₱${String.format(Locale.US, "%,.2f", payables)}")
+                add("Unpaid expenses \u20B1${String.format(Locale.US, "%,.2f", payables)}")
             }
         }.joinToString(" · ")
         actions += FarmActionItem(

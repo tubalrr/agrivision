@@ -237,7 +237,7 @@ internal fun MarketPricesScreen(
                 Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) { Text(row.commodity, color = AgriText, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium); Text(row.category, color = AgriMuted, style = MaterialTheme.typography.labelSmall) }
-                        Text("₱" + String.format(Locale.US, "%.2f", row.pricePerKg) + "/" + row.unit, color = AgriGreen, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                        Text("\u20B1" + String.format(Locale.US, "%.2f", row.pricePerKg) + "/" + row.unit, color = AgriGreen, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
                     }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         val trendLabel = when (row.trend) { "UP" -> "↑ " + String.format(Locale.US, "%.1f%%", row.changePercent); "DOWN" -> "↓ " + String.format(Locale.US, "%.1f%%", kotlin.math.abs(row.changePercent)); else -> featureText(language, "Walang pagbabago", "Stable") }

@@ -204,7 +204,7 @@ internal fun ProductionFinanceScreen(
                         }
                     }
                     Text(
-                        "₱" + money(netIncome),
+                        "\u20B1" + money(netIncome),
                         color = Color.White,
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.ExtraBold
@@ -216,7 +216,7 @@ internal fun ProductionFinanceScreen(
                         ) {
                             Icon(Icons.Outlined.TrendingUp, null, tint = Color(0xFFB9E85A), modifier = Modifier.size(18.dp))
                             Text("Sales", color = Color.White.copy(alpha = 0.76f), style = MaterialTheme.typography.labelSmall)
-                            Text("₱" + money(totalSales), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("\u20B1" + money(totalSales), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                         }
                         Column(
                             Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.1f)).padding(12.dp),
@@ -224,7 +224,7 @@ internal fun ProductionFinanceScreen(
                         ) {
                             Icon(Icons.Outlined.ReceiptLong, null, tint = Color(0xFFFFD4C7), modifier = Modifier.size(18.dp))
                             Text("Expenses", color = Color.White.copy(alpha = 0.76f), style = MaterialTheme.typography.labelSmall)
-                            Text("₱" + money(totalExpenses), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("\u20B1" + money(totalExpenses), color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                         }
                     }
                 }
@@ -663,7 +663,7 @@ internal fun ProductionFinanceScreen(
                         listOf(
                             log.date,
                             log.livestockId.ifBlank { "Unlinked livestock" },
-                            if (log.costAmount > 0.0) "Feed cost ₱" + money(log.costAmount) else "Cost not recorded",
+                            if (log.costAmount > 0.0) "Feed cost \u20B1" + money(log.costAmount) else "Cost not recorded",
                             log.notes
                         ).filter { it.isNotBlank() }.joinToString(" · "),
                         Icons.Outlined.Restaurant
@@ -745,13 +745,13 @@ internal fun ProductionFinanceScreen(
                     else -> "Unallocated"
                 }
                 val detail = listOf(expense.date, expense.note, sourceLabel).filter { it.isNotBlank() }.joinToString(" · ")
-                FinanceTransactionCard(title = expense.category, amount = "₱" + money(expense.amount), detail = detail, paymentStatus = expense.paymentStatus, onTogglePayment = { onExpensePaymentStatus(expense, if (expense.paymentStatus.equals("Paid", true)) "Unpaid" else "Paid") })
+                FinanceTransactionCard(title = expense.category, amount = "\u20B1" + money(expense.amount), detail = detail, paymentStatus = expense.paymentStatus, onTogglePayment = { onExpensePaymentStatus(expense, if (expense.paymentStatus.equals("Paid", true)) "Unpaid" else "Paid") })
             }
             item { Text("Income records", fontWeight = FontWeight.SemiBold) }
             items(periodSales) { sale ->
                 FinanceTransactionCard(
                     title = sale.product,
-                    amount = "₱" + money(sale.amount),
+                    amount = "\u20B1" + money(sale.amount),
                     detail = sale.incomeCategory + " · " + sale.date + " · " + when (sale.sourceType) {
                         "Crop" -> "Crop " + sale.sourceId
                         "Livestock" -> "Livestock " + sale.sourceId
@@ -794,20 +794,20 @@ private fun CropProfitabilityCard(
                                 color = AgriMuted, style = MaterialTheme.typography.labelSmall
                             )
                         }
-                        Text((if (row.netProfit < 0.0) "−₱" else "₱") + money(kotlin.math.abs(row.netProfit)), color = if (row.netProfit >= 0.0) AgriGreen else AgriDanger, fontWeight = FontWeight.ExtraBold)
+                        Text((if (row.netProfit < 0.0) "−\u20B1" else "\u20B1") + money(kotlin.math.abs(row.netProfit)), color = if (row.netProfit >= 0.0) AgriGreen else AgriDanger, fontWeight = FontWeight.ExtraBold)
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Column(Modifier.weight(1f).background(AgriGreenSoft, RoundedCornerShape(12.dp)).padding(10.dp)) {
                             Text("Linked income", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                            Text("₱" + money(row.income), color = AgriText, fontWeight = FontWeight.Bold)
+                            Text("\u20B1" + money(row.income), color = AgriText, fontWeight = FontWeight.Bold)
                         }
                         Column(Modifier.weight(1f).background(AgriGoldSoft, RoundedCornerShape(12.dp)).padding(10.dp)) {
                             Text("Linked costs", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                            Text("₱" + money(row.expenses), color = AgriText, fontWeight = FontWeight.Bold)
+                            Text("\u20B1" + money(row.expenses), color = AgriText, fontWeight = FontWeight.Bold)
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(row.costPerHectare?.let { "Cost/ha: ₱" + money(it) } ?: "Cost/ha: set area", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                        Text(row.costPerHectare?.let { "Cost/ha: \u20B1" + money(it) } ?: "Cost/ha: set area", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
                         Text(if (row.harvestUnit.isBlank()) "No linked harvest" else "Harvest: " + String.format(Locale.US, "%.2f %s", row.harvestQuantity, row.harvestUnit), color = AgriMuted, style = MaterialTheme.typography.labelSmall)
                     }
                 }
@@ -817,11 +817,11 @@ private fun CropProfitabilityCard(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text("Income", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                    Text("₱" + money(unallocatedIncome), fontWeight = FontWeight.Bold)
+                    Text("\u20B1" + money(unallocatedIncome), fontWeight = FontWeight.Bold)
                 }
                 Column(Modifier.weight(1f)) {
                     Text("Expenses", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                    Text("₱" + money(unallocatedExpenses), fontWeight = FontWeight.Bold)
+                    Text("\u20B1" + money(unallocatedExpenses), fontWeight = FontWeight.Bold)
                 }
             }
             Text("Unlinked transactions are never guessed into a crop; use the Finance form to link them.", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
@@ -855,21 +855,21 @@ private fun LivestockProfitabilityCard(
                             Text(row.livestockLabel, fontWeight = FontWeight.Bold, color = AgriText)
                             Text(row.currentHeads.toString() + " head(s)", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
                         }
-                        Text((if (row.netProfit < 0.0) "−₱" else "₱") + money(kotlin.math.abs(row.netProfit)), color = if (row.netProfit >= 0.0) AgriGreen else AgriDanger, fontWeight = FontWeight.ExtraBold)
+                        Text((if (row.netProfit < 0.0) "−\u20B1" else "\u20B1") + money(kotlin.math.abs(row.netProfit)), color = if (row.netProfit >= 0.0) AgriGreen else AgriDanger, fontWeight = FontWeight.ExtraBold)
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Column(Modifier.weight(1f).background(AgriGreenSoft, RoundedCornerShape(12.dp)).padding(10.dp)) {
                             Text("Linked income", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                            Text("₱" + money(row.income), color = AgriText, fontWeight = FontWeight.Bold)
+                            Text("\u20B1" + money(row.income), color = AgriText, fontWeight = FontWeight.Bold)
                         }
                         Column(Modifier.weight(1f).background(AgriGoldSoft, RoundedCornerShape(12.dp)).padding(10.dp)) {
                             Text("Linked costs", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                            Text("₱" + money(row.expenses), color = AgriText, fontWeight = FontWeight.Bold)
+                            Text("\u20B1" + money(row.expenses), color = AgriText, fontWeight = FontWeight.Bold)
                         }
                     }
-                    Text(row.costPerHead?.let { "Recorded cost/head: ₱" + money(it) } ?: "Cost/head: no current heads", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
+                    Text(row.costPerHead?.let { "Recorded cost/head: \u20B1" + money(it) } ?: "Cost/head: no current heads", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
                     Text(
-                        if (row.feedCost > 0.0) "Recorded feed cost included: ₱" + money(row.feedCost)
+                        if (row.feedCost > 0.0) "Recorded feed cost included: \u20B1" + money(row.feedCost)
                         else "No feed cost entered for this group’s feed logs.",
                         color = AgriMuted,
                         style = MaterialTheme.typography.bodySmall
@@ -914,24 +914,24 @@ private fun FinancePeriodSummaryCard(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f).background(AgriGreenSoft, RoundedCornerShape(14.dp)).padding(12.dp)) {
                     Text("Income", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                    Text("₱" + money(income), color = AgriText, fontWeight = FontWeight.ExtraBold)
+                    Text("\u20B1" + money(income), color = AgriText, fontWeight = FontWeight.ExtraBold)
                     Text(sales.size.toString() + " record(s)", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
                 }
                 Column(Modifier.weight(1f).background(AgriGoldSoft, RoundedCornerShape(14.dp)).padding(12.dp)) {
                     Text("Expenses", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                    Text("₱" + money(costs), color = AgriText, fontWeight = FontWeight.ExtraBold)
+                    Text("\u20B1" + money(costs), color = AgriText, fontWeight = FontWeight.ExtraBold)
                     Text(expenses.size.toString() + " record(s)", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Recorded net result", color = AgriMuted, style = MaterialTheme.typography.bodySmall)
-                    Text((if (net < 0.0) "−₱" else "₱") + money(kotlin.math.abs(net)), color = if (net < 0) AgriDanger else AgriGreen, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                    Text((if (net < 0.0) "−\u20B1" else "\u20B1") + money(kotlin.math.abs(net)), color = if (net < 0) AgriDanger else AgriGreen, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Outstanding · all periods", color = AgriMuted, style = MaterialTheme.typography.labelSmall)
-                    Text("Receivable ₱" + money(receivables), color = AgriGreen, fontWeight = FontWeight.Bold)
-                    Text("Payable ₱" + money(payables), color = AgriDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text("Receivable \u20B1" + money(receivables), color = AgriGreen, fontWeight = FontWeight.Bold)
+                    Text("Payable \u20B1" + money(payables), color = AgriDanger, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
             }
             if (undatedCount > 0 && period != "All time") {
@@ -954,7 +954,7 @@ private fun FinanceTrendCard(months: List<MonthlyFinanceSummary>) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(row.month.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)), fontWeight = FontWeight.SemiBold, color = AgriText)
-                        Text((if (row.net < 0) "−₱" else "₱") + money(kotlin.math.abs(row.net)), color = if (row.net < 0) AgriDanger else AgriGreen, fontWeight = FontWeight.Bold)
+                        Text((if (row.net < 0) "−\u20B1" else "\u20B1") + money(kotlin.math.abs(row.net)), color = if (row.net < 0) AgriDanger else AgriGreen, fontWeight = FontWeight.Bold)
                     }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         Text("Income", color = AgriMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(48.dp))
@@ -1010,7 +1010,7 @@ private fun FinanceCategorySummary(rows: List<Pair<String, Double>>) {
             rows.forEach { (category, value) ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(category, fontWeight = FontWeight.Medium)
-                    Text("₱" + money(value), fontWeight = FontWeight.SemiBold)
+                    Text("\u20B1" + money(value), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -1264,7 +1264,7 @@ internal fun AddProductionFinanceDialog(
                         value = amount,
                         onValueChange = { amount = it.filter { ch -> ch.isDigit() || ch == '.' } },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Amount (₱)") },
+                        label = { Text("Amount (\u20B1)") },
                         singleLine = true
                     )
                     Text("Payment status", color = AgriGreen, fontWeight = FontWeight.Bold)
@@ -1530,7 +1530,7 @@ private fun FeedLogDialog(
                 OutlinedTextField(
                     value = feedCost,
                     onValueChange = { feedCost = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                    label = { Text("Feed cost used (₱, optional)") },
+                    label = { Text("Feed cost used (\u20B1, optional)") },
                     supportingText = { Text("Total cost for this feed event, not price per sack. Leave blank if unknown.") },
                     singleLine = true
                 )
