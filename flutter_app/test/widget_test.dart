@@ -81,7 +81,75 @@ void main() {
     expect(restored.amount, 750.50);
   });
 
-  test('local backup exports and restores farmer and farm activity records', () {
+  test('offline summary calculates cash flow, due tasks, and inventory balances', () {
+    final rows = [
+      const FarmActivity(
+        id: 'INC-1', farmRecordId: 'F1', type: 'Finance', title: 'Rice sale',
+        category: 'Income / sale', quantity: '1', unit: 'lot', amount: 12000,
+        date: '2026-10-20', status: 'Received', notes: '', updatedAt: '',
+      ),
+      const FarmActivity(
+        id: 'EXP-1', farmRecordId: 'F1', type: 'Finance', title: 'Fertilizer',
+        category: 'Expense', quantity: '2', unit: 'bags', amount: 3500,
+        date: '2026-10-20', status: 'Paid', notes: '', updatedAt: '',
+      ),
+      const FarmActivity(
+        id: 'TASK-1', farmRecordId: 'F1', type: 'Tasks', title: 'Water the field',
+        category: 'Watering', quantity: '', unit: '', amount: 0,
+        date: '2026-10-19', status: 'Pending', notes: '', updatedAt: '',
+      ),
+      const FarmActivity(
+        id: 'TASK-2', farmRecordId: 'F1', type: 'Tasks', title: 'Check seedlings',
+        category: 'Follow-up', quantity: '', unit: '', amount: 0,
+        date: '2026-10-20', status: 'In progress', notes: '', updatedAt: '',
+      ),
+      const FarmActivity(
+        id: 'STOCK-IN', farmRecordId: 'F1', type: 'Inventory', title: 'Urea',
+        category: 'Stock In / purchase', quantity: '10', unit: 'kg', amount: 0,
+        date: '2026-10-20', status: 'In stock', notes: '', updatedAt: '',
+      ),
+      const FarmActivity(
+        id: 'STOCK-OUT', farmRecordId: 'F1', type: 'Inventory', title: 'Urea',
+        category: 'Stock Out / used', quantity: '10', unit: 'kg', amount: 0,
+        date: '2026-10-20', status: 'Out of stock', notes: '', updatedAt: '',
+      ),
+      const FarmActivity(
+        id: 'PROD-1', farmRecordId: 'F1', type: 'Production', title: 'Rice harvest',
+        category: 'Harvest', quantity: '500', unit: 'kg', amount: 0,
+        date: '2026-10-20', status: 'Recorded', notes: '', updatedAt: '',
+      ),
+    ];
+    final summary = calculateOfflineFarmSummary(rows, now: DateTime(2026, 10, 20));
+    expect(summary.income, 12000);
+    expect(summary.expenses, 3500);
+    expect(summary.netCashFlow, 8500);
+    expect(summary.overdueTasks, 1);
+    expect(summary.tasksDueToday, 1);
+    expect(summary.inventoryItems, 1);
+    expect(summary.lowOrEmptyStockItems, 1);
+    expect(summary.productionRecords, 1);
+  });
+
+  test('backup preserves offline module types and schema v1 compatibility', () {
+    const farmer = FarmerApplication(
+      id: 'FARM-1', farmerName: 'Ana', contact: '', farmName: 'Farm',
+      province: '', municipality: '', barangay: '', area: '',
+      landTenure: 'Owned', commodities: 'Rice', status: '', reviewNotes: '',
+      updatedAt: '',
+    );
+    const field = FarmActivity(
+      id: 'FIELD-1', farmRecordId: 'FARM-1', type: 'Field Mapping',
+      title: 'North field point', category: 'Field point / coordinate',
+      quantity: '1', unit: 'point', amount: 0, date: '2026-10-20',
+      status: 'Recorded', notes: '7.1234, 125.5678', updatedAt: '',
+    );
+    final newBackup = buildAgriVisionBackupJson(farmers: [farmer], activities: [field]);
+    expect(parseAgriVisionBackupJson(newBackup).activities.single.type, 'Field Mapping');
+    final v1 = newBackup.replaceFirst('"schemaVersion": 2', '"schemaVersion": 1');
+    expect(parseAgriVisionBackupJson(v1).activities.single.title, 'North field point');
+  });
+
+  test('local backup exports and restores farmer and farm activity records', {
     const farmer = FarmerApplication(
       id: 'FAR-BACKUP-1',
       farmerName: 'Maria Santos',
@@ -167,5 +235,8 @@ void main() {
     expect(find.text('AgriVision'), findsWidgets);
     expect(find.text('My Reports'), findsWidgets);
     expect(find.text('My farm at a glance'), findsOneWidget);
+    await tester.tap(find.text('More').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Offline farm insights'), findsOneWidget);
   });
 }

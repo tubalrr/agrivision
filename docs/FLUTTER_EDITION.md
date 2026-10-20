@@ -51,8 +51,10 @@ flutter build apk --debug
 - Farmer-linked Farm Operations tabs for Crops, Livestock, Finance, and Tasks.
 - Add/edit/delete farm activity entries linked to the selected farmer's application ID.
 - DA report builder for Farmer Applications, Crop Records, Livestock Records, Finance Records, Task Register, and Complete Farm Activity.
-- CSV and JSON report sharing via the Android share sheet.
-- Full JSON local backup/export and validated restore/merge.
+- CSV, JSON, and locally generated PDF report sharing via the Android share sheet.
+- Full JSON local backup/export and validated restore/merge (imports schema v1 and v2).
+- Offline registers for Inventory, Production, Equipment, Field Mapping notes, Pest & Disease observations, and Incidents.
+- On-device summaries for categorized finance records, stock-in/stock-out entries, and due/overdue tasks.
 
 ## Persistence boundaries
 
@@ -65,7 +67,7 @@ flutter build apk --debug
 
 ## Known limitations
 
-The Flutter edition does not yet include all native modules such as the persisted satellite/farm map, complete crop/livestock life cycles, weather, scan history, market prices, full native DA PDF/ZIP reports, a verified DA staff login, or an official DA submission workflow. The Flutter finance/livestock/crop/task areas are general farm activity records; they are not yet equivalents of the complete native domain modules.
+The Flutter edition remains a partial migration. The added modules are offline activity registers and local summaries, not yet the native app's full structured crop/livestock lifecycle or transactional inventory database. It does not yet capture/store photos with records, render map or satellite tiles, acquire GPS automatically, provide operating-system scheduled notifications, or bundle photos in backup. Weather requests, live market prices, trained disease detection, online accounts/cloud sync, official DA submission, and native ZIP/photo-evidence backup are not part of this offline Flutter edition. Field coordinates/boundary points may be entered manually as notes; those notes are not a rendered map.
 
 There is no connected central server in this edition. Do not promise multi-device sync, centralized access control, official DA submission, live market prices, or trained disease detection unless those are separately implemented and tested.
 

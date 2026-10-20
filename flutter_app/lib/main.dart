@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'branding/agrivision_mark.dart';
 import 'branding/agrivision_splash_gate.dart';
 
@@ -225,6 +227,98 @@ class FarmActivity {
 }
 
 
+class OfflineFarmSummary {
+  const OfflineFarmSummary({
+    required this.income,
+    required this.expenses,
+    required this.overdueTasks,
+    required this.tasksDueToday,
+    required this.inventoryItems,
+    required this.lowOrEmptyStockItems,
+    required this.productionRecords,
+    required this.fieldRecords,
+    required this.incidentRecords,
+  });
+
+  final double income;
+  final double expenses;
+  final int overdueTasks;
+  final int tasksDueToday;
+  final int inventoryItems;
+  final int lowOrEmptyStockItems;
+  final int productionRecords;
+  final int fieldRecords;
+  final int incidentRecords;
+
+  double get netCashFlow => income - expenses;
+}
+
+/// Summarizes only saved local records; no internet connection is needed.
+OfflineFarmSummary calculateOfflineFarmSummary(
+  Iterable<FarmActivity> activities, {
+  DateTime? now,
+}) {
+  final rows = activities.toList(growable: false);
+  final dateValue = now ?? DateTime.now();
+  final today = DateTime(dateValue.year, dateValue.month, dateValue.day);
+  var income = 0.0;
+  var expenses = 0.0;
+  var overdue = 0;
+  var dueToday = 0;
+  final stock = <String, double>{};
+
+  for (final row in rows) {
+    final category = row.category.toLowerCase();
+    final status = row.status.toLowerCase();
+
+    if (row.type == 'Finance') {
+      if (category.contains('income') || category.contains('sale') || status == 'received') {
+        income += row.amount;
+      } else if (category.contains('expense') || category.contains('cost') ||
+          category.contains('labor') || category.contains('fuel') ||
+          category.contains('medicine')) {
+        expenses += row.amount;
+      }
+    }
+
+    if (row.type == 'Tasks' && status != 'completed' && status != 'cancelled') {
+      final date = DateTime.tryParse(row.date);
+      if (date != null) {
+        final due = DateTime(date.year, date.month, date.day);
+        if (due.isBefore(today)) overdue++;
+        if (due == today) dueToday++;
+      }
+    }
+
+    if (row.type == 'Inventory') {
+      final key = '${row.title.trim().toLowerCase()}|${row.unit.trim().toLowerCase()}';
+      final quantity = double.tryParse(row.quantity.trim());
+      if (quantity != null && quantity.isFinite && quantity >= 0) {
+        if (category.contains('stock in') || category.contains('purchase') ||
+            category.contains('restock') || category == 'add stock') {
+          stock[key] = (stock[key] ?? 0) + quantity;
+        } else if (category.contains('stock out') || category.contains('used') ||
+            category.contains('issued') || category.contains('wastage')) {
+          stock[key] = (stock[key] ?? 0) - quantity;
+        }
+      }
+    }
+  }
+
+  return OfflineFarmSummary(
+    income: income,
+    expenses: expenses,
+    overdueTasks: overdue,
+    tasksDueToday: dueToday,
+    inventoryItems: stock.length,
+    lowOrEmptyStockItems: stock.values.where((value) => value <= 0).length,
+    productionRecords: rows.where((row) => row.type == 'Production').length,
+    fieldRecords: rows.where((row) => row.type == 'Field Mapping').length,
+    incidentRecords: rows.where((row) =>
+        row.type == 'Incidents' || row.type == 'Pest & Disease').length,
+  );
+}
+
 class AgriVisionBackup {
   const AgriVisionBackup({
     required this.exportedAt,
@@ -245,7 +339,7 @@ String buildAgriVisionBackupJson({
   final timestamp = (exportedAt ?? DateTime.now()).toIso8601String();
   return const JsonEncoder.withIndent('  ').convert({
     'format': 'agrivision.local-backup',
-    'schemaVersion': 1,
+    'schemaVersion': 2,
     'app': 'AgriVision',
     'exportedAt': timestamp,
     'recordCounts': {
@@ -273,7 +367,7 @@ AgriVisionBackup parseAgriVisionBackupJson(String content) {
   }
   final root = Map<String, dynamic>.from(decoded);
   if (root['format'] != 'agrivision.local-backup' ||
-      root['schemaVersion'] != 1) {
+      !const {1, 2}.contains(root['schemaVersion'])) {
     throw const FormatException(
       'Unsupported backup format or version. Choose an AgriVision backup file.',
     );
@@ -300,7 +394,10 @@ AgriVisionBackup parseAgriVisionBackupJson(String content) {
 
   final activities = <FarmActivity>[];
   final activityIds = <String>{};
-  const allowedTypes = {'Crops', 'Livestock', 'Finance', 'Tasks'};
+  const allowedTypes = {
+    'Crops', 'Livestock', 'Finance', 'Tasks', 'Inventory', 'Production',
+    'Equipment', 'Field Mapping', 'Pest & Disease', 'Incidents',
+  };
   for (final item in root['activities'] as List<dynamic>) {
     if (item is! Map) {
       throw const FormatException('A farm activity record is malformed.');
@@ -533,7 +630,9 @@ class _AgriHomeState extends State<AgriHome> {
 
   static const _reportTypes = [
     'Farm Profile', 'Crop Records', 'Livestock Records',
-    'Finance Records', 'Task Register', 'Complete Farm Activity',
+    'Finance Records', 'Task Register', 'Inventory Records',
+    'Production Records', 'Equipment Register', 'Field Mapping Records',
+    'Pest & Disease Log', 'Incident Register', 'Complete Farm Activity',
   ];
 
   List<Map<String, dynamic>> _reportRows() {
@@ -547,6 +646,12 @@ class _AgriHomeState extends State<AgriHome> {
       'Livestock Records' => 'Livestock',
       'Finance Records' => 'Finance',
       'Task Register' => 'Tasks',
+      'Inventory Records' => 'Inventory',
+      'Production Records' => 'Production',
+      'Equipment Register' => 'Equipment',
+      'Field Mapping Records' => 'Field Mapping',
+      'Pest & Disease Log' => 'Pest & Disease',
+      'Incident Register' => 'Incidents',
       _ => '',
     };
     final chosenActivities = selectedType.isEmpty
@@ -565,8 +670,6 @@ class _AgriHomeState extends State<AgriHome> {
         'Farm Area': r.area,
         'Land Tenure': r.landTenure,
         'Commodities': r.commodities,
-        'Application Status': r.status,
-        'Review Notes': r.reviewNotes,
         'Last Updated': r.updatedAt,
       }).toList();
     }
@@ -621,28 +724,71 @@ class _AgriHomeState extends State<AgriHome> {
       return;
     }
     final now = DateTime.now();
-    final content = _reportFormat == 'JSON'
-        ? const JsonEncoder.withIndent('  ').convert({
-            'app': 'AgriVision Flutter',
-            'reportType': _reportType,
-            'scope': _reportScope,
-            'generatedAt': now.toIso8601String(),
-            'recordCount': rows.length,
-            'records': rows,
-          })
-        : _rowsToCsv(rows);
     final extension = _reportFormat.toLowerCase();
     final safeType = _reportType.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
     final fileName = 'agrivision-$safeType-${now.toIso8601String().substring(0, 10)}.$extension';
-    final mimeType = _reportFormat == 'JSON' ? 'application/json' : 'text/csv';
+    final List<int> fileBytes;
+    final String mimeType;
+
+    if (_reportFormat == 'PDF') {
+      final document = pw.Document();
+      final columns = rows.first.keys.toList();
+      document.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          build: (context) => [
+            pw.Text(
+              'AgriVision · $_reportType',
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 5),
+            pw.Text('Scope: $_reportScope'),
+            pw.Text('Generated on device: ${now.toIso8601String()}'),
+            pw.SizedBox(height: 14),
+            pw.TableHelper.fromTextArray(
+              headers: columns,
+              data: rows.map((row) =>
+                  columns.map((column) => (row[column] ?? '').toString()).toList()
+              ).toList(),
+              headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#173F35')),
+              headerStyle: pw.TextStyle(
+                color: PdfColors.white,
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 8,
+              ),
+              cellStyle: const pw.TextStyle(fontSize: 7),
+              cellAlignment: pw.Alignment.centerLeft,
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.35),
+            ),
+            pw.SizedBox(height: 10),
+            pw.Text(
+              'Offline report generated from records saved on this device.',
+              style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+            ),
+          ],
+        ),
+      );
+      fileBytes = await document.save();
+      mimeType = 'application/pdf';
+    } else {
+      final content = _reportFormat == 'JSON'
+          ? const JsonEncoder.withIndent('  ').convert({
+              'app': 'AgriVision Flutter',
+              'reportType': _reportType,
+              'scope': _reportScope,
+              'generatedAt': now.toIso8601String(),
+              'recordCount': rows.length,
+              'records': rows,
+            })
+          : _rowsToCsv(rows);
+      fileBytes = utf8.encode(content);
+      mimeType = _reportFormat == 'JSON' ? 'application/json' : 'text/csv';
+    }
+
     await SharePlus.instance.share(
       ShareParams(
-        files: [
-          XFile.fromData(
-            utf8.encode(content),
-            mimeType: mimeType,
-          ),
-        ],
+        files: [XFile.fromData(fileBytes, mimeType: mimeType)],
         subject: 'AgriVision $_reportType $_reportFormat',
         fileNameOverrides: [fileName],
       ),
@@ -1010,6 +1156,18 @@ class _AgriHomeState extends State<AgriHome> {
                     _activityChip('Finance', Icons.account_balance_wallet_outlined),
                     const SizedBox(width: 7),
                     _activityChip('Tasks', Icons.checklist_rounded),
+                    const SizedBox(width: 7),
+                    _activityChip('Inventory', Icons.inventory_2_outlined),
+                    const SizedBox(width: 7),
+                    _activityChip('Production', Icons.agriculture_rounded),
+                    const SizedBox(width: 7),
+                    _activityChip('Equipment', Icons.handyman_outlined),
+                    const SizedBox(width: 7),
+                    _activityChip('Field Mapping', Icons.map_outlined),
+                    const SizedBox(width: 7),
+                    _activityChip('Pest & Disease', Icons.biotech_outlined),
+                    const SizedBox(width: 7),
+                    _activityChip('Incidents', Icons.report_gmailerrorred_outlined),
                   ],
                 ),
               ),
@@ -1069,13 +1227,7 @@ class _AgriHomeState extends State<AgriHome> {
                 )
               : visibleActivities.isEmpty
                   ? _EmptyCard(
-                      icon: _activityType == 'Crops'
-                          ? Icons.grass_outlined
-                          : _activityType == 'Livestock'
-                              ? Icons.pets_outlined
-                              : _activityType == 'Finance'
-                                  ? Icons.account_balance_wallet_outlined
-                                  : Icons.checklist_rounded,
+                      icon: _activityIcon(_activityType),
                       title: 'No ${_activityType.toLowerCase()} records yet',
                       message: 'Add a ${_activityType.toLowerCase()} record for ${chosen?.farmerName ?? 'this farmer'}. The record will stay linked to this farmer.',
                       action: FilledButton.icon(
@@ -1105,6 +1257,20 @@ class _AgriHomeState extends State<AgriHome> {
       ],
     );
   }
+
+  IconData _activityIcon(String type) => switch (type) {
+    'Crops' => Icons.grass_outlined,
+    'Livestock' => Icons.pets_outlined,
+    'Finance' => Icons.account_balance_wallet_outlined,
+    'Tasks' => Icons.checklist_rounded,
+    'Inventory' => Icons.inventory_2_outlined,
+    'Production' => Icons.agriculture_rounded,
+    'Equipment' => Icons.handyman_outlined,
+    'Field Mapping' => Icons.map_outlined,
+    'Pest & Disease' => Icons.biotech_outlined,
+    'Incidents' => Icons.report_gmailerrorred_outlined,
+    _ => Icons.folder_outlined,
+  };
 
   Widget _activityChip(String type, IconData icon) => FilterChip(
     selected: _activityType == type,
@@ -1188,6 +1354,8 @@ class _AgriHomeState extends State<AgriHome> {
                   Expanded(child: _formatChoice('CSV')),
                   const SizedBox(width: 9),
                   Expanded(child: _formatChoice('JSON')),
+                  const SizedBox(width: 9),
+                  Expanded(child: _formatChoice('PDF')),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1610,6 +1778,135 @@ class _AgriHomeState extends State<AgriHome> {
     ),
   );
 
+  Widget _offlineInsightsCard() {
+    final selectedFarmId = _selectedFarmRecord?.id;
+    final activities = _activities.where((row) =>
+        selectedFarmId == null || row.farmRecordId == selectedFarmId).toList();
+    final summary = calculateOfflineFarmSummary(activities);
+    final todayKey = DateTime.now().toIso8601String().substring(0, 10);
+    final dueTasks = activities.where((row) {
+      if (row.type != 'Tasks') return false;
+      final status = row.status.toLowerCase();
+      return status != 'completed' && status != 'cancelled' &&
+          row.date.compareTo(todayKey) <= 0;
+    }).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    Widget metric(String title, String value, IconData icon) => Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(color: _cream, borderRadius: BorderRadius.circular(14)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: _green, size: 19),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(color: _muted, fontSize: 10)),
+            const SizedBox(height: 3),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      ),
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Offline farm insights',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: _ink)),
+            const SizedBox(height: 4),
+            const Text('Computed only from records stored on this phone.',
+                style: TextStyle(color: _muted, fontSize: 12)),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                metric('Income logged', '₱${summary.income.toStringAsFixed(0)}', Icons.trending_up_rounded),
+                const SizedBox(width: 8),
+                metric('Expenses logged', '₱${summary.expenses.toStringAsFixed(0)}', Icons.trending_down_rounded),
+                const SizedBox(width: 8),
+                metric('Net recorded', '₱${summary.netCashFlow.toStringAsFixed(0)}', Icons.account_balance_wallet_outlined),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _insightPill('Overdue tasks: ${summary.overdueTasks}', summary.overdueTasks > 0),
+                _insightPill('Due today: ${summary.tasksDueToday}', summary.tasksDueToday > 0),
+                _insightPill('Production logs: ${summary.productionRecords}', false),
+                _insightPill('Field notes: ${summary.fieldRecords}', false),
+                _insightPill('Incidents: ${summary.incidentRecords}', summary.incidentRecords > 0),
+                _insightPill('Inventory items: ${summary.inventoryItems}', false),
+                _insightPill('Zero/negative stock: ${summary.lowOrEmptyStockItems}', summary.lowOrEmptyStockItems > 0),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Icon(Icons.notifications_active_outlined, color: _amber, size: 20),
+                const SizedBox(width: 7),
+                const Expanded(child: Text('Offline task reminders',
+                    style: TextStyle(fontWeight: FontWeight.w800, color: _ink))),
+                Text('${dueTasks.length} due',
+                    style: const TextStyle(color: _muted, fontSize: 11)),
+              ],
+            ),
+            const SizedBox(height: 5),
+            if (dueTasks.isEmpty)
+              const Text('Walang overdue o due-today na task sa saved records.',
+                  style: TextStyle(color: _muted, fontSize: 12))
+            else
+              ...dueTasks.take(3).map((task) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(
+                  task.date.compareTo(todayKey) < 0
+                      ? Icons.error_outline_rounded
+                      : Icons.today_rounded,
+                  color: task.date.compareTo(todayKey) < 0 ? const Color(0xFFB33B32) : _amber,
+                ),
+                title: Text(task.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text('${task.date} · ${task.status}'),
+                trailing: IconButton(
+                  tooltip: 'Open task',
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  onPressed: () => setState(() {
+                    _activityType = 'Tasks';
+                    _tab = 2;
+                    _selectedFarmRecordId = task.farmRecordId;
+                    _activitySearch = task.title;
+                  }),
+                ),
+              )),
+            const SizedBox(height: 6),
+            const Text(
+              'Finance totals use records categorized as income/sales or expenses. Inventory balances use matching item names and stock-in/stock-out entries. Check entries before relying on totals.',
+              style: TextStyle(color: _muted, fontSize: 10, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _insightPill(String label, bool attention) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    decoration: BoxDecoration(
+      color: attention ? const Color(0xFFFFF0D7) : _mint,
+      borderRadius: BorderRadius.circular(11),
+    ),
+    child: Text(label, style: TextStyle(
+      color: attention ? _amber : _forest,
+      fontSize: 10,
+      fontWeight: FontWeight.w800,
+    )),
+  );
+
   Widget _more() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
@@ -1644,6 +1941,8 @@ class _AgriHomeState extends State<AgriHome> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        _offlineInsightsCard(),
         const SizedBox(height: 12),
         _backupRestoreCard(),
         const SizedBox(height: 12),
@@ -1740,16 +2039,51 @@ class _ActivityDialogState extends State<ActivityDialog> {
   late String _status;
 
   List<String> get _categories => switch (widget.type) {
-    'Crops' => const ['Planting', 'Crop growth', 'Harvest', 'Pest / disease', 'Other'],
-    'Livestock' => const ['Poultry', 'Cattle', 'Swine', 'Goat / sheep', 'Other'],
-    'Finance' => const ['Expense', 'Income / sale', 'Assistance', 'Other'],
-    _ => const ['Farm maintenance', 'Follow-up', 'Supplies / paperwork', 'Farm activity', 'Other'],
+    'Crops' => const [
+        'Land preparation', 'Planting', 'Irrigation', 'Fertilization',
+        'Pest / disease monitoring', 'Harvest', 'Other',
+      ],
+    'Livestock' => const [
+        'Animal group', 'Feed', 'Health / medicine', 'Mortality',
+        'Production', 'Sales', 'Other',
+      ],
+    'Finance' => const ['Expense', 'Income / sale', 'Other income', 'Other'],
+    'Tasks' => const [
+        'Farm maintenance', 'Planting schedule', 'Watering', 'Fertilizing',
+        'Spraying', 'Harvest schedule', 'Follow-up', 'Other',
+      ],
+    'Inventory' => const [
+        'Stock In / purchase', 'Stock Out / used', 'Wastage',
+        'Stock count / adjustment', 'Expiry check', 'Other',
+      ],
+    'Production' => const ['Harvest', 'Eggs', 'Milk', 'Livestock growth', 'Other'],
+    'Equipment' => const ['Purchase', 'Maintenance', 'Repair', 'Fuel', 'Other'],
+    'Field Mapping' => const [
+        'Farm location', 'Field point / coordinate', 'Boundary point',
+        'Boundary notes', 'Other',
+      ],
+    'Pest & Disease' => const [
+        'Observation', 'Suspected pest', 'Suspected disease',
+        'Treatment applied', 'Follow-up', 'Other',
+      ],
+    'Incidents' => const [
+        'Weather damage', 'Pest / disease outbreak', 'Livestock health incident',
+        'Crop damage', 'Equipment damage', 'Loss / theft', 'Other',
+      ],
+    _ => const ['Farm activity', 'Other'],
   };
 
   List<String> get _statuses => switch (widget.type) {
     'Crops' => const ['Planned', 'In progress', 'Harvested', 'Needs attention', 'Completed'],
     'Livestock' => const ['Active', 'For monitoring', 'Needs attention', 'Completed'],
     'Finance' => const ['Recorded', 'Pending', 'Paid', 'Received'],
+    'Tasks' => const ['Pending', 'In progress', 'Completed', 'Cancelled'],
+    'Inventory' => const ['In stock', 'Low stock', 'Out of stock', 'Expired', 'Disposed'],
+    'Production' => const ['Recorded', 'Verified', 'Sold', 'Spoiled'],
+    'Equipment' => const ['Available', 'In use', 'Under maintenance', 'Needs repair', 'Retired'],
+    'Field Mapping' => const ['Draft', 'Recorded', 'Verified', 'Needs update'],
+    'Pest & Disease' => const ['Observed', 'Monitoring', 'Treatment applied', 'Resolved', 'Needs expert review'],
+    'Incidents' => const ['Draft', 'Recorded', 'Needs follow-up', 'Resolved'],
     _ => const ['Pending', 'In progress', 'Completed', 'Cancelled'],
   };
 
@@ -1759,7 +2093,10 @@ class _ActivityDialogState extends State<ActivityDialog> {
     final activity = widget.existing;
     _title = TextEditingController(text: activity?.title ?? '');
     _quantity = TextEditingController(text: activity?.quantity ?? '');
-    _unit = TextEditingController(text: activity?.unit ?? (widget.type == 'Crops' ? 'ha' : ''));
+    _unit = TextEditingController(text: activity?.unit ?? (
+        widget.type == 'Crops' ? 'ha' :
+        widget.type == 'Field Mapping' ? 'points' : ''
+      ));
     _amount = TextEditingController(
       text: activity == null || activity.amount == 0 ? '' : activity.amount.toString(),
     );
@@ -1789,13 +2126,36 @@ class _ActivityDialogState extends State<ActivityDialog> {
   @override
   Widget build(BuildContext context) {
     final isNew = widget.existing == null;
-    final farmerTitle = widget.type == 'Crops'
-        ? 'Crop record'
-        : widget.type == 'Livestock'
-            ? 'Livestock record'
-            : widget.type == 'Finance'
-                ? 'Finance record'
-                : 'Farm task';
+    final farmerTitle = switch (widget.type) {
+      'Crops' => 'Crop record',
+      'Livestock' => 'Livestock record',
+      'Finance' => 'Finance record',
+      'Tasks' => 'Farm task',
+      'Inventory' => 'Inventory record',
+      'Production' => 'Production record',
+      'Equipment' => 'Equipment record',
+      'Field Mapping' => 'Field mapping record',
+      'Pest & Disease' => 'Pest & disease record',
+      'Incidents' => 'Farm incident',
+      _ => 'Farm record',
+    };
+    final quantityLabel = switch (widget.type) {
+      'Crops' => 'Area / quantity',
+      'Livestock' => 'Animal count / quantity',
+      'Inventory' => 'Stock quantity',
+      'Production' => 'Production quantity',
+      'Field Mapping' => 'Point count (optional)',
+      _ => 'Quantity / count',
+    };
+    final notesLabel = switch (widget.type) {
+      'Inventory' => 'Supplier, batch, expiry, or stock notes',
+      'Production' => 'Linked crop/livestock source, quality, or grade',
+      'Field Mapping' => 'Enter coordinates (latitude, longitude) or boundary-point notes',
+      'Pest & Disease' => 'Symptoms, affected area, treatment, and follow-up',
+      'Incidents' => 'Impact, evidence reference, coordinates, and follow-up',
+      'Tasks' => 'Instructions and follow-up notes',
+      _ => 'Notes',
+    };
     return Dialog.fullscreen(
       child: Scaffold(
         backgroundColor: _cream,
@@ -1826,7 +2186,9 @@ class _ActivityDialogState extends State<ActivityDialog> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'This entry will be saved under your selected farm profile.',
+                        widget.type == 'Field Mapping'
+                            ? 'Save field coordinates or boundary notes locally. No satellite imagery is downloaded or rendered in this module.'
+                            : 'This entry will be saved under your selected farm profile and remains available offline.',
                         style: const TextStyle(color: _forest, fontSize: 12, height: 1.45),
                       ),
                     ),
@@ -1851,8 +2213,7 @@ class _ActivityDialogState extends State<ActivityDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: _field(_quantity, widget.type == 'Crops'
-                        ? 'Area / quantity' : 'Quantity / count',
+                    child: _field(_quantity, quantityLabel,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true)),
                   ),
                   const SizedBox(width: 10),
@@ -1889,7 +2250,7 @@ class _ActivityDialogState extends State<ActivityDialog> {
                 onChanged: (value) => setState(() => _status = value ?? _statuses.first),
               ),
               const SizedBox(height: 12),
-              _field(_notes, 'Notes', icon: Icons.sticky_note_2_outlined, maxLines: 3),
+              _field(_notes, notesLabel, icon: Icons.sticky_note_2_outlined, maxLines: 4),
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: _save,
@@ -1964,12 +2325,7 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = switch (activity.type) {
-      'Crops' => Icons.grass_outlined,
-      'Livestock' => Icons.pets_outlined,
-      'Finance' => Icons.account_balance_wallet_outlined,
-      _ => Icons.checklist_rounded,
-    };
+    final icon = _activityIcon(activity.type);
     final detail = [
       activity.category,
       if (activity.quantity.trim().isNotEmpty)

@@ -36,7 +36,9 @@ A separate Flutter implementation lives in `flutter_app/` as a farmer-focused Ma
 - My Farm Profiles for editing farmer details and farm information
 - My Farm Log for crops, livestock, finances, and daily tasks
 - Device-local storage and manual JSON backup/restore with non-destructive merge
-- My Reports with all-farm or selected-farm CSV/JSON export/share
+- Offline registers for crops, livestock, finance, tasks, inventory, production, equipment, field notes, pest/disease observations, and incidents
+- On-device summary calculations and due/overdue task reminders
+- My Reports with all-farm or selected-farm CSV/JSON/PDF export/share
 - Flutter analysis, tests, and debug APK build in GitHub Actions
 
 **Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `.\build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.
