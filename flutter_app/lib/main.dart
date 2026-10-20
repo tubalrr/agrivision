@@ -273,13 +273,25 @@ OfflineFarmSummary calculateOfflineFarmSummary(
     final status = row.status.toLowerCase();
 
     if (row.type == 'Finance') {
-      if (category.contains('income') || category.contains('sale') || status == 'received') {
+      if (category.contains('income') ||
+          category.contains('sale') ||
+          status == 'received') {
         income += row.amount;
-      } else if (category.contains('expense') || category.contains('cost') ||
-          category.contains('labor') || category.contains('fuel') ||
+      } else if (category.contains('expense') ||
+          category.contains('cost') ||
+          category.contains('labor') ||
+          category.contains('fuel') ||
           category.contains('medicine')) {
         expenses += row.amount;
       }
+    }
+
+    // Harvest amount represents recorded monetary value in this app.
+    // Count it as income only once the harvest is marked sold or received.
+    if ((row.type == 'Production' || row.type == 'Crops') &&
+        category.contains('harvest') &&
+        (status == 'sold' || status == 'received')) {
+      income += row.amount;
     }
 
     if (row.type == 'Tasks' && status != 'completed' && status != 'cancelled') {
