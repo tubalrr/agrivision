@@ -28,16 +28,15 @@ Built with:
 - Material 3
 - Offline-first architecture
 
-## Flutter Edition (new)
+## Farmer Edition (Flutter)
 
-A separate Flutter implementation lives in `flutter_app/` with a premium Material 3 DA staff workspace and original AgriVision branding.
+A separate Flutter implementation lives in `flutter_app/` as a farmer-focused Material 3 app with the supplied green-leaf branding and animated loading screen.
 
-- Dashboard with live counts from saved farmer applications
-- Searchable Farmer & Farm Registry with application review status and notes
-- Farmer-linked Farm Operations for crops, livestock, finance, and tasks
-- Device-local persistence for registry and activity records
-- Manual validated JSON backup/restore with non-destructive merge
-- DA report builder with all-farm or selected-farmer scope and CSV/JSON file export/share
+- Farmer dashboard with crop, livestock, and task counts
+- My Farm Profiles for editing farmer details and farm information
+- My Farm Log for crops, livestock, finances, and daily tasks
+- Device-local storage and manual JSON backup/restore with non-destructive merge
+- My Reports with all-farm or selected-farm CSV/JSON export/share
 - Flutter analysis, tests, and debug APK build in GitHub Actions
 
 **Open the `flutter_app` folder in Android Studio** to work on the Flutter version. On Windows, from the repository root run `.\build_flutter.ps1` in PowerShell, or follow `flutter_app/README.md`.

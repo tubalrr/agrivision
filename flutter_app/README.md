@@ -1,30 +1,28 @@
-# AgriVision Flutter Edition
+# AgriVision — Farmer Edition
 
-A premium Flutter interface for the DA staff workflow. The original Kotlin/Jetpack Compose Android application remains in the repository unchanged while the Flutter edition is built and validated separately.
+A farmer-focused Flutter app for keeping personal farm details, crop and livestock entries, farm finances, and everyday tasks together.
 
 ## Current Flutter features
 
-- Premium green/cream DA staff overview with live counts from locally saved records.
-- Farmer & Farm Registry with search, registration application, editable statuses, and DA review notes.
-- Farm Operations screen with crops, livestock, finance, and tasks tabs.
-- Add/edit/delete farm activity records linked to a selected farmer/farm application.
-- Local persistence using SharedPreferences (this is device-local storage, not cloud sync).
-- Full JSON backup and restore for farmer and farm activity records, with validation, confirmation, and safe merge (no local-only records are deleted).
-- DA reports for farmer applications and operational records with all-farm or selected-farmer scope.
-- Share actual CSV or JSON report files using Android's share sheet.
-- Empty states instead of invented farmer or farm records.
-- Responsive Material 3 layout and bottom navigation.
+- Farmer home dashboard with crop, livestock, and open-task counts for the selected farm profile.
+- My Farm Profiles for adding and editing your own farmer and farm details.
+- My Farm Log for recording crops, livestock, finance, and daily tasks under a selected farm profile.
+- My Reports to export farm profiles or activity records as CSV or JSON.
+- Device-local storage using SharedPreferences; there is no automatic cloud sync or multi-device account.
+- Full JSON backup and restore with validation, confirmation, and a non-destructive merge.
+- Animated HTML loading screen and the supplied green-leaf AgriVision branding.
+- No sample farmer or farm records are pre-populated.
 
 ## Windows setup
 
-Install the Flutter stable SDK (Flutter 3.47.x is the CI baseline) and Android Studio. In PowerShell, start at the repository root:
+Install Flutter stable (Flutter 3.47.x is the CI baseline) and Android Studio. In PowerShell, start at the repository root:
 
 ```powershell
 git pull origin main
 .\build_flutter.ps1
 ```
 
-The helper creates the Android platform folder when needed, resolves dependencies, applies the AgriVision launcher icon/app name, runs `flutter analyze`, runs `flutter test`, and builds the debug APK.
+The helper generates the Android platform folder when needed, resolves packages, applies the AgriVision app name and leaf launcher icon, runs `flutter analyze`, runs `flutter test`, and builds the debug APK.
 
 For manual development, enter `flutter_app` and run:
 
@@ -36,24 +34,18 @@ flutter test
 flutter build apk --debug
 ```
 
-The debug APK is created at:
+APK output:
 
 ```
 flutter_app/build/app/outputs/flutter-apk/app-debug.apk
 ```
 
-Open the `flutter_app` folder (not the repository root) in Android Studio to work on the Flutter edition. After the first `flutter create` command, the `android/` platform project is generated locally.
+Open the `flutter_app` folder (not the repository root) in Android Studio. The `android/` platform project is generated locally by `flutter create`.
 
-## Build dependencies
+## Data and privacy notes
 
-The Flutter edition currently uses `file_picker` for importing a user-selected JSON backup, `share_plus` for report/backup sharing, and `shared_preferences` for device-local records. Keep these plugin versions mutually compatible with the Flutter stable SDK and run the full build after updating dependencies. The generated `flutter_app/android` directory is local/generated; the branding sources are maintained in `flutter_app/branding/android/res/`.
-
-## Current scope and data warning
-
-This is the first Flutter migration milestone, not a replacement for every existing native feature yet. The Flutter registry uses its own local SharedPreferences store, supports manual JSON backup/restore, and does **not** automatically import or sync the existing Kotlin Room database. Existing Kotlin farm maps, crop/livestock/finance modules, weather, scan history, and the full DA PDF/JSON report exporter have not been migrated in this milestone.
-
-The Flutter DA Reports screen exports Farmer Applications, Crop Records, Livestock Records, Finance Records, Task Register, and Complete Farm Activity in CSV or JSON. A PDF report template, official DA submission workflow, and remaining native maps/weather/scan/market functions are still future migration work. Cloud sync, verified DA staff authentication, and role-based access are not connected in this prototype. See the repository-level [Privacy Policy](../PRIVACY_POLICY.md) and [DA deployment/privacy checklist](../docs/DA_PRIVACY_AND_DEPLOYMENT.md) before entering real beneficiary data.
+Profiles and activity records stay on this device until you export/share them. JSON backups can contain your name, contact number, and farm information, so keep exported files private. The Flutter edition does not share its data store with the older native Kotlin/Room edition and does not automatically submit records to a government system. There is no connected login, cloud sync, or official DA workflow in this prototype.
 
 ## CI
 
-The Flutter workflow bootstraps the Android platform, runs `flutter analyze` and tests, builds a debug APK, and uploads the APK as a GitHub Actions artifact.
+GitHub Actions runs Flutter analysis, tests, a debug APK build, and uploads the APK as an artifact.

@@ -5,7 +5,7 @@ import 'package:agrivision_flutter/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('CSV export includes headers and all application rows', () {
+  test('CSV export includes farmer profile headers and fields', () {
     const record = FarmerApplication(
       id: 'FAR-100',
       farmerName: 'Ana Dela Cruz',
@@ -22,12 +22,12 @@ void main() {
       updatedAt: '2026-10-19T10:00:00',
     );
 
-    final csv = applicationsToCsv([record]).replaceFirst('\uFEFF', '');
+    final csv = farmProfilesToCsv([record]).replaceFirst('\uFEFF', '');
 
     expect(csv, contains('Farmer Name'));
     expect(csv, contains('Ana Dela Cruz'));
     expect(csv, contains('FAR-100'));
-    expect(csv, contains('Needs land document'));
+    expect(csv, contains('Green Valley'));
     expect(csv.split('\r\n'), hasLength(2));
   });
 
@@ -48,7 +48,7 @@ void main() {
       updatedAt: '',
     );
 
-    final csv = applicationsToCsv([record]);
+    final csv = farmProfilesToCsv([record]);
 
     expect(csv, contains('"Juan ""Jun"" Santos"'));
     expect(csv, contains('"Farm, North"'));
@@ -165,7 +165,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AgriVision'), findsWidgets);
-    expect(find.text('DA Reports'), findsWidgets);
-    expect(find.text('Registry at a glance'), findsOneWidget);
+    expect(find.text('My Reports'), findsWidgets);
+    expect(find.text('My farm at a glance'), findsOneWidget);
   });
 }
