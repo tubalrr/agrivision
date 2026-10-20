@@ -353,7 +353,7 @@ String buildAgriVisionBackupJson({
 }
 
 AgriVisionBackup parseAgriVisionBackupJson(String content) {
-  if (content.length > 10 * 1024 * 1024) {
+  if (utf8.encode(content).length > 10 * 1024 * 1024) {
     throw const FormatException('Backup is larger than the 10 MB safety limit.');
   }
 
@@ -375,6 +375,25 @@ AgriVisionBackup parseAgriVisionBackupJson(String content) {
   }
   if (root['farmers'] is! List || root['activities'] is! List) {
     throw const FormatException('The backup is missing farmer or activity records.');
+  }
+
+  // Schema v2 writes recordCounts. When present, validate them before import
+  // so a truncated or manually altered backup is not silently accepted.
+  final rawCounts = root['recordCounts'];
+  if (rawCounts != null) {
+    if (rawCounts is! Map ||
+        rawCounts['farmers'] is! int ||
+        rawCounts['activities'] is! int ||
+        (rawCounts['farmers'] as int) < 0 ||
+        (rawCounts['activities'] as int) < 0) {
+      throw const FormatException('The backup record counts are malformed.');
+    }
+    if (rawCounts['farmers'] != (root['farmers'] as List).length ||
+        rawCounts['activities'] != (root['activities'] as List).length) {
+      throw const FormatException(
+        'The backup record counts do not match its contents. Export a fresh backup and try again.',
+      );
+    }
   }
 
   final farmers = <FarmerApplication>[];

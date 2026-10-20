@@ -195,6 +195,41 @@ void main() {
     expect(backup.exportedAt, '2026-10-19T10:10:00.000');
   });
 
+  test('backup import rejects record counts that do not match its contents', () {
+    const inconsistentBackup = '''
+    {
+      "format": "agrivision.local-backup",
+      "schemaVersion": 2,
+      "recordCounts": {"farmers": 2, "activities": 0},
+      "farmers": [{
+        "id": "FARM-COUNT-1",
+        "farmerName": "Ana",
+        "contact": "",
+        "farmName": "Farm",
+        "province": "",
+        "municipality": "",
+        "barangay": "",
+        "area": "",
+        "landTenure": "Owned",
+        "commodities": "Rice",
+        "status": "Approved",
+        "reviewNotes": "",
+        "updatedAt": ""
+      }],
+      "activities": []
+    }
+    ''';
+
+    expect(
+      () => parseAgriVisionBackupJson(inconsistentBackup),
+      throwsA(isA<FormatException>().having(
+        (error) => error.message,
+        'message',
+        contains('record counts do not match'),
+      )),
+    );
+  });
+
   test('backup import rejects unsupported JSON and orphaned activities', () {
     expect(
       () => parseAgriVisionBackupJson('{"format":"other","schemaVersion":1,"farmers":[],"activities":[]}'),
