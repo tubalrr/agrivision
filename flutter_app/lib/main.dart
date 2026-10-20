@@ -123,7 +123,7 @@ class FarmerApplication {
       );
 }
 
-String applicationsToCsv(List<FarmerApplication> records) {
+String farmProfilesToCsv(List<FarmerApplication> records) {
   String cell(String value) {
     // Prevent spreadsheet formula execution for untrusted user-entered text.
     final dangerous = RegExp(r'^[\s\uFEFF]*[=+\-@＝＋－＠]').hasMatch(value);
@@ -142,8 +142,6 @@ String applicationsToCsv(List<FarmerApplication> records) {
       'Farm Area',
       'Land Tenure',
       'Commodities',
-      'Application Status',
-      'Review Notes',
       'Last Updated',
     ],
     ...records.map((r) => [
@@ -157,8 +155,6 @@ String applicationsToCsv(List<FarmerApplication> records) {
           r.area,
           r.landTenure,
           r.commodities,
-          r.status,
-          r.reviewNotes,
           r.updatedAt,
         ]),
   ];
@@ -417,9 +413,9 @@ class _AgriHomeState extends State<AgriHome> {
   String _activitySearch = '';
   String _activityType = 'Crops';
   String _selectedFarmRecordId = '';
-  String _reportType = 'Farmer Applications';
+  String _reportType = 'Farm Profile';
   String _reportFormat = 'CSV';
-  String _reportScope = 'All farmers';
+  String _reportScope = 'All my farms';
   List<FarmerApplication> _records = [];
   List<FarmActivity> _activities = [];
 
@@ -528,20 +524,20 @@ class _AgriHomeState extends State<AgriHome> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(existing == null
-            ? 'Farmer application saved on this device.'
-            : 'Farmer record updated.'),
+            ? 'Farm profile saved on this device.'
+            : 'Farm profile updated.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
   static const _reportTypes = [
-    'Farmer Applications', 'Crop Records', 'Livestock Records',
+    'Farm Profile', 'Crop Records', 'Livestock Records',
     'Finance Records', 'Task Register', 'Complete Farm Activity',
   ];
 
   List<Map<String, dynamic>> _reportRows() {
-    final chosenRecords = _reportScope == 'Selected farmer'
+    final chosenRecords = _reportScope == 'Selected farm'
         ? _records.where((r) => r.id == (_selectedFarmRecord?.id ?? '')).toList()
         : _records;
     final chosenIds = chosenRecords.map((r) => r.id).toSet();
@@ -557,7 +553,7 @@ class _AgriHomeState extends State<AgriHome> {
         ? activities
         : activities.where((a) => a.type == selectedType).toList();
 
-    if (_reportType == 'Farmer Applications') {
+    if (_reportType == 'Farm Profile') {
       return chosenRecords.map((r) => <String, dynamic>{
         'Farm Record ID': r.id,
         'Farmer Name': r.farmerName,
@@ -594,9 +590,9 @@ class _AgriHomeState extends State<AgriHome> {
   }
 
   String _rowsToCsv(List<Map<String, dynamic>> rows) {
-    if (_reportType == 'Farmer Applications') {
-      final text = applicationsToCsv(_records.where((r) =>
-          _reportScope == 'All farmers' || r.id == (_selectedFarmRecord?.id ?? '')).toList());
+    if (_reportType == 'Farm Profile') {
+      final text = farmProfilesToCsv(_records.where((r) =>
+          _reportScope == 'All my farms' || r.id == (_selectedFarmRecord?.id ?? '')).toList());
       return text;
     }
     const columns = [
@@ -620,7 +616,7 @@ class _AgriHomeState extends State<AgriHome> {
     final rows = _reportRows();
     if (rows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Walang records para sa napiling DA report.')),
+        const SnackBar(content: Text('Walang farm records para sa napiling report.')),
       );
       return;
     }
@@ -647,7 +643,7 @@ class _AgriHomeState extends State<AgriHome> {
             mimeType: mimeType,
           ),
         ],
-        subject: 'AgriVision DA $_reportType $_reportFormat',
+        subject: 'AgriVision $_reportType $_reportFormat',
         fileNameOverrides: [fileName],
       ),
     );
@@ -674,10 +670,10 @@ class _AgriHomeState extends State<AgriHome> {
         backgroundColor: Colors.white,
         indicatorColor: _mint,
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Overview'),
-          NavigationDestination(icon: Icon(Icons.groups_2_outlined), label: 'Registry'),
-          NavigationDestination(icon: Icon(Icons.agriculture_outlined), label: 'Farm Data'),
-          NavigationDestination(icon: Icon(Icons.assessment_outlined), label: 'DA Reports'),
+          NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.agriculture_outlined), label: 'My Farms'),
+          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Farm Log'),
+          NavigationDestination(icon: Icon(Icons.assessment_outlined), label: 'My Reports'),
           NavigationDestination(icon: Icon(Icons.tune_rounded), label: 'More'),
         ],
       ),
@@ -973,8 +969,8 @@ class _AgriHomeState extends State<AgriHome> {
               _topBar(),
               const SizedBox(height: 18),
               const _SectionHeading(
-                title: 'Farm Operations',
-                subtitle: 'Crops, livestock, finance, and tasks saved against a specific farmer record.',
+                title: 'My Farm Log',
+                subtitle: 'Track crops, livestock, farm finances, and daily tasks in your own farm log.',
               ),
               const SizedBox(height: 14),
               if (_records.isNotEmpty)
@@ -1063,12 +1059,12 @@ class _AgriHomeState extends State<AgriHome> {
           child: _records.isEmpty
               ? _EmptyCard(
                   icon: Icons.agriculture_outlined,
-                  title: 'Register a farmer first',
-                  message: 'Farm operations must be linked to a specific farmer/farm. Register a record before adding crops, livestock, finance, or tasks.',
+                  title: 'Set up your farm first',
+                  message: 'Add your farm details before recording crops, livestock, finances, or daily tasks.',
                   action: FilledButton.icon(
                     onPressed: () => _openApplication(),
                     icon: const Icon(Icons.person_add_alt_1_rounded),
-                    label: const Text('Register farmer'),
+                    label: const Text('Set up my farm'),
                   ),
                 )
               : visibleActivities.isEmpty
@@ -1119,18 +1115,26 @@ class _AgriHomeState extends State<AgriHome> {
   );
 
   Widget _reports() {
-    final review = _records.where((r) => _isReview(r.status)).length;
-    final approved = _records.where((r) => _isApproved(r.status)).length;
     final reportCount = _reportRows().length;
-    final selectedName = _selectedFarmRecord?.farmerName ?? 'No farmer selected';
+    final profile = _selectedFarmRecord;
+    final selectedName = profile == null
+        ? 'No farm selected'
+        : (profile.farmName.trim().isEmpty ? profile.farmerName : profile.farmName);
+    final selectedIds = _reportScope == 'Selected farm'
+        ? <String>{profile?.id ?? ''}
+        : _records.map((r) => r.id).toSet();
+    final selectedActivities = _activities.where((a) => selectedIds.contains(a.farmRecordId));
+    final cropCount = selectedActivities.where((a) => a.type == 'Crops').length;
+    final livestockCount = selectedActivities.where((a) => a.type == 'Livestock').length;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
       children: [
         _topBar(),
         const SizedBox(height: 22),
         const _SectionHeading(
-          title: 'DA Reports',
-          subtitle: 'Choose a report type and scope, then share a CSV or JSON export built from locally saved data.',
+          title: 'My Reports',
+          subtitle: 'Export your farm profile and activity records as CSV or JSON files.',
         ),
         const SizedBox(height: 18),
         Container(
@@ -1150,16 +1154,16 @@ class _AgriHomeState extends State<AgriHome> {
               const Icon(Icons.description_outlined, color: Colors.white, size: 30),
               const SizedBox(height: 15),
               const Text(
-                'DA Report Builder',
+                'Farm Report Builder',
                 style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 6),
               Text(
-                'Prepare a focused register for ${_reportScope == 'Selected farmer' ? selectedName : 'all registered farmers'}.',
+                'Prepare a farm report for ' + (_reportScope == 'Selected farm' ? selectedName : 'all your farm profiles') + '.',
                 style: TextStyle(color: Colors.white.withValues(alpha: .8), height: 1.45),
               ),
               const SizedBox(height: 18),
-              const Text('Report type', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              const Text('What to export', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               const SizedBox(height: 7),
               _darkSelector<String>(
                 value: _reportType,
@@ -1168,16 +1172,16 @@ class _AgriHomeState extends State<AgriHome> {
                 onChanged: (value) => setState(() => _reportType = value),
               ),
               const SizedBox(height: 14),
-              const Text('Report scope', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              const Text('Farm selection', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               const SizedBox(height: 7),
               _darkSelector<String>(
                 value: _reportScope,
-                values: const ['All farmers', 'Selected farmer'],
+                values: const ['All my farms', 'Selected farm'],
                 label: (value) => value,
                 onChanged: (value) => setState(() => _reportScope = value),
               ),
               const SizedBox(height: 14),
-              const Text('Export format', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              const Text('File format', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               const SizedBox(height: 7),
               Row(
                 children: [
@@ -1203,9 +1207,9 @@ class _AgriHomeState extends State<AgriHome> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('$reportCount records',
+                          Text(reportCount.toString() + ' records',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                          Text('$_reportType · $_reportFormat · $_reportScope',
+                          Text(_reportType + ' · ' + _reportFormat + ' · ' + _reportScope,
                               style: TextStyle(color: Colors.white.withValues(alpha: .77), fontSize: 11)),
                         ],
                       ),
@@ -1223,7 +1227,7 @@ class _AgriHomeState extends State<AgriHome> {
                   minimumSize: const Size.fromHeight(49),
                 ),
                 icon: const Icon(Icons.ios_share_rounded),
-                label: Text(reportCount == 0 ? 'No records to export' : 'Share $_reportFormat report'),
+                label: Text(reportCount == 0 ? 'No records to export' : 'Share ' + _reportFormat + ' report'),
               ),
             ],
           ),
@@ -1232,18 +1236,22 @@ class _AgriHomeState extends State<AgriHome> {
         Row(
           children: [
             Expanded(child: _MetricCard(
-              icon: Icons.groups_2_outlined, label: 'Farmers registered',
-              value: _records.length.toString(), tint: _mint, iconColor: _green,
+              icon: Icons.home_work_outlined, label: 'Farm profiles',
+              value: (_reportScope == 'Selected farm'
+                  ? (profile == null ? 0 : 1)
+                  : _records.length).toString(),
+              tint: _mint, iconColor: _green,
             )),
             const SizedBox(width: 10),
             Expanded(child: _MetricCard(
-              icon: Icons.pending_actions_rounded, label: 'For review',
-              value: review.toString(), tint: const Color(0xFFFFF0D7), iconColor: _amber,
+              icon: Icons.grass_outlined, label: 'Crop entries',
+              value: cropCount.toString(), tint: const Color(0xFFFFF0D7), iconColor: _amber,
             )),
             const SizedBox(width: 10),
             Expanded(child: _MetricCard(
-              icon: Icons.verified_outlined, label: 'Approved',
-              value: approved.toString(), tint: const Color(0xFFE6ECFF), iconColor: const Color(0xFF4C62A8),
+              icon: Icons.pets_outlined, label: 'Livestock entries',
+              value: livestockCount.toString(), tint: const Color(0xFFE6ECFF),
+              iconColor: const Color(0xFF4C62A8),
             )),
           ],
         ),
@@ -1254,12 +1262,12 @@ class _AgriHomeState extends State<AgriHome> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Report contents', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const Text('Included information', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 5),
                 Text(
-                  _reportType == 'Farmer Applications'
-                      ? 'Farmer and farm registration fields'
-                      : 'Farm-linked ${_reportType.toLowerCase()} entries',
+                  _reportType == 'Farm Profile'
+                      ? 'Your farmer and farm details'
+                      : 'Your farm-linked ' + _reportType.toLowerCase() + ' entries',
                   style: const TextStyle(color: _muted, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
@@ -1279,7 +1287,7 @@ class _AgriHomeState extends State<AgriHome> {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Data boundary: exports contain only records saved in this Flutter app on this device. They are not an official DA submission and are not synced to a central server.',
+          'Exports contain only records saved in this app on this device. Nothing is automatically uploaded or synced to a central server.',
           style: TextStyle(color: _muted, fontSize: 12, height: 1.5),
         ),
       ],
@@ -1340,11 +1348,11 @@ class _AgriHomeState extends State<AgriHome> {
   );
 
   List<String> _reportIncludedFields() {
-    if (_reportType == 'Farmer Applications') {
+    if (_reportType == 'Farm Profile') {
       return const [
         'Farmer/farm record IDs, farmer name, and contact number',
         'Farm name, location, area, land tenure, and commodities',
-        'Application status, DA review notes, and update timestamp',
+        'Farmer name, contact details, farm location, and last-updated date',
       ];
     }
     return const [
@@ -1628,7 +1636,7 @@ class _AgriHomeState extends State<AgriHome> {
                     children: [
                       Text('AgriVision', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                       SizedBox(height: 3),
-                      Text('DA Staff Workspace · Flutter Edition', style: TextStyle(color: _muted, fontSize: 12)),
+                      Text('Farmer Edition · Flutter', style: TextStyle(color: _muted, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -1641,26 +1649,26 @@ class _AgriHomeState extends State<AgriHome> {
         const SizedBox(height: 12),
         const _InfoTile(
           icon: Icons.offline_pin_outlined,
-          title: 'Local-first registry',
-          subtitle: 'Farmer applications are saved on this device using local preferences.',
+          title: 'Your farm data stays local',
+          subtitle: 'Your farm profile and activity records are saved on this device.',
         ),
         const SizedBox(height: 10),
         const _InfoTile(
           icon: Icons.cloud_off_outlined,
           title: 'Cloud sync not connected',
-          subtitle: 'Records are not shared with another staff device or central DA server yet.',
+          subtitle: 'Records stay on this device until you export or share a backup.',
         ),
         const SizedBox(height: 10),
         const _InfoTile(
           icon: Icons.verified_user_outlined,
-          title: 'Staff access',
-          subtitle: 'This screen is a workspace prototype; verified DA login and permissions still need setup.',
+          title: 'Farmer privacy',
+          subtitle: 'Exported backups can contain your contact details and farm information. Store them safely.',
         ),
         const SizedBox(height: 20),
         OutlinedButton.icon(
           onPressed: () => setState(() => _tab = 0),
           icon: const Icon(Icons.home_outlined),
-          label: const Text('Back to overview'),
+          label: const Text('Back to home'),
           style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         ),
       ],
@@ -1682,7 +1690,7 @@ class _AgriHomeState extends State<AgriHome> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('AgriVision', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -.4)),
-              Text('DA FIELD OPERATIONS', style: TextStyle(fontSize: 9, color: _muted,
+              Text('FARMER EDITION', style: TextStyle(fontSize: 9, color: _muted,
                   fontWeight: FontWeight.w800, letterSpacing: 1.4)),
             ],
           ),
@@ -1735,13 +1743,13 @@ class _ActivityDialogState extends State<ActivityDialog> {
     'Crops' => const ['Planting', 'Crop growth', 'Harvest', 'Pest / disease', 'Other'],
     'Livestock' => const ['Poultry', 'Cattle', 'Swine', 'Goat / sheep', 'Other'],
     'Finance' => const ['Expense', 'Income / sale', 'Assistance', 'Other'],
-    _ => const ['Field inspection', 'Follow-up', 'Document review', 'Distribution', 'Other'],
+    _ => const ['Farm maintenance', 'Follow-up', 'Supplies / paperwork', 'Farm activity', 'Other'],
   };
 
   List<String> get _statuses => switch (widget.type) {
-    'Crops' => const ['Planned', 'In progress', 'Harvested', 'Needs review', 'Completed'],
+    'Crops' => const ['Planned', 'In progress', 'Harvested', 'Needs attention', 'Completed'],
     'Livestock' => const ['Active', 'For monitoring', 'Needs attention', 'Completed'],
-    'Finance' => const ['Recorded', 'Pending', 'Paid', 'Received', 'For review'],
+    'Finance' => const ['Recorded', 'Pending', 'Paid', 'Received'],
     _ => const ['Pending', 'In progress', 'Completed', 'Cancelled'],
   };
 
@@ -1818,7 +1826,7 @@ class _ActivityDialogState extends State<ActivityDialog> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'This record will be linked to farm record ${widget.farmRecordId}. Records for other farmers stay separate.',
+                        'This entry will be saved under your selected farm profile.',
                         style: const TextStyle(color: _forest, fontSize: 12, height: 1.45),
                       ),
                     ),
@@ -1891,7 +1899,7 @@ class _ActivityDialogState extends State<ActivityDialog> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Local record only. It is not submitted to a DA database automatically.',
+                'This record is saved on your device. Export a backup before changing phones.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: _muted, fontSize: 11, height: 1.45),
               ),
@@ -2060,10 +2068,8 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
   late final TextEditingController _barangay;
   late final TextEditingController _area;
   late final TextEditingController _commodities;
-  late final TextEditingController _notes;
   late final TextEditingController _id;
   String _tenure = 'Owned';
-  String _status = 'For Review';
 
   @override
   void initState() {
@@ -2078,16 +2084,14 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
     _barangay = TextEditingController(text: r?.barangay ?? '');
     _area = TextEditingController(text: r?.area ?? '');
     _commodities = TextEditingController(text: r?.commodities ?? '');
-    _notes = TextEditingController(text: r?.reviewNotes ?? '');
     _tenure = r?.landTenure.isNotEmpty == true ? r!.landTenure : 'Owned';
-    _status = r?.status ?? 'For Review';
   }
 
   @override
   void dispose() {
     for (final controller in [
       _id, _name, _contact, _farm, _province, _municipality,
-      _barangay, _area, _commodities, _notes,
+      _barangay, _area, _commodities,
     ]) {
       controller.dispose();
     }
@@ -2105,7 +2109,7 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.close_rounded),
           ),
-          title: Text(isNew ? 'Farmer application' : 'Edit farmer record',
+          title: Text(isNew ? 'Set up my farm' : 'Edit farm profile',
               style: const TextStyle(fontWeight: FontWeight.w800)),
           actions: [
             TextButton(
@@ -2131,8 +2135,8 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
                     Expanded(
                       child: Text(
                         isNew
-                            ? 'Encode the farmer and farm details. A local reference ID is created when you submit.'
-                            : 'Update the record details and application review status.',
+                            ? 'Add your details and farm information. Your profile is saved on this device.'
+                            : 'Update your farmer details and farm information.',
                         style: const TextStyle(color: _forest, height: 1.4, fontSize: 13),
                       ),
                     ),
@@ -2140,12 +2144,12 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
                 ),
               ),
               const SizedBox(height: 20),
-              const _FormSectionTitle(title: 'Farmer information', number: '01'),
+              const _FormSectionTitle(title: 'Your information', number: '01'),
               const SizedBox(height: 12),
-              _field(_name, 'Full name of farmer *', icon: Icons.person_outline,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Farmer name is required' : null),
+              _field(_name, 'Your full name *', icon: Icons.person_outline,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Your name is required' : null),
               const SizedBox(height: 10),
-              _field(_id, 'Farmer / reference ID (optional)', icon: Icons.badge_outlined,
+              _field(_id, 'Profile ID (optional)', icon: Icons.badge_outlined,
                   readOnly: !isNew),
               const SizedBox(height: 10),
               _field(_contact, 'Contact number', icon: Icons.phone_outlined,
@@ -2173,28 +2177,16 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
               const SizedBox(height: 10),
               _field(_commodities, 'Commodities / crops / livestock',
                   icon: Icons.grass_outlined, maxLines: 2),
-              const SizedBox(height: 22),
-              const _FormSectionTitle(title: 'DA review', number: '03'),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _status,
-                decoration: const InputDecoration(labelText: 'Application status'),
-                items: const ['For Review', 'Incomplete', 'Approved', 'Rejected']
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                onChanged: (v) => setState(() => _status = v ?? 'For Review'),
-              ),
-              const SizedBox(height: 10),
-              _field(_notes, 'Review notes', icon: Icons.sticky_note_2_outlined, maxLines: 3),
-              const SizedBox(height: 22),
+              const SizedBox(height: 22),              const SizedBox(height: 22),
               FilledButton.icon(
                 onPressed: _save,
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 icon: Icon(isNew ? Icons.check_rounded : Icons.save_outlined),
-                label: Text(isNew ? 'Submit application' : 'Save changes'),
+                label: Text(isNew ? 'Save farm profile' : 'Save changes'),
               ),
               const SizedBox(height: 10),
               Text(
-                'Storage: this device only. This does not submit the application to a central DA system.',
+                'Saved on this device only. Export a backup before changing phones.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: _muted.withValues(alpha: .95), fontSize: 11, height: 1.4),
               ),
@@ -2246,8 +2238,8 @@ class _ApplicationDialogState extends State<ApplicationDialog> {
         area: _area.text.trim(),
         landTenure: _tenure,
         commodities: _commodities.text.trim(),
-        status: _status,
-        reviewNotes: _notes.text.trim(),
+        status: widget.existing?.status ?? 'Active',
+        reviewNotes: widget.existing?.reviewNotes ?? '',
         updatedAt: now,
       ),
     );
@@ -2311,8 +2303,7 @@ class _FarmerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final approved = _isApproved(record.status);
-    final initials = record.farmerName.trim().split(RegExp(r'\s+'))
+    final initials = record.farmerName.trim().split(RegExp(r'\\s+'))
         .where((part) => part.isNotEmpty).take(2)
         .map((part) => part[0].toUpperCase()).join();
     return Card(
@@ -2334,37 +2325,22 @@ class _FarmerTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(record.farmerName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    Text(record.farmName.isEmpty ? 'My farm' : record.farmName,
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w800, color: _ink, fontSize: 14)),
                     const SizedBox(height: 3),
-                    Text(record.farmName.isEmpty ? 'Farm not specified' : record.farmName,
+                    Text(record.farmerName,
                         maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: _green, fontSize: 12, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 3),
-                    Text(record.location.isEmpty ? 'Location not provided' : record.location,
+                    Text(record.location.isEmpty ? 'Location not added' : record.location,
                         maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: _muted, fontSize: 11)),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: approved ? _mint : const Color(0xFFFFF0D7),
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Text(record.status.toUpperCase(),
-                        style: TextStyle(fontSize: 8, letterSpacing: .3, fontWeight: FontWeight.w900,
-                            color: approved ? _green : _amber)),
-                  ),
-                  const SizedBox(height: 8),
-                  const Icon(Icons.chevron_right_rounded, size: 19, color: _muted),
-                ],
-              ),
+              const Icon(Icons.edit_outlined, size: 19, color: _muted),
             ],
           ),
         ),
@@ -2432,9 +2408,9 @@ class _ReportShortcut extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('DA Reports', style: TextStyle(color: _forest, fontWeight: FontWeight.w900)),
+                  Text('My Farm Reports', style: TextStyle(color: _forest, fontWeight: FontWeight.w900)),
                   SizedBox(height: 3),
-                  Text('Export the saved farmer register', style: TextStyle(color: _muted, fontSize: 11)),
+                  Text('Save or share your farm records', style: TextStyle(color: _muted, fontSize: 11)),
                 ],
               ),
             ),
@@ -2496,14 +2472,3 @@ class _FormSectionTitle extends StatelessWidget {
     ],
   );
 }
-
-bool _isApproved(String status) =>
-    status.toLowerCase().contains('approved') ||
-    status.toLowerCase().contains('registered') ||
-    status.toLowerCase().contains('complete');
-
-bool _isReview(String status) =>
-    status.isEmpty ||
-    status.toLowerCase().contains('review') ||
-    status.toLowerCase().contains('pending') ||
-    status.toLowerCase().contains('incomplete');
