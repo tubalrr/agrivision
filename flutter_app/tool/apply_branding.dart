@@ -8,10 +8,10 @@ Future<void> main() async {
   }
 
   const files = <String, String>{
-    'branding/android/res/drawable/agrivision_icon_foreground.xml':
-        'android/app/src/main/res/drawable/agrivision_icon_foreground.xml',
-    'branding/android/res/drawable/agrivision_icon_full.xml':
-        'android/app/src/main/res/drawable/agrivision_icon_full.xml',
+    'branding/android/res/drawable/agrivision_leaf_foreground.xml':
+        'android/app/src/main/res/drawable/agrivision_leaf_foreground.xml',
+    'branding/android/res/drawable/agrivision_leaf_logo.xml':
+        'android/app/src/main/res/drawable/agrivision_leaf_logo.xml',
     'branding/android/res/values/agrivision_brand_colors.xml':
         'android/app/src/main/res/values/agrivision_brand_colors.xml',
     'branding/android/res/mipmap-anydpi-v26/ic_launcher.xml':
@@ -43,19 +43,19 @@ Future<void> main() async {
         )
         .replaceFirst(
           RegExp(r'android:icon="[^"]*"'),
-          'android:icon="@drawable/agrivision_icon_full"',
+          'android:icon="@drawable/agrivision_leaf_logo"',
         )
         .replaceFirst(
           RegExp(r'android:roundIcon="[^"]*"'),
-          'android:roundIcon="@drawable/agrivision_icon_full"',
+          'android:roundIcon="@drawable/agrivision_leaf_logo"',
         );
 
     if (branded != original) {
       await manifest.writeAsString(branded);
-      stdout.writeln('Set Android app name and launcher icon to AgriVision.');
+      stdout.writeln('Set AgriVision app name and leaf launcher icon.');
     } else if (!original.contains('android:label="AgriVision"') ||
-        !original.contains('android:icon="@drawable/agrivision_icon_full"')) {
-      stderr.writeln('Could not apply AgriVision app name/icon to manifest.');
+        !original.contains('android:icon="@drawable/agrivision_leaf_logo"')) {
+      stderr.writeln('Could not apply AgriVision app name/leaf icon to manifest.');
       exitCode = 1;
       return;
     }
