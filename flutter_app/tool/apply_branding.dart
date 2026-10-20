@@ -86,7 +86,7 @@ Future<void> main() async {
         : '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n</resources>\n';
 
     final launchStylePattern = RegExp(
-      r'<style\\s+name="LaunchTheme"[^>]*>[\\s\\S]*?</style>',
+      r'<style\s+name="LaunchTheme"[^>]*>[\s\S]*?</style>',
     );
     if (launchStylePattern.hasMatch(xml)) {
       xml = xml.replaceFirst(launchStylePattern, launchStyle);
