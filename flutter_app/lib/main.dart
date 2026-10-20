@@ -854,7 +854,7 @@ class _AgriHomeState extends State<AgriHome> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Text(_filteredRecords.length.toString() + ' farm profiles',
+                  Text('${_filteredRecords.length} farm profiles',
                       style: const TextStyle(color: _muted, fontWeight: FontWeight.w600)),
                   const Spacer(),
                   FilledButton.icon(
@@ -1159,7 +1159,7 @@ class _AgriHomeState extends State<AgriHome> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Prepare a farm report for ' + (_reportScope == 'Selected farm' ? selectedName : 'all your farm profiles') + '.',
+                'Prepare a farm report for ${_reportScope == 'Selected farm' ? selectedName : 'all your farm profiles'}.',
                 style: TextStyle(color: Colors.white.withValues(alpha: .8), height: 1.45),
               ),
               const SizedBox(height: 18),
@@ -1207,9 +1207,9 @@ class _AgriHomeState extends State<AgriHome> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(reportCount.toString() + ' records',
+                          Text('$reportCount records',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                          Text(_reportType + ' · ' + _reportFormat + ' · ' + _reportScope,
+                          Text('$_reportType · $_reportFormat · $_reportScope',
                               style: TextStyle(color: Colors.white.withValues(alpha: .77), fontSize: 11)),
                         ],
                       ),
@@ -1227,7 +1227,7 @@ class _AgriHomeState extends State<AgriHome> {
                   minimumSize: const Size.fromHeight(49),
                 ),
                 icon: const Icon(Icons.ios_share_rounded),
-                label: Text(reportCount == 0 ? 'No records to export' : 'Share ' + _reportFormat + ' report'),
+                label: Text(reportCount == 0 ? 'No records to export' : 'Share $_reportFormat report'),
               ),
             ],
           ),
@@ -1267,7 +1267,7 @@ class _AgriHomeState extends State<AgriHome> {
                 Text(
                   _reportType == 'Farm Profile'
                       ? 'Your farmer and farm details'
-                      : 'Your farm-linked ' + _reportType.toLowerCase() + ' entries',
+                      : 'Your farm-linked ${_reportType.toLowerCase()} entries',
                   style: const TextStyle(color: _muted, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
