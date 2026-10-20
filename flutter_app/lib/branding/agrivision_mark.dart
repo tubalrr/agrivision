@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// AgriVision's green-leaf logo supplied for this project.
+/// AgriVision's green-leaf logo, matching the supplied artwork.
 class AgriVisionMark extends StatelessWidget {
   const AgriVisionMark({
     super.key,
@@ -15,28 +15,25 @@ class AgriVisionMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Keep the large translucent watermark clear of a white square.
-    if (backgroundColor.alpha == 0) {
+    if (backgroundColor.a == 0.0) {
+      // A transparent watermark avoids painting a white square over the page.
       return CustomPaint(
         painter: _AgriVisionMarkPainter(onDark: onDark),
         size: Size.square(size),
       );
     }
 
-    // The provided artwork has a white background and a single forest-green leaf.
+    // The supplied logo is a single dark-green leaf on white.
     return Container(
       width: size,
       height: size,
-      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(size * .25),
       ),
-      child: Image.asset(
-        'branding/agrivision_mark.png',
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) =>
-            CustomPaint(painter: _AgriVisionMarkPainter(onDark: false)),
+      child: CustomPaint(
+        painter: const _AgriVisionMarkPainter(onDark: false),
+        size: Size.square(size),
       ),
     );
   }
@@ -52,7 +49,7 @@ class _AgriVisionMarkPainter extends CustomPainter {
     canvas.save();
     canvas.scale(size.width / 100, size.height / 100);
 
-    // This path traces the supplied leaf silhouette and its distinctive white slit.
+    // Traced from the leaf silhouette and distinctive white slit in the supplied logo.
     final leaf = Path()
       ..moveTo(82.2, 6.5)
       ..cubicTo(72.6, 12.5, 60.3, 17.6, 50.1, 21.5)
