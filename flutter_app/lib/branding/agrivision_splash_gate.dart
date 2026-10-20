@@ -41,7 +41,6 @@ class _AgriVisionSplashGateState extends State<AgriVisionSplashGate> {
             );
           },
           onWebResourceError: (_) => _dismissSplash(),
-          onNavigationRequest: (_) => NavigationDecision.prevent,
         ),
       )
       ..loadFlutterAsset('assets/agrivision-splash.html');
