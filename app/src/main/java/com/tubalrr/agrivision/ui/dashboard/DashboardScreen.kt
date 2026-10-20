@@ -189,7 +189,7 @@ internal fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.ic_agrivision_logo),
+                        painter = painterResource(id = R.drawable.agrivision_leaf_logo),
                         contentDescription = "AgriVision logo",
                         modifier = Modifier
                             .size(52.dp)

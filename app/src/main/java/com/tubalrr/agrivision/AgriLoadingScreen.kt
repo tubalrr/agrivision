@@ -64,7 +64,7 @@ internal fun AgriLoadingScreen() {
             verticalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.ic_agrivision_logo),
+                painter = painterResource(id = R.drawable.agrivision_leaf_logo),
                 contentDescription = "AgriVision logo",
                 modifier = Modifier
                     .size(172.dp)
